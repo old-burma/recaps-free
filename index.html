@@ -238,20 +238,93 @@ function sha256Hex(str){
  }
  return H.map(x=>(x>>>0).toString(16).padStart(8,'0')).join('');
 }
-async function edgeGecToken(){
- /* Sec-MS-GEC: SHA-256 of Windows-epoch 100ns ticks (rounded down to 300 s) + the trusted-client token, hex uppercase.
-    Uses crypto.subtle when available, else the pure-JS sha256Hex above — both give the identical value. */
- let ticks=(BigInt(Math.floor(Date.now()/1000))+11644473600n)*10000000n;
- ticks-=ticks%3000000000n;
- const input=ticks.toString()+EDGE_TOKEN;
- if(window.crypto&&crypto.subtle){const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(input));return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('').toUpperCase()}
- return sha256Hex(input).toUpperCase();
+/* ---- Sec-MS-GEC v2 (Microsoft now rejects the old v1 plain-SHA-256 token at the websocket
+   handshake with HTTP 403): token = "<CS64>-<SHA256>" over the 300 s-rounded Windows-epoch
+   ticks + trusted-client token. Pure-JS port, verified byte-identical to the reference
+   implementation (edge-tts 7.3.1 DRM) and live-tested from a browser-equivalent socket:
+   no ConnectionId, no custom headers needed. ---- */
+const GEC_K=[0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2];
+const GEC_H0=[0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19];
+const GEC_STATE=[0xfd9fbea2,0x91243ce7,0xbe499094,0xcd2e1e0a,0x6c006f49,0x04bd35ab,0xfeb0a7e4,0x03effbd2];
+const GEC_SCHED=[0xeb24bf9e,0x1558691f,0xa0c09ee2,0x0cfa32ba,0xa622ee8c,0xd1dd9491,0xc0dd25a0,0xf9e70ab6,0xf0c31573,0x7058ce4e,0x7188e606,0x00e5ab33,0xd258b060,0x72766564];
+const GEC_COEF=[[0xe82e91b1,0xb32700d0],[0x44de24c6,0x88dff51d],[0x3beb65bc,0x29514038],[0xc89c5933,0xb328cbdf],[0x8d1ec211,0xd405b4d5],[0x314ef5d5,0x26e55f3c],[0xe92491b1,0x607801c6],[0xf0a5b9d5,0x82b2c1fb],[0x06064cf3,0xfa51a3da],[0xda79fa60,0x207cc464],[0xbed20560,0x3c3c74f3],[0x89f9c9f8,0xd2d14b61],[0x35fa38c6,0xbb04a2c1],[0xcb49e3c6,0xc5626167]];
+function gecRotr(x,n){return((x>>>n)|(x<<(32-n)))>>>0}
+function gecRol16(x){return((x<<16)|(x>>>16))>>>0}
+function gecSig0(x){return(gecRotr(x,7)^gecRotr(x,18)^(x>>>3))>>>0}
+function gecSig1(x){return(gecRotr(x,17)^gecRotr(x,19)^(x>>>10))>>>0}
+function gecExpand(w,first){for(let i=first;i<64;i++)w[i]=(gecSig1(w[i-2])+w[i-7]+gecSig0(w[i-15])+w[i-16])>>>0}
+function gecRounds(st,w,first,K){let a=st[0],b=st[1],c=st[2],d=st[3],e=st[4],f=st[5],g=st[6],h=st[7];for(let i=first;i<64;i++){const t1=(h+((gecRotr(e,6)^gecRotr(e,11)^gecRotr(e,25))>>>0)+((g^(e&(f^g)))>>>0)+K[i]+w[i])>>>0;const t2=(((gecRotr(a,2)^gecRotr(a,13)^gecRotr(a,22))>>>0)+(((a&b)|(c&(a|b)))>>>0))>>>0;h=g;g=f;f=e;e=(d+t1)>>>0;d=c;c=b;b=a;a=(t1+t2)>>>0}return[a,b,c,d,e,f,g,h]}
+function gecInit(d7){
+ const w=new Array(64).fill(0);
+ w[14]=((d7[0]<<16)|(d7[1]<<8)|d7[2])>>>0;
+ w[15]=((d7[3]<<24)|(d7[4]<<16)|(d7[5]<<8)|d7[6])>>>0;
+ for(let i=16;i<30;i++){let v=GEC_SCHED[i-16];if(i-2>=14)v+=(i===16?(gecSig1(w[i-2])^0x000b92c0):gecSig1(w[i-2]));if(i-7>=14)v+=w[i-7];if(i-15>=14)v+=(i===29?(gecSig0(w[i-15])^0x059c0b80):gecSig0(w[i-15]));w[i]=v>>>0}
+ w[30]=(gecSig1(w[28])+w[23]+gecSig0(w[15])+w[14]+0xc9dc06a7-GEC_K[14])>>>0;
+ gecExpand(w,31);
+ const K=GEC_K.slice();K[14]=0xc9dc06a7;
+ const work=gecRounds(GEC_STATE,w,14,K);
+ return GEC_H0.map((x,i)=>(x+work[i])>>>0);
+}
+function gecDigest(data){
+ let st=gecInit(data.subarray(0,7));
+ const len=57+data.length;
+ const all=Array.from(data.subarray(7));all.push(0x80);
+ const zeros=((55-len)%64+64)%64;for(let i=0;i<zeros;i++)all.push(0);
+ let bl=len*8;const lb=new Array(8);for(let i=7;i>=0;i--){lb[i]=bl%256;bl=Math.floor(bl/256)}
+ for(const b of lb)all.push(b);
+ for(let off=0;off<all.length;off+=64){const w=new Array(64).fill(0);for(let i=0;i<16;i++)w[i]=((all[off+i*4]<<24)|(all[off+i*4+1]<<16)|(all[off+i*4+2]<<8)|all[off+i*4+3])>>>0;gecExpand(w,16);const work=gecRounds(st,w,0,GEC_K);st=st.map((x,i)=>(x+work[i])>>>0)}
+ return st;
+}
+function gecWordsLE(data){const p=Array.from(data);while(p.length%4)p.push(0);const w=[];for(let i=0;i<p.length;i+=4)w.push((p[i]|(p[i+1]<<8)|(p[i+2]<<16)|(p[i+3]<<24))>>>0);if(w.length%2)w.push(0);return w}
+function gecCs64(data,dw){
+ const db=[];for(const w of dw)db.push((w>>>24)&255,(w>>>16)&255,(w>>>8)&255,w&255);
+ const keyA=(((db[0]|(db[1]<<8)|(db[2]<<16)|(db[3]<<24))>>>0)|1)>>>0;
+ const keyB=(((db[4]|(db[5]<<8)|(db[6]<<16)|(db[7]<<24))>>>0)|1)>>>0;
+ const fac=[Math.imul(keyA,0x82893933)>>>0,Math.imul(keyB,0x82893933)>>>0];
+ const terms=GEC_COEF.map((c,i)=>Math.imul(c[0],fac[i%2])>>>0);
+ const offs=GEC_COEF.map(c=>c[1]>>>0);
+ gecWordsLE([0].concat(Array.from(data))).forEach((word,index)=>{
+  let term=Math.imul(word,index%2===0?keyA:keyB);
+  let off=Math.imul(gecRol16(word),index%2===0?0xEF0569FB:0xC31713DB);
+  if(index===0){term+=Math.imul(0xf2f90b1a,fac[0]);off+=0x0b1a0000}
+  terms.push(term>>>0);offs.push(off>>>0);
+ });
+ let swapAcc=0,swapLast=0,state=0,acc=0;
+ for(let i=0;i<terms.length;i+=2){
+  const x=terms[i],y=terms[i+1];
+  let q=Math.imul(gecRol16((offs[i]+x)>>>0),0x76F50F34)>>>0;
+  swapAcc+=(Math.imul(gecRol16(q),0xC3EFEA97)+q)>>>0;
+  q=Math.imul(gecRol16((offs[i+1]+y)>>>0),0x1881CE3C)>>>0;
+  swapLast=(Math.imul(gecRol16(q),0x35BD1EC9)+q)>>>0;
+  swapAcc=(swapAcc+swapLast)>>>0;
+  state=(Math.imul(state,keyA)+x)>>>0;
+  state=Math.imul(gecRol16(state),0xCF98B111)>>>0;
+  state=Math.imul(gecRol16(state),0x87085B9F)>>>0;
+  state=Math.imul(gecRol16(state),0x12CEB96D)>>>0;
+  state=Math.imul(gecRol16(state),0x257E1D83)>>>0;
+  acc+=state;
+  let t=(Math.imul(state,keyB)+y)>>>0;
+  t=Math.imul(gecRol16(t),0xA27416F5)>>>0;
+  t=Math.imul(gecRol16(t),0xD38396FF)>>>0;
+  state=Math.imul(gecRol16(Math.imul(gecRol16(t),0x7C932B89)>>>0),0xBFA49F69)>>>0;
+  acc=(acc+state)>>>0;
+ }
+ return[(swapLast^state)>>>0,(swapAcc^acc)>>>0];
+}
+function edgeGecToken(){
+ let t=Date.now()/1000+11644473600;t-=t%300;t*=10000000;
+ const data=new TextEncoder().encode(t.toFixed(0)+EDGE_TOKEN);
+ const dw=gecDigest(data);
+ const cs=gecCs64(data,dw);
+ const le=w=>[w&255,(w>>>8)&255,(w>>>16)&255,(w>>>24)&255].map(b=>b.toString(16).padStart(2,'0')).join('').toUpperCase();
+ const be=w=>[(w>>>24)&255,(w>>>16)&255,(w>>>8)&255,w&255].map(b=>b.toString(16).padStart(2,'0')).join('').toUpperCase();
+ return le(cs[0])+le(cs[1])+'-'+dw.map(be).join('');
 }
 function edgeDateStr(){return new Date().toUTCString().replace('GMT','GMT+0000 (Coordinated Universal Time)')}
 function edgeUuid(){const u=crypto.randomUUID?crypto.randomUUID():'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.random()*16|0;return (c==='x'?r:(r&0x3|0x8)).toString(16)});return u.replace(/-/g,'')}
 async function edgeTTS(text,voiceName){
  const gec=await edgeGecToken();
- const url='wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken='+EDGE_TOKEN+'&Sec-MS-GEC='+gec+'&Sec-MS-GEC-Version=1-130.0.2849.68';
+ const url='wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken='+EDGE_TOKEN+'&Sec-MS-GEC='+gec+'&Sec-MS-GEC-Version=2-143.0.3650.75';
  return new Promise((resolve,reject)=>{
   let ws;try{ws=new WebSocket(url)}catch(e){reject(new Error('Edge TTS websocket ဖွင့်မရပါ: '+(e.message||e)));return}
   ws.binaryType='arraybuffer';

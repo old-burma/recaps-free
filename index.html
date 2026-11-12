@@ -181,11 +181,22 @@ function openSheet(title,html){$('#sheetTitle').textContent=title;$('#sheetBody'
 function closeSheet(){$('#sheetWrap').classList.remove('open');document.body.classList.remove('locked')}
 $('#sheetBg').addEventListener('click',closeSheet);
 $('#urlCard').addEventListener('click',()=>{openSheet('🔗 URL မှ Recap','<p style="font-size:14px;line-height:1.7;color:#40626d">URL (YouTube / TikTok link) မှ Recap လုပ်ခြင်း သည် <b>နောက်အဆင့် (Stage 2)</b> တွင် လာပါမည် — server လိုအပ်သောကြောင့် ဖြစ်ပါတယ်။<br><br>လောလောဆယ် <b>ဖုန်းထဲက Video</b> တင်ပြီး Recap လုပ်နိုင်ပါတယ်။</p><button class="btn primary" style="margin-top:14px" onclick="closeSheet();goTab(\'recap\')">📱 Video တင်ရန် သွားမယ်</button>')});
-/* IndexedDB library */
-const DBP=new Promise((res,rej)=>{const r=indexedDB.open('RecapsDB',1);r.onupgradeneeded=()=>{r.result.createObjectStore('videos',{keyPath:'id',autoIncrement:true})};r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
-async function idbAll(){const db=await DBP;return new Promise((res,rej)=>{const q=db.transaction('videos').objectStore('videos').getAll();q.onsuccess=()=>res(q.result||[]);q.onerror=()=>rej(q.error)})}
-async function idbAdd(item){const db=await DBP;return new Promise((res,rej)=>{const q=db.transaction('videos','readwrite').objectStore('videos').add(item);q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)})}
-async function idbDel(id){const db=await DBP;return new Promise((res,rej)=>{const q=db.transaction('videos','readwrite').objectStore('videos').delete(id);q.onsuccess=()=>res();q.onerror=()=>rej(q.error)})}
+/* IndexedDB library — resilient: the connection can enter a "closing" state
+   (seen live after heavy ffmpeg.wasm exports), so reopen + retry instead of
+   caching one connection forever. */
+let _db=null,_dbOpening=null;
+function openDB(){
+ if(_db)return Promise.resolve(_db);
+ if(_dbOpening)return _dbOpening;
+ _dbOpening=new Promise((res,rej)=>{const r=indexedDB.open('RecapsDB',1);
+  r.onupgradeneeded=()=>{r.result.createObjectStore('videos',{keyPath:'id',autoIncrement:true})};
+  r.onsuccess=()=>{_db=r.result;_dbOpening=null;_db.onclose=()=>{_db=null};_db.onversionchange=()=>{try{_db.close()}catch(e){}_db=null};res(_db)};
+  r.onerror=()=>{_dbOpening=null;rej(r.error)}});
+ return _dbOpening}
+async function idbTx(mode,fn){let lastErr=null;for(let a=0;a<3;a++){const db=await openDB();try{return await new Promise((res,rej)=>{const tx=db.transaction('videos',mode);const out={};fn(tx.objectStore('videos'),out);tx.oncomplete=()=>res(out.val);tx.onerror=()=>rej(tx.error);tx.onabort=()=>rej(tx.error||new Error('transaction aborted'))})}catch(e){lastErr=e;if(/closing|InvalidStateError/i.test((e.name||'')+' '+(e.message||''))){_db=null;continue}throw e}}throw lastErr}
+async function idbAll(){return idbTx('readonly',(s,o)=>{const q=s.getAll();q.onsuccess=()=>{o.val=q.result||[]}})}
+async function idbAdd(item){return idbTx('readwrite',(s,o)=>{const q=s.add(item);q.onsuccess=()=>{o.val=q.result}})}
+async function idbDel(id){return idbTx('readwrite',s=>{s.delete(id)})}
 async function renderHome(){try{const items=await idbAll();items.sort((a,b)=>b.date-a.date);$('#statCount').textContent=items.length;$('#statSize').textContent=fmtSize(items.reduce((a,x)=>a+(x.size||0),0));$('#statLast').textContent=items.length?new Date(items[0].date).toLocaleDateString('my-MM'):'—';const box=$('#recentList');if(!items.length){box.innerHTML='<div class="empty"><b>Recap မရှိသေးပါ</b><br><span style="font-size:12.5px">Recap tab မှာ ပထမဆုံး video စလုပ်ပါ</span></div>';return}box.innerHTML='';items.slice(0,5).forEach(it=>{const d=document.createElement('div');d.className='lib-item';d.innerHTML='<div class="lib-meta"><b></b><span></span></div>';d.querySelector('b').textContent=it.name;d.querySelector('span').textContent=new Date(it.date).toLocaleString()+' · '+fmtSize(it.size);box.appendChild(d)})}catch(e){showNotice('စာကြည့်တိုက် ဖတ်မရပါ: '+(e.message||e),'err')}}
 async function renderLibrary(){const box=$('#libraryList');try{const items=await idbAll();items.sort((a,b)=>b.date-a.date);if(!items.length){box.innerHTML='<div class="empty"><b>ဘာမှ မရှိသေးပါ</b><br><span style="font-size:12.5px">Export လုပ်ပြီးရင် ဒီမှာ သိမ်းပေးပါမယ်</span></div>';return}box.innerHTML='';items.forEach(it=>{const url=URL.createObjectURL(it.blob);const d=document.createElement('div');d.className='lib-item';const v=document.createElement('video');v.src=url;v.controls=true;v.preload='metadata';const meta=document.createElement('div');meta.className='lib-meta';const b=document.createElement('b');b.textContent=it.name;const sp=document.createElement('span');sp.textContent=new Date(it.date).toLocaleString()+' · '+fmtSize(it.size);meta.appendChild(b);meta.appendChild(sp);const acts=document.createElement('div');const dl=document.createElement('button');dl.className='btn light small';dl.textContent='⬇️ ဒေါင်း';dl.onclick=()=>{const a=document.createElement('a');a.href=url;a.download=it.name;a.click()};const del=document.createElement('button');del.className='btn danger small';del.textContent='ဖျက်';del.style.marginTop='6px';del.onclick=async()=>{await idbDel(it.id);showNotice('ဖျက်ပြီးပါပြီ','ok');renderLibrary();renderHome()};acts.appendChild(dl);if(it.srt){acts.appendChild(document.createElement('br'));const sb=document.createElement('button');sb.className='btn light small';sb.textContent='📄 SRT';sb.style.marginTop='6px';sb.onclick=()=>downloadText(it.name.replace(/\.mp4$/i,'')+'.srt',it.srt);acts.appendChild(sb)}acts.appendChild(document.createElement('br'));acts.appendChild(del);d.appendChild(v);d.appendChild(meta);d.appendChild(acts);box.appendChild(d)})}catch(e){box.innerHTML='<div class="empty"><b>ဖတ်မရပါ</b><br>'+String(e.message||e)+'</div>'}}
 /* settings UI */
@@ -315,7 +326,7 @@ async function exportOne(ff,ed,seg,idx,total,log){
  overlays.forEach((ov,i)=>{const out=i===overlays.length-1?'vout':'vo'+i;fc+='['+base+']['+(inIdx+i)+':v]overlay=0:'+ov.y+":enable='between(t,"+ov.from.toFixed(2)+','+ov.to.toFixed(2)+")'["+out+'];';base=out});
  if(!overlays.length){fc+='['+base+']null[vout];'}
  fc=fc.replace(/;\s*$/,'');
- const args=['-i','in.mp4'];if(ed.audioMode==='voice')args.push('-i','voice.wav');overlays.forEach(ov=>args.push('-i',ov.file));
+ const args=['-i','in.mp4'];if(ed.audioMode==='voice')args.push('-i','voice.wav');overlays.forEach(ov=>args.push('-loop','1','-t',dur.toFixed(2),'-i',ov.file));
  args.push('-filter_complex',fc);
  if(ed.audioMode==='voice'){args.push('-map','[vout]','-map','1:a','-af','apad,atrim=0:'+dur.toFixed(2))}
  else{args.push('-map','[vout]','-map','0:a?','-af','atrim=0:'+dur.toFixed(2)+',asetpts=PTS-STARTPTS')}
@@ -368,7 +379,7 @@ async function exportEditor(ed){
   const made=[];
   for(let i=0;i<segments.length;i++){const blob=await exportOne(ff,ed,segments[i],i,segments.length,log);
    const name=baseName+(segments.length>1?'_part'+(i+1):'')+'.mp4';
-   const segSrt=segments[i].cues.length?buildSRT(spreadCuesWeighted(segments[i].cues.map(c=>c.text),segments[i].start,segments[i].end),segments[i].start):'';await idbAdd({name,date:Date.now(),size:blob.size,blob,srt:segSrt});made.push({name,blob});log('✅ '+name+' — '+fmtSize(blob.size)+' (စာကြည့်တိုက်တွင် သိမ်းပြီး)')}
+   const segSrt=segments[i].cues.length?buildSRT(spreadCuesWeighted(segments[i].cues.map(c=>c.text),segments[i].start,segments[i].end),segments[i].start):'';let savedLib=true;try{await idbAdd({name,date:Date.now(),size:blob.size,blob,srt:segSrt})}catch(e){savedLib=false;log('⚠️ စာကြည့်တိုက်ထဲ မသိမ်းနိုင်ပါ: '+(e.message||e)+' — ဒေါင်း link မှ ယူပါ')}made.push({name,blob});log('✅ '+name+' — '+fmtSize(blob.size)+(savedLib?' (စာကြည့်တိုက်တွင် သိမ်းပြီး)':''))}
   const res=E('result');res.innerHTML='<b style="font-size:14px">✅ ပြီးပါပြီ — အောက်မှာ တန်းစီ ဒေါင်းနိုင်ပါတယ်</b>';
   made.forEach(m=>{const url=URL.createObjectURL(m.blob);const a=document.createElement('a');a.href=url;a.download=m.name;a.className='btn light small';a.style.margin='8px 8px 0 0';a.textContent='⬇️ '+m.name;res.appendChild(a)});
   renderHome();showDone('✅ အသံ ရပါပြီ — Export ပြီးပါပြီ','Video '+made.length+' ပိုင်း ကို စာကြည့်တိုက်ထဲ သိမ်းထားပြီး ဖြစ်ပါတယ်။ ဒေါင်းလည်း ရပါတယ်။');

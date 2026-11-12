@@ -71,7 +71,7 @@ body.locked{overflow:hidden}
 .logbox{background:#04222b;color:#bfeef7;border-radius:13px;padding:11px 13px;font-size:11.5px;max-height:130px;overflow:auto;white-space:pre-wrap;word-break:break-all;margin-top:10px;display:none}
 @media(max-width:720px){.actions{grid-template-columns:1fr}.stats{grid-template-columns:1fr 1fr}.layout{padding:10px 10px 24px}.main{padding:16px 13px 24px}}
 /* recap workflow: pinned video + step pager */
-.vid-pin{position:sticky;top:10px;z-index:40;box-shadow:0 18px 38px rgba(0,45,58,.30)}
+.vid-pin{position:sticky;top:10px;z-index:40;background:rgba(250,254,255,.985);backdrop-filter:blur(16px) saturate(1.2);-webkit-backdrop-filter:blur(16px) saturate(1.2);box-shadow:0 18px 38px rgba(0,45,58,.30)}
 .vid-pin video.preview{max-height:34vh}
 .step-head{display:flex;align-items:center;gap:10px;margin:0 2px 8px}
 .step-label{flex:1;text-align:center;color:#fff;font-weight:800;font-size:14px;text-shadow:0 1px 8px rgba(0,40,50,.45)}
@@ -423,17 +423,28 @@ async function exportEditor(ed){
 <script>
 /* ================= AI Script pipeline (Gemini, visitor's own key) =================
    Flow: video audio → transcript → Myanmar script (2 modes) → script box → voiceover/SRT */
-const GEM_MODELS=['gemini-3.8-flash','gemini-3.5-flash-lite','gemini-2.5-flash','gemini-2.5-flash-lite'];
+const GEM_MODELS=['gemini-3.5-flash-lite','gemini-3.8-flash','gemini-2.5-flash','gemini-2.5-flash-lite'];
 async function geminiGen(key,parts,temp,statusFn){
  const sleep=ms=>new Promise(r=>setTimeout(r,ms));
  let lastErr=null,quotaErr=null,busyErr=null;
  for(const model of GEM_MODELS){
   for(let attempt=0;attempt<2;attempt++){
-   let res,data;
+   let res,data,timedOut=false;
+   const ctl=(typeof AbortController!=='undefined')?new AbortController():null;
+   const timer=ctl?setTimeout(()=>{timedOut=true;ctl.abort()},60000):null;
    try{
-    res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+model+':generateContent',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify({contents:[{parts}],generationConfig:{temperature:(temp==null?0.2:temp)}})});
+    res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+model+':generateContent',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify({contents:[{parts}],generationConfig:{temperature:(temp==null?0.2:temp)}}),signal:ctl?ctl.signal:undefined});
+    if(timer)clearTimeout(timer);
     data=await res.json().catch(()=>({}));
-   }catch(netErr){lastErr=netErr;break}
+   }catch(netErr){
+    if(timer)clearTimeout(timer);
+    if(timedOut){ /* a 60s timeout is handled exactly like a 503 (busy): record busyErr, retry once after the busy wait, then move to the next model */
+     const err=new Error('Gemini ('+model+') — 60 စက္ကန့် အတွင်း ပြန်မရပါ (timeout)');lastErr=err;if(!busyErr)busyErr=err;
+     if(attempt===0){if(statusFn)statusFn('⏳ Google server busy ဖြစ်နေလို့ 6 စက္ကန့် စောင့်ပြီး ပြန်ကြိုးစားနေပါတယ်… ('+model+')');await sleep(6000);continue}
+     break;
+    }
+    lastErr=netErr;break;
+   }
    if(res.ok){
     const cand=(data.candidates||[])[0]||{};const cparts=(cand.content||{}).parts||[];
     const txt=cparts.map(pp=>pp.text||'').join('').trim();

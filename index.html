@@ -187,7 +187,7 @@ async function idbAll(){const db=await DBP;return new Promise((res,rej)=>{const 
 async function idbAdd(item){const db=await DBP;return new Promise((res,rej)=>{const q=db.transaction('videos','readwrite').objectStore('videos').add(item);q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)})}
 async function idbDel(id){const db=await DBP;return new Promise((res,rej)=>{const q=db.transaction('videos','readwrite').objectStore('videos').delete(id);q.onsuccess=()=>res();q.onerror=()=>rej(q.error)})}
 async function renderHome(){try{const items=await idbAll();items.sort((a,b)=>b.date-a.date);$('#statCount').textContent=items.length;$('#statSize').textContent=fmtSize(items.reduce((a,x)=>a+(x.size||0),0));$('#statLast').textContent=items.length?new Date(items[0].date).toLocaleDateString('my-MM'):'—';const box=$('#recentList');if(!items.length){box.innerHTML='<div class="empty"><b>Recap မရှိသေးပါ</b><br><span style="font-size:12.5px">Recap tab မှာ ပထမဆုံး video စလုပ်ပါ</span></div>';return}box.innerHTML='';items.slice(0,5).forEach(it=>{const d=document.createElement('div');d.className='lib-item';d.innerHTML='<div class="lib-meta"><b></b><span></span></div>';d.querySelector('b').textContent=it.name;d.querySelector('span').textContent=new Date(it.date).toLocaleString()+' · '+fmtSize(it.size);box.appendChild(d)})}catch(e){showNotice('စာကြည့်တိုက် ဖတ်မရပါ: '+(e.message||e),'err')}}
-async function renderLibrary(){const box=$('#libraryList');try{const items=await idbAll();items.sort((a,b)=>b.date-a.date);if(!items.length){box.innerHTML='<div class="empty"><b>ဘာမှ မရှိသေးပါ</b><br><span style="font-size:12.5px">Export လုပ်ပြီးရင် ဒီမှာ သိမ်းပေးပါမယ်</span></div>';return}box.innerHTML='';items.forEach(it=>{const url=URL.createObjectURL(it.blob);const d=document.createElement('div');d.className='lib-item';const v=document.createElement('video');v.src=url;v.controls=true;v.preload='metadata';const meta=document.createElement('div');meta.className='lib-meta';const b=document.createElement('b');b.textContent=it.name;const sp=document.createElement('span');sp.textContent=new Date(it.date).toLocaleString()+' · '+fmtSize(it.size);meta.appendChild(b);meta.appendChild(sp);const acts=document.createElement('div');const dl=document.createElement('button');dl.className='btn light small';dl.textContent='⬇️ ဒေါင်း';dl.onclick=()=>{const a=document.createElement('a');a.href=url;a.download=it.name;a.click()};const del=document.createElement('button');del.className='btn danger small';del.textContent='ဖျက်';del.style.marginTop='6px';del.onclick=async()=>{await idbDel(it.id);showNotice('ဖျက်ပြီးပါပြီ','ok');renderLibrary();renderHome()};acts.appendChild(dl);acts.appendChild(document.createElement('br'));acts.appendChild(del);d.appendChild(v);d.appendChild(meta);d.appendChild(acts);box.appendChild(d)})}catch(e){box.innerHTML='<div class="empty"><b>ဖတ်မရပါ</b><br>'+String(e.message||e)+'</div>'}}
+async function renderLibrary(){const box=$('#libraryList');try{const items=await idbAll();items.sort((a,b)=>b.date-a.date);if(!items.length){box.innerHTML='<div class="empty"><b>ဘာမှ မရှိသေးပါ</b><br><span style="font-size:12.5px">Export လုပ်ပြီးရင် ဒီမှာ သိမ်းပေးပါမယ်</span></div>';return}box.innerHTML='';items.forEach(it=>{const url=URL.createObjectURL(it.blob);const d=document.createElement('div');d.className='lib-item';const v=document.createElement('video');v.src=url;v.controls=true;v.preload='metadata';const meta=document.createElement('div');meta.className='lib-meta';const b=document.createElement('b');b.textContent=it.name;const sp=document.createElement('span');sp.textContent=new Date(it.date).toLocaleString()+' · '+fmtSize(it.size);meta.appendChild(b);meta.appendChild(sp);const acts=document.createElement('div');const dl=document.createElement('button');dl.className='btn light small';dl.textContent='⬇️ ဒေါင်း';dl.onclick=()=>{const a=document.createElement('a');a.href=url;a.download=it.name;a.click()};const del=document.createElement('button');del.className='btn danger small';del.textContent='ဖျက်';del.style.marginTop='6px';del.onclick=async()=>{await idbDel(it.id);showNotice('ဖျက်ပြီးပါပြီ','ok');renderLibrary();renderHome()};acts.appendChild(dl);if(it.srt){acts.appendChild(document.createElement('br'));const sb=document.createElement('button');sb.className='btn light small';sb.textContent='📄 SRT';sb.style.marginTop='6px';sb.onclick=()=>downloadText(it.name.replace(/\.mp4$/i,'')+'.srt',it.srt);acts.appendChild(sb)}acts.appendChild(document.createElement('br'));acts.appendChild(del);d.appendChild(v);d.appendChild(meta);d.appendChild(acts);box.appendChild(d)})}catch(e){box.innerHTML='<div class="empty"><b>ဖတ်မရပါ</b><br>'+String(e.message||e)+'</div>'}}
 /* settings UI */
 function refreshSettingsUI(){$('#setAspectBtn').textContent=ASPECTS[SETTINGS.aspect].label;$('#setBlur').value=SETTINGS.blur;$('#setBlurVal').textContent=SETTINGS.blur;$('#setVoiceBtn').textContent=SETTINGS.voice;$('#setApiKey').value=getApiKey()}
 $('#setBlur').addEventListener('input',e=>{SETTINGS.blur=+e.target.value;saveSettings();refreshSettingsUI();syncEditorsFromSettings()});
@@ -207,9 +207,10 @@ return '<h2 class="page-title">'+(isShort?'အတိုချုပ် — Long 
 +'<div class="card"><h3>၁။ Video ရွေးပါ</h3><input type="file" id="'+p+'-file" accept="video/*" style="display:none"><button class="btn primary" id="'+p+'-pick">📱 Video ရွေးရန်</button><div class="file-info" id="'+p+'-fileinfo">ဖိုင် မရွေးရသေးပါ</div><video class="preview" id="'+p+'-video" controls playsinline style="display:none;margin-top:10px"></video></div>'
 +'<div class="card"><h3>၂။ ဖြတ်ရန် အပိုင်း (Trim)</h3><div class="row2"><div class="field" id="'+p+'-f-start"><label>စချိန် (စက္ကန့်)</label><input type="number" id="'+p+'-start" value="0" min="0" step="0.1"><div class="err-text" id="'+p+'-e-start"></div></div><div class="field" id="'+p+'-f-end"><label>ဆုံးချိန် (စက္ကန့်)</label><input type="number" id="'+p+'-end" value="0" min="0" step="0.1"><div class="err-text" id="'+p+'-e-end"></div></div></div>'
 +'<div class="field"><label>စချိန် slider</label><input type="range" id="'+p+'-rstart" value="0" min="0" max="100" step="0.1"></div><div class="field"><label>ဆုံးချိန် slider</label><input type="range" id="'+p+'-rend" value="0" min="0" max="100" step="0.1"></div><p class="hint" style="font-size:12px;color:#527884">ကြာချိန်: <b id="'+p+'-durinfo">—</b></p></div>'
++(isShort?'':'<div class="card"><h3>🤖 AI Script</h3><p style="margin-bottom:10px">Video အသံကနေ AI က စာသား ထုတ်ပြီး မြန်မာ script အဖြစ် ပြောင်းပေးပါမယ် — ပြီးရင် အောက်က စာတန်း အကွက်ထဲ အလိုအလျောက် ထည့်ပေးပါမယ် (သင့် Gemini key လိုပါတယ်)</p><div class="file-info" id="'+p+'-aiModeInfo" style="margin-bottom:10px;color:#40626d"></div><button class="btn primary" id="'+p+'-aiGen"><span class="wave"><i></i><i></i><i></i><i></i><i></i></span><span class="btn-label">🤖 AI Script ထုတ်မယ်</span></button><div class="file-info" id="'+p+'-aiStatus"></div><div id="'+p+'-aiTxWrap" style="display:none;margin-top:12px"><div class="switch-row"><div><b style="font-size:14px">မူရင်း စာသား</b><div style="font-size:12px;color:#527884">AI ကြားရသလောက် ထုတ်ထားသော မူရင်း ဘာသာ စာသား</div></div><button class="btn light small" id="'+p+'-aiTxTgl">ဖျောက်</button></div><div class="field" id="'+p+'-f-transcript" style="margin-bottom:0"><textarea id="'+p+'-transcript" placeholder="AI ထုတ်ထားသော မူရင်း စာသား ဒီမှာ ပေါ်ပါမယ်"></textarea></div></div></div>')
 +'<div class="card"><h3>၃။ ပုံစံ (Aspect) နှင့် Blur</h3><div class="field"><label>Aspect</label><button class="btn light" id="'+p+'-aspectBtn" style="width:100%"></button></div><div class="field"><label>Blur အား — <span id="'+p+'-blurVal"></span></label><input type="range" id="'+p+'-blur" min="5" max="60" step="1"><p class="hint">Blur pad သုံးသော ပုံစံတွင်သာ သက်ရောက်ပါတယ်</p></div>'
 +'<div class="switch-row"><div><b style="font-size:14px">ခေါင်းစဉ် (Title)</b><div style="font-size:12px;color:#527884">Video အပေါ်ပိုင်းတွင် ပြမည်</div></div><div class="tgl on" id="'+p+'-titleTgl"></div></div><div class="field" id="'+p+'-f-title"><label>ခေါင်းစဉ် စာသား</label><input type="text" id="'+p+'-title" placeholder="ဥပမာ — အံ့ဩဖွယ် ဖြစ်ရပ်"><div class="err-text" id="'+p+'-e-title"></div></div></div>'
-+'<div class="card"><h3>၄။ စာတန်း (Subtitles)</h3><div class="switch-row"><div><b style="font-size:14px">စာတန်း ဖွင့်ရန်</b><div style="font-size:12px;color:#527884">တစ်ကြောင်း = စာတန်း တစ်ခု၊ အချိန် အလိုအလျောက် ခွဲပေးမည်</div></div><div class="tgl on" id="'+p+'-subTgl"></div></div><div class="field" id="'+p+'-f-subs"><label>စာတန်း / ဇာတ်ကြောင်း စာသား</label><textarea id="'+p+'-subs" placeholder="ပထမ စာတန်း&#10;ဒုတိယ စာတန်း&#10;တတိယ စာတန်း"></textarea><div class="err-text" id="'+p+'-e-subs"></div><p class="hint">အသံအသစ် ရွေးထားရင် ဒီစာသားကိုပဲ အသံအဖြစ် ပြောပေးပါမယ် (တစ်ကြောင်းချင်း ချိတ်ဆက်၍)</p></div></div>'
++'<div class="card"><h3>၄။ စာတန်း (Subtitles)</h3><div class="switch-row"><div><b style="font-size:14px">စာတန်း ဖွင့်ရန်</b><div style="font-size:12px;color:#527884">တစ်ကြောင်း = စာတန်း တစ်ခု၊ အချိန် အလိုအလျောက် ခွဲပေးမည်</div></div><div class="tgl on" id="'+p+'-subTgl"></div></div><div class="field" id="'+p+'-f-subs"><label>စာတန်း / ဇာတ်ကြောင်း စာသား</label><textarea id="'+p+'-subs" placeholder="ပထမ စာတန်း&#10;ဒုတိယ စာတန်း&#10;တတိယ စာတန်း"></textarea><div class="err-text" id="'+p+'-e-subs"></div><p class="hint">အသံအသစ် ရွေးထားရင် ဒီစာသားကိုပဲ အသံအဖြစ် ပြောပေးပါမယ် (တစ်ကြောင်းချင်း ချိတ်ဆက်၍)</p></div><button class="btn light small" id="'+p+'-srtBtn">📄 SRT ဒေါင်း</button><span style="font-size:12px;color:#527884;margin-left:8px">စာတန်း အချိန်ဇယား (.srt) ဖိုင် သီးခြား ဒေါင်းရန်</span></div>'
 +'<div class="card"><h3>၅။ အသံ</h3><div class="field"><label>အသံ ပုံစံ</label><button class="btn light" id="'+p+'-audioBtn" style="width:100%"></button></div><div class="field"><label>အသံ (Voice) — အသံအသစ် အတွက်</label><button class="btn light" id="'+p+'-voiceBtn" style="width:100%"></button></div></div>'
 +(isShort?'<div class="card"><h3>၆။ အပိုင်းခွဲရန် (Split)</h3><div class="field"><label>ခွဲပုံ</label><button class="btn light" id="'+p+'-splitBtn" style="width:100%"></button></div><div class="row2"><div class="field"><label>အပိုင်း အရေအတွက် (N)</label><input type="number" id="'+p+'-splitN" value="3" min="2" max="20" step="1"></div><div class="field"><label>တစ်ပိုင်း ကြာချိန် (စက္ကန့်)</label><input type="number" id="'+p+'-splitLen" value="60" min="5" step="1"></div></div><p class="hint" style="font-size:12px;color:#527884">ရွေးထားသော ခွဲပုံအတိုင်းသာ သက်ဆိုင်ရာ အကွက် အသုံးဝင်ပါတယ်</p></div>':'')
 +'<div class="card"><button class="btn primary" id="'+p+'-export"><span class="wave"><i></i><i></i><i></i><i></i><i></i></span><span class="btn-label">🎬 Export ထုတ်မယ်</span></button><div class="logbox" id="'+p+'-log"></div><div id="'+p+'-result" style="margin-top:12px"></div></div>';
@@ -367,7 +368,7 @@ async function exportEditor(ed){
   const made=[];
   for(let i=0;i<segments.length;i++){const blob=await exportOne(ff,ed,segments[i],i,segments.length,log);
    const name=baseName+(segments.length>1?'_part'+(i+1):'')+'.mp4';
-   await idbAdd({name,date:Date.now(),size:blob.size,blob});made.push({name,blob});log('✅ '+name+' — '+fmtSize(blob.size)+' (စာကြည့်တိုက်တွင် သိမ်းပြီး)')}
+   const segSrt=segments[i].cues.length?buildSRT(spreadCuesWeighted(segments[i].cues.map(c=>c.text),segments[i].start,segments[i].end),segments[i].start):'';await idbAdd({name,date:Date.now(),size:blob.size,blob,srt:segSrt});made.push({name,blob});log('✅ '+name+' — '+fmtSize(blob.size)+' (စာကြည့်တိုက်တွင် သိမ်းပြီး)')}
   const res=E('result');res.innerHTML='<b style="font-size:14px">✅ ပြီးပါပြီ — အောက်မှာ တန်းစီ ဒေါင်းနိုင်ပါတယ်</b>';
   made.forEach(m=>{const url=URL.createObjectURL(m.blob);const a=document.createElement('a');a.href=url;a.download=m.name;a.className='btn light small';a.style.margin='8px 8px 0 0';a.textContent='⬇️ '+m.name;res.appendChild(a)});
   renderHome();showDone('✅ အသံ ရပါပြီ — Export ပြီးပါပြီ','Video '+made.length+' ပိုင်း ကို စာကြည့်တိုက်ထဲ သိမ်းထားပြီး ဖြစ်ပါတယ်။ ဒေါင်းလည်း ရပါတယ်။');
@@ -375,6 +376,183 @@ async function exportEditor(ed){
  finally{ed.busy=false;btn.classList.remove('loading');btn.disabled=false;btn.querySelector('.btn-label').textContent='🎬 Export ထုတ်မယ်'}
 }
 refreshSettingsUI();renderHome();
+</script>
+<script>
+/* ================= AI Script pipeline (Gemini, visitor's own key) =================
+   Flow: video audio → transcript → Myanmar script (2 modes) → script box → voiceover/SRT */
+const GEM_MODELS=['gemini-3.8-flash','gemini-3.5-flash-lite','gemini-2.5-flash','gemini-2.5-flash-lite'];
+async function geminiGen(key,parts,temp){
+ let lastErr=null,lastStatus=0;
+ for(const model of GEM_MODELS){
+  let res,data;
+  try{
+   res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+model+':generateContent',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify({contents:[{parts}],generationConfig:{temperature:(temp==null?0.2:temp)}})});
+   data=await res.json().catch(()=>({}));
+  }catch(netErr){lastErr=netErr;lastStatus=0;continue}
+  if(res.ok){
+   const cand=(data.candidates||[])[0]||{};const cparts=(cand.content||{}).parts||[];
+   const txt=cparts.map(pp=>pp.text||'').join('').trim();
+   if(txt)return txt;
+   lastErr=new Error('Gemini ('+model+') မှ စာသား ပြန်မရပါ'+(cand.finishReason?' — '+cand.finishReason:''));lastStatus=200;continue;
+  }
+  const msg=((data.error||{}).message)||('HTTP '+res.status);
+  lastErr=new Error('Gemini အမှား '+res.status+' ('+model+'): '+msg);lastStatus=res.status;
+  const modelErr=res.status===404||/not found|not supported/i.test(msg);
+  if(!(modelErr||res.status===429||res.status>=500))break;
+ }
+ if(lastStatus===429)throw new Error('⚠️ Credit/Quota ကုန်သွားပါပြီ — Gemini model အားလုံး quota ပြည့်သွားပါတယ်။ ခဏ စောင့်ပြီး ပြန်ကြိုးစားပါ၊ ဒါမှမဟုတ် ဆက်တင်မှာ တခြား key ပြောင်းသုံးပါ။ အသေးစိတ်: '+(lastErr?lastErr.message:''));
+ throw lastErr||new Error('Gemini ကို ခေါ်မရပါ — internet စစ်ပြီး ပြန်ကြိုးစားပါ');
+}
+function cleanLines(txt){return String(txt||'').split('\n').map(s=>s.replace(/^```[a-z]*$/i,'').trim()).filter(Boolean)}
+function u8ToB64(u8){let s='';const STEP=0x8000;for(let i=0;i<u8.length;i+=STEP)s+=String.fromCharCode.apply(null,u8.subarray(i,Math.min(u8.length,i+STEP)));return btoa(s)}
+/* --- extract the trim-range audio as <=240s MP3 chunks via the shared ffmpeg instance --- */
+const AI_NO_AUDIO='AI_NO_AUDIO';
+async function extractAiAudio(ff,ed,start,end){
+ const fetchFile=window.FFmpegUtil&&window.FFmpegUtil.fetchFile;
+ await ff.writeFile('ai_in.mp4',fetchFile?await fetchFile(ed.file):new Uint8Array(await ed.file.arrayBuffer()));
+ const chunks=[];const CHUNK=240;
+ try{
+  for(let s=start;s<end-0.05;s+=CHUNK){
+   const e=Math.min(end,s+CHUNK);const fn='ai_a'+chunks.length+'.mp3';
+   const code=await ff.exec(['-ss',s.toFixed(2),'-i','ai_in.mp4','-t',(e-s).toFixed(2),'-vn','-ac','1','-ar','16000','-b:a','32k',fn],600000);
+   if(code!==0){if(chunks.length===0)throw new Error(AI_NO_AUDIO);throw new Error('အသံ ထုတ်ရာတွင် ffmpeg exit code '+code)}
+   chunks.push(await ff.readFile(fn));
+   try{await ff.deleteFile(fn)}catch(e2){}
+  }
+ }finally{try{await ff.deleteFile('ai_in.mp4')}catch(e3){}}
+ return chunks;
+}
+async function transcribeChunks(key,chunks){
+ const texts=[];
+ for(const ch of chunks){
+  const parts=[{inlineData:{mimeType:'audio/mp3',data:u8ToB64(ch)}},{text:'Transcribe the speech in this audio exactly, in its original language. One sentence per line. Output ONLY the transcript lines — no translation, no labels, no commentary.'}];
+  texts.push(await geminiGen(key,parts,0.2));
+ }
+ return texts.join('\n');
+}
+async function translateFaithful(key,transcript){
+ const prompt='Translate the following transcript into natural SPOKEN Burmese (Myanmar language), the way a real person would SAY it out loud — NOT formal written style.\nRules:\n- Keep EXACTLY the same number of lines: one output line per input line, in the same order.\n- Keep names, places and facts accurate — translate faithfully, do not add or remove content.\n- Write ALL numbers as Burmese words (for example တစ်သောင်း, နှစ်ဆယ်, သုံးရာ) — never use digits.\n- Transliterate foreign words into Burmese script where natural, because this text will be read aloud by a voice.\n- Output ONLY the Burmese lines — no labels, no notes, no blank lines.\n\nTranscript:\n'+transcript;
+ return geminiGen(key,[{text:prompt}],0.2);
+}
+async function sampleFrames(ed,start,end){
+ const v=$('#'+ed.p+'-video');if(!v||!v.videoWidth||!ed.url)return[];
+ const dur=end-start;const n=Math.max(2,Math.min(12,Math.round(dur/4.5)));
+ const sc=Math.min(1,512/v.videoWidth);const cw=Math.max(2,Math.round(v.videoWidth*sc)),ch=Math.max(2,Math.round(v.videoHeight*sc));
+ const c=document.createElement('canvas');c.width=cw;c.height=ch;const x=c.getContext('2d');
+ const prevT=v.currentTime,wasPaused=v.paused;if(!wasPaused)try{v.pause()}catch(e){}
+ const frames=[];
+ const seek=t=>new Promise(res=>{let done=false;const fin=()=>{if(done)return;done=true;v.removeEventListener('seeked',fin);res()};v.addEventListener('seeked',fin);try{v.currentTime=t}catch(e){fin()}setTimeout(fin,1600)});
+ for(let i=0;i<n;i++){const t=start+dur*(i+0.5)/n;await seek(Math.max(start,Math.min(t,end-0.05)));try{x.drawImage(v,0,0,cw,ch);frames.push(c.toDataURL('image/jpeg',0.7).split(',')[1])}catch(e){}}
+ try{v.currentTime=prevT;if(!wasPaused)v.play().catch(()=>{})}catch(e){}
+ return frames;
+}
+async function writeSceneScript(key,frames,transcript,dur){
+ const target=Math.max(3,Math.round(dur/4.5));
+ const parts=frames.map(b64=>({inlineData:{mimeType:'image/jpeg',data:b64}}));
+ let prompt='You are writing the narration script for a short TikTok recap video (about '+Math.round(dur)+' seconds long). The images above are frames sampled in time order from the video.';
+ if(transcript)prompt+='\n\nTranscript of the original audio (use it for facts and context):\n'+transcript;
+ prompt+='\n\nWrite the recap narration in Burmese (Myanmar language), following ALL of these rules:\n- About '+target+' lines. One short cue per line (each line at most about 25 words — one subtitle cue, one breath).\n- The FIRST line must be a strong curiosity hook that makes viewers keep watching.\n- Then tell the story in scene order. Cover the key facts COMPLETELY.\n- Use ONLY facts visible in the frames'+(transcript?' or stated in the transcript':'')+'. Do NOT invent facts. No exaggeration.\n- Write in natural, conversational SPOKEN Burmese (သဘာဝကျကျ ပြောတဲ့ပုံစံ) — like a real person telling the story, NOT formal written Burmese.\n- Write ALL numbers as Burmese words — never use digits.\n- Output ONLY the script lines — no title, no labels, no notes.';
+ parts.push({text:prompt});
+ return geminiGen(key,parts,0.4);
+}
+/* --- SRT helpers --- */
+function srtTime(sec){let t=Math.max(0,Math.round(sec*1000));const p=(n,l)=>String(n).padStart(l,'0');const h=Math.floor(t/3600000);t%=3600000;const m=Math.floor(t/60000);t%=60000;const s=Math.floor(t/1000);return p(h,2)+':'+p(m,2)+':'+p(s,2)+','+p(t,3)}
+function spreadCuesWeighted(lines,start,end){
+ const n=lines.length;if(!n)return[];const D=end-start;if(D<=0)return lines.map(text=>({text,start,end}));
+ const w=lines.map(t=>Math.max(1,t.length));const sum=w.reduce((a,b)=>a+b,0);let durs=w.map(x=>D*x/sum);
+ if(D>=n){let deficit=0;durs=durs.map(d=>{if(d<1){deficit+=1-d;return 1}return d});
+  if(deficit>0){const over=[];durs.forEach((d,i)=>{if(d>1)over.push(i)});const osum=over.reduce((a,i)=>a+(durs[i]-1),0);if(osum>0)over.forEach(i=>{durs[i]-=deficit*(durs[i]-1)/osum})}}
+ let t=start;return lines.map((text,i)=>{const s=t;t+=durs[i];return{text,start:s,end:i===n-1?end:Math.max(s+0.1,Math.min(t,end))}});
+}
+function buildSRT(cues,offset){
+ if(!cues||!cues.length)return'';
+ return cues.map((c,i)=>{const st=Math.max(0,c.start-offset);const en=Math.max(st+0.1,c.end-offset);return (i+1)+'\n'+srtTime(st)+' --> '+srtTime(en)+'\n'+c.text}).join('\n\n')+'\n';
+}
+function downloadText(name,text){const b=new Blob([text],{type:'text/plain;charset=utf-8'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),5000)}
+/* --- wire the SRT buttons (both editors) --- */
+['recap','short'].forEach(p=>{
+ const btn=$('#'+p+'-srtBtn');if(!btn)return;const ed=editors[p];
+ btn.onclick=()=>{
+  const lines=($('#'+p+'-subs').value||'').split('\n').map(s=>s.trim()).filter(Boolean);
+  if(!lines.length){fieldErr(p,'subs','SRT ထုတ်ရန် စာတန်း စာသား အရင် လိုပါတယ် — တစ်ကြောင်းစီ ရိုက်ထည့်ပါ၊ သို့မဟုတ် AI Script ထုတ်ပါ');showNotice('⚠️ SRT အတွက် စာသား လိုပါတယ်','err');return}
+  const start=parseFloat($('#'+p+'-start').value),end=parseFloat($('#'+p+'-end').value);
+  if(isNaN(start)||isNaN(end)||end<=start){fieldErr(p,'end','SRT အတွက် ဖြတ်ထားသော အပိုင်း (စချိန်/ဆုံးချိန်) အရင် မှန်အောင် ထားပါ');showNotice('⚠️ Trim အချိန် ပြင်ပါ','err');return}
+  clearErrs(p);
+  const srt=buildSRT(spreadCuesWeighted(lines,start,end),start);
+  const base=((ed&&ed.file?ed.file.name:'recap')||'recap').replace(/\.[^.]+$/,'').replace(/[^\w\- ]+/g,'').trim()||'recap';
+  downloadText(base+'.srt',srt);showNotice('✅ SRT ဖိုင် ဒေါင်းပြီးပါပြီ — '+lines.length+' ကြောင်း','ok');
+ };
+});
+/* --- AI Script wiring (Recap editor only) --- */
+(function(){
+ const ed=editors.recap;if(!ed)return;const p='recap';const E=id=>$('#'+p+'-'+id);
+ ed.aiMode='faithful';ed.aiBusy=false;
+ function modeLabel(){return ed.aiMode==='scene'?'🎬 Scene အသစ် Recap':'🎧 မူရင်းအသံအတိုင်း'}
+ function refreshAi(){const mi=E('aiModeInfo');if(mi)mi.innerHTML='လက်ရှိ ပုံစံ: <b>'+modeLabel()+'</b> — "AI Script ထုတ်မယ်" နှိပ်ရင် ပုံစံ ပြန် ရွေးနိုင်ပါတယ်'}
+ refreshAi();
+ const txTgl=E('aiTxTgl');if(txTgl)txTgl.onclick=()=>{const f=E('f-transcript');const hidden=f.style.display==='none';f.style.display=hidden?'':'none';txTgl.textContent=hidden?'ဖျောက်':'ပြ'};
+ function setStatus(t){const s=E('aiStatus');if(s)s.textContent=t}
+ async function runAi(){
+  if(ed.aiBusy)return;clearErrs(p);
+  /* instructive pre-validation BEFORE any network/processing call */
+  if(!ed.file){E('fileinfo').style.color='#b3261e';E('fileinfo').textContent='⚠️ Video ဖိုင် မရွေးရသေးပါ — အရင် "Video ရွေးရန်" ကို နှိပ်ပြီး ဖိုင် ရွေးပါ';E('pick').scrollIntoView({behavior:'smooth',block:'center'});showNotice('⚠️ Video ဖိုင် လိုပါတယ် — အရင် ဖိုင် ရွေးပါ','err');return}
+  const key=getApiKey();
+  if(!key){showNotice('⚠️ AI Script အတွက် Gemini API Key လိုပါတယ် — ဆက်တင် tab မှာ သင့် key ထည့်ပါ','err');goTab('settings');const ki=$('#setApiKey');ki.focus();ki.scrollIntoView({behavior:'smooth',block:'center'});return}
+  const start=parseFloat(E('start').value),end=parseFloat(E('end').value);
+  if(isNaN(start)||start<0){fieldErr(p,'start','စချိန် မှားနေပါတယ် — 0 သို့မဟုတ် အထက် ထည့်ပါ');showNotice('⚠️ စချိန် ပြင်ပါ','err');return}
+  if(isNaN(end)||end<=start){fieldErr(p,'end','ဆုံးချိန် သည် စချိန်ထက် ကြီးရပါမည်');showNotice('⚠️ ဆုံးချိန် ပြင်ပါ','err');return}
+  if(ed.duration&&end>ed.duration+0.5){fieldErr(p,'end','ဆုံးချိန် သည် video ကြာချိန် ('+fmtDur(ed.duration)+') ထက် ကျော်နေပါတယ်');showNotice('⚠️ ဆုံးချိန် ပြင်ပါ','err');return}
+  ed.videoW=E('video').videoWidth||ed.videoW||1280;ed.videoH=E('video').videoHeight||ed.videoH||720;
+  ed.aiBusy=true;const btn=E('aiGen');btn.classList.add('loading');btn.disabled=true;const origLabel=btn.querySelector('.btn-label').textContent;btn.querySelector('.btn-label').textContent='AI လုပ်ဆောင်နေပါတယ်…';
+  const mode=ed.aiMode;
+  try{
+   showNotice('▶️ AI Script စတင်ပါပြီ — '+modeLabel(),'info');
+   const ff=await getFFmpeg(()=>{});
+   let transcript='',noAudio=false;
+   setStatus('🔊 အသံ ထုတ်နေပါတယ်…');showNotice('🔊 အသံ ထုတ်နေပါတယ်…','info');
+   try{
+    const chunks=await extractAiAudio(ff,ed,start,end);
+    setStatus('📝 စာသား ထုတ်နေပါတယ်… (အသံ အပိုင်း '+chunks.length+' ပိုင်း)');showNotice('📝 စာသား ထုတ်နေပါတယ်…','info');
+    transcript=cleanLines(await transcribeChunks(key,chunks)).join('\n');
+   }catch(ae){if(ae&&ae.message===AI_NO_AUDIO)noAudio=true;else throw ae}
+   if(noAudio){
+    if(mode==='faithful'){setStatus('⚠️ ဒီ video မှာ အသံ မပါပါ');showNotice('⚠️ ဒီ video မှာ အသံထွက် မပါပါ — "မူရင်းအသံအတိုင်း" ပုံစံ သုံးမရပါ။ "Scene အသစ် Recap" ပုံစံကို ရွေးပြီး ပြန် ကြိုးစားပါ (Scene ပုံများ ကိုပဲ ကြည့်၍ ရေးပေးပါမယ်)','err');return}
+    transcript='';setStatus('🔇 အသံ မပါသော video — Scene ပုံများဖြင့်သာ ဆက်လုပ်ပါမည်');
+   }else{
+    const wrap=E('aiTxWrap');if(wrap)wrap.style.display='block';
+    const tx=E('transcript');if(tx)tx.value=transcript;
+   }
+   let scriptLines=[];
+   if(mode==='faithful'){
+    if(!transcript)throw new Error('အသံထဲက စကားပြော မကြားရပါ — စကားပြော မရှိသော video ဖြစ်နိုင်ပါတယ်။ "Scene အသစ် Recap" ပုံစံကို စမ်းကြည့်ပါ');
+    setStatus('🔄 မြန်မာ script ပြောင်းနေပါတယ်…');showNotice('🔄 မြန်မာ script ပြောင်းနေပါတယ်…','info');
+    scriptLines=cleanLines(await translateFaithful(key,transcript));
+   }else{
+    setStatus('🎞️ Scene ပုံများ ယူနေပါတယ်…');
+    const frames=await sampleFrames(ed,start,end);
+    if(!frames.length&&!transcript)throw new Error('Scene ပုံများ ယူမရပါ — video ကို ခဏ play လုပ်ထားပြီး ပြန် ကြိုးစားပါ');
+    setStatus('✍️ Scene အသစ် script ရေးနေပါတယ်…');showNotice('✍️ Scene အသစ် script ရေးနေပါတယ်…','info');
+    scriptLines=cleanLines(await writeSceneScript(key,frames,transcript,end-start));
+   }
+   if(!scriptLines.length)throw new Error('AI မှ script ပြန်မရပါ — ပြန် ကြိုးစားကြည့်ပါ');
+   E('subs').value=scriptLines.join('\n');
+   const st=E('subTgl');if(st&&!st.classList.contains('on'))st.classList.add('on');
+   ed.audioMode='voice';if(ed.refresh)ed.refresh();
+   setStatus('✅ Script '+scriptLines.length+' ကြောင်း ရပါပြီ — အသံ ပုံစံကို "အသံအသစ် (Gemini voiceover)" အဖြစ် ပြောင်းထားပါတယ်');
+   E('subs').scrollIntoView({behavior:'smooth',block:'center'});
+   showNotice('✅ AI Script ရပါပြီ — Export မထုတ်ခင် စာသားကို စိတ်ကြိုက် ပြင်/ဖြည့် နိုင်ပါတယ်','ok');
+  }catch(err){console.error(err);setStatus('❌ '+(err.message||err));showNotice('❌ AI Script မအောင်မြင်ပါ: '+(err.message||err),'err')}
+  finally{ed.aiBusy=false;btn.classList.remove('loading');btn.disabled=false;btn.querySelector('.btn-label').textContent=origLabel;refreshAi()}
+ }
+ const genBtn=E('aiGen');
+ if(genBtn)genBtn.onclick=()=>{
+  if(ed.aiBusy)return;
+  openSheet('🤖 AI Script ပုံစံ ရွေးပါ',
+   '<button class="opt'+(ed.aiMode==='faithful'?' sel':'')+'" data-v="faithful"><b>🎧 မူရင်းအသံအတိုင်း</b><span>မူရင်း စကားပြောကို အရင် စာသားထုတ်၍ မြန်မာ စကားပြော ပုံစံဖြင့် တစ်ကြောင်းချင်း ဘာသာပြန်မယ် (ဘာသာပြန် အသံထပ် ပုံစံ)</span></button>'
+  +'<button class="opt'+(ed.aiMode==='scene'?' sel':'')+'" data-v="scene"><b>🎬 Scene အသစ် Recap</b><span>Scene ပုံများနှင့် စာသားကို ကြည့်၍ hook ပါသော ဇာတ်ကြောင်း အသစ် ရေးပေးမယ်</span></button>');
+  $$('#sheetBody .opt').forEach(o=>o.onclick=()=>{ed.aiMode=o.dataset.v;refreshAi();closeSheet();runAi()});
+ };
+})();
 </script>
 </body>
 </html>

@@ -272,7 +272,14 @@ async function getFFmpeg(logFn){
  if(ffLoading)return ffLoading;
  ffLoading=(async()=>{const FFmpegWASM=window.FFmpegWASM;if(!FFmpegWASM)throw new Error('ffmpeg library မတင်ရသေးပါ — internet စစ်ပြီး ပြန်ကြိုးစားပါ');
   const ff=new FFmpegWASM.FFmpeg();ff.on('log',({message})=>{if(logFn)logFn(message)});
-  await ff.load({coreURL:FF_CORE,wasmURL:FF_WASM});ffInstance=ff;return ff})();
+  /* Browsers block cross-origin classic Workers, so fetch the ffmpeg worker,
+     core and wasm as blobs and pass same-origin blob URLs (fixes the live-site
+     "Failed to construct 'Worker'" error from the unpkg URLs). */
+  const toBlobURL=window.FFmpegUtil&&window.FFmpegUtil.toBlobURL;
+  const FF_WORKER='https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/814.ffmpeg.js';
+  let loadCfg={coreURL:FF_CORE,wasmURL:FF_WASM};
+  if(toBlobURL){loadCfg={classWorkerURL:await toBlobURL(FF_WORKER,'text/javascript'),coreURL:await toBlobURL(FF_CORE,'text/javascript'),wasmURL:await toBlobURL(FF_WASM,'application/wasm')}}
+  await ff.load(loadCfg);ffInstance=ff;return ff})();
  try{return await ffLoading}catch(e){ffLoading=null;throw e}}
 async function exportOne(ff,ed,seg,idx,total,log){
  /* seg = {start,end,cues:[{text,start,end}]} times absolute; output times relative */

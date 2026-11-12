@@ -208,162 +208,47 @@ function syncEditorsFromSettings(){Object.values(editors).forEach(ed=>{ed.aspect
 /* ---------- canvas text PNGs (browser shapes Myanmar correctly) ---------- */
 function wrapLines(ctx,text,maxW,maxLines){const words=String(text).split(/\s+/);const lines=[];let cur='';for(const w of words){const t=cur?cur+' '+w:w;if(ctx.measureText(t).width<=maxW||!cur)cur=t;else{lines.push(cur);cur=w;if(lines.length>=maxLines)break}}if(cur&&lines.length<maxLines)lines.push(cur);if(lines.length>maxLines)lines.length=maxLines;return lines}
 function textPNG(text,W,H,opts){opts=opts||{};const fs=opts.size||44;const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');x.font='700 '+fs+'px Padauk, "Noto Sans Myanmar", sans-serif';x.textAlign='center';x.textBaseline='middle';const lines=wrapLines(x,text,W-40,2);const lh=fs*1.45;const y0=H/2-((lines.length-1)*lh)/2;lines.forEach((ln,i)=>{const y=y0+i*lh;x.lineWidth=Math.max(6,fs/6);x.strokeStyle='rgba(0,0,0,0.85)';x.lineJoin='round';x.strokeText(ln,W/2,y);x.shadowColor='rgba(0,0,0,0.7)';x.shadowBlur=6;x.fillStyle=opts.color||'#ffffff';x.fillText(ln,W/2,y)});return new Promise(res=>c.toBlob(b=>b.arrayBuffer().then(ab=>res(new Uint8Array(ab))),'image/png'))}
-/* ---------- Edge TTS (no key) — Microsoft Edge read-aloud endpoint, pure browser JS ---------- */
-const EDGE_TOKEN='6A5AA1D4EAFF4E9FB37E23D68491D6F4';
+/* ---------- Edge TTS (no key) — via the user's Render server route ----------
+   POST https://burmese-voice-tts.onrender.com/api/synthesize {text, voice}
+   -> raw MP3 bytes (audio/mpeg, CORS *). Verified end-to-end 2026-11-12 (V188).
+   The old browser-direct websocket path (Sec-MS-GEC token machinery) was removed —
+   the server route is the stable one. Free tier sleeps: the FIRST call after idle
+   can take ~1 minute, so the fetch timeout is 120s and a waking hint shows after 5s. */
 const EDGE_VOICES=[{id:'my-MM-ThihaNeural',label:'Thiha'},{id:'my-MM-NilarNeural',label:'Nilar'}];
 function edgeVoiceLabel(id){const v=EDGE_VOICES.find(x=>x.id===id);return v?v.label:id}
-function ssmlEscape(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
-function sha256Hex(str){
- /* Compact pure-JS SHA-256 (UTF-8 string -> lowercase hex). Fallback for crypto.subtle,
-    which is unavailable in non-secure contexts (plain HTTP) — the Edge wss:// socket itself works over HTTP. */
- const K=[0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2];
- const H=[0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19];
- const bytes=new TextEncoder().encode(String(str));
- const bitLen=bytes.length*8;
- const total=Math.ceil((bytes.length+9)/64)*64;
- const msg=new Uint8Array(total);msg.set(bytes);msg[bytes.length]=0x80;
- const dv=new DataView(msg.buffer);dv.setUint32(total-4,bitLen>>>0);dv.setUint32(total-8,Math.floor(bitLen/4294967296));
- const w=new Uint32Array(64);
- const rr=(x,n)=>(x>>>n)|(x<<(32-n));
- for(let off=0;off<total;off+=64){
-  for(let i=0;i<16;i++)w[i]=dv.getUint32(off+i*4);
-  for(let i=16;i<64;i++){const s0=rr(w[i-15],7)^rr(w[i-15],18)^(w[i-15]>>>3);const s1=rr(w[i-2],17)^rr(w[i-2],19)^(w[i-2]>>>10);w[i]=(w[i-16]+s0+w[i-7]+s1)|0}
-  let a=H[0],b=H[1],c=H[2],d=H[3],e=H[4],f=H[5],g=H[6],h=H[7];
-  for(let i=0;i<64;i++){
-   const S1=rr(e,6)^rr(e,11)^rr(e,25),ch=(e&f)^(~e&g),t1=(h+S1+ch+K[i]+w[i])|0;
-   const S0=rr(a,2)^rr(a,13)^rr(a,22),mj=(a&b)^(a&c)^(b&c),t2=(S0+mj)|0;
-   h=g;g=f;f=e;e=(d+t1)|0;d=c;c=b;b=a;a=(t1+t2)|0;
+const EDGE_API='https://burmese-voice-tts.onrender.com/api/synthesize';
+async function edgeServerTTS(text,voiceName,statusFn){
+ const ctl=(typeof AbortController!=='undefined')?new AbortController():null;
+ const timer=ctl?setTimeout(()=>ctl.abort(),120000):null;
+ const wake=statusFn?setTimeout(()=>{try{statusFn('⏳ Server နိုးနေပါတယ် — ပထမ အကြိမ် ~၁ မိနစ် ကြာနိုင်ပါတယ်')}catch(e){}},5000):null;
+ try{
+  const res=await fetch(EDGE_API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:text,voice:voiceName}),signal:ctl?ctl.signal:undefined});
+  if(!res.ok){
+   let detail='';try{const d=await res.json();detail=(d&&(d.detail||d.message))||''}catch(e){}
+   throw new Error('Edge TTS server အမှား '+res.status+(detail?': '+detail:''));
   }
-  H[0]=(H[0]+a)|0;H[1]=(H[1]+b)|0;H[2]=(H[2]+c)|0;H[3]=(H[3]+d)|0;H[4]=(H[4]+e)|0;H[5]=(H[5]+f)|0;H[6]=(H[6]+g)|0;H[7]=(H[7]+h)|0;
- }
- return H.map(x=>(x>>>0).toString(16).padStart(8,'0')).join('');
+  const buf=await res.arrayBuffer();
+  if(!buf.byteLength)throw new Error('Edge TTS server မှ အသံ data ပြန်မရပါ');
+  return new Uint8Array(buf);
+ }catch(e){
+  if(e&&e.name==='AbortError')throw new Error('Edge TTS timeout — server မှ ၁၂၀ စက္ကန့် အတွင်း အသံ ပြန်မရပါ');
+  throw e;
+ }finally{if(timer)clearTimeout(timer);if(wake)clearTimeout(wake)}
 }
-/* ---- Sec-MS-GEC v2 (Microsoft now rejects the old v1 plain-SHA-256 token at the websocket
-   handshake with HTTP 403): token = "<CS64>-<SHA256>" over the 300 s-rounded Windows-epoch
-   ticks + trusted-client token. Pure-JS port, verified byte-identical to the reference
-   implementation (edge-tts 7.3.1 DRM) and live-tested from a browser-equivalent socket:
-   no ConnectionId, no custom headers needed. ---- */
-const GEC_K=[0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2];
-const GEC_H0=[0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19];
-const GEC_STATE=[0xfd9fbea2,0x91243ce7,0xbe499094,0xcd2e1e0a,0x6c006f49,0x04bd35ab,0xfeb0a7e4,0x03effbd2];
-const GEC_SCHED=[0xeb24bf9e,0x1558691f,0xa0c09ee2,0x0cfa32ba,0xa622ee8c,0xd1dd9491,0xc0dd25a0,0xf9e70ab6,0xf0c31573,0x7058ce4e,0x7188e606,0x00e5ab33,0xd258b060,0x72766564];
-const GEC_COEF=[[0xe82e91b1,0xb32700d0],[0x44de24c6,0x88dff51d],[0x3beb65bc,0x29514038],[0xc89c5933,0xb328cbdf],[0x8d1ec211,0xd405b4d5],[0x314ef5d5,0x26e55f3c],[0xe92491b1,0x607801c6],[0xf0a5b9d5,0x82b2c1fb],[0x06064cf3,0xfa51a3da],[0xda79fa60,0x207cc464],[0xbed20560,0x3c3c74f3],[0x89f9c9f8,0xd2d14b61],[0x35fa38c6,0xbb04a2c1],[0xcb49e3c6,0xc5626167]];
-function gecRotr(x,n){return((x>>>n)|(x<<(32-n)))>>>0}
-function gecRol16(x){return((x<<16)|(x>>>16))>>>0}
-function gecSig0(x){return(gecRotr(x,7)^gecRotr(x,18)^(x>>>3))>>>0}
-function gecSig1(x){return(gecRotr(x,17)^gecRotr(x,19)^(x>>>10))>>>0}
-function gecExpand(w,first){for(let i=first;i<64;i++)w[i]=(gecSig1(w[i-2])+w[i-7]+gecSig0(w[i-15])+w[i-16])>>>0}
-function gecRounds(st,w,first,K){let a=st[0],b=st[1],c=st[2],d=st[3],e=st[4],f=st[5],g=st[6],h=st[7];for(let i=first;i<64;i++){const t1=(h+((gecRotr(e,6)^gecRotr(e,11)^gecRotr(e,25))>>>0)+((g^(e&(f^g)))>>>0)+K[i]+w[i])>>>0;const t2=(((gecRotr(a,2)^gecRotr(a,13)^gecRotr(a,22))>>>0)+(((a&b)|(c&(a|b)))>>>0))>>>0;h=g;g=f;f=e;e=(d+t1)>>>0;d=c;c=b;b=a;a=(t1+t2)>>>0}return[a,b,c,d,e,f,g,h]}
-function gecInit(d7){
- const w=new Array(64).fill(0);
- w[14]=((d7[0]<<16)|(d7[1]<<8)|d7[2])>>>0;
- w[15]=((d7[3]<<24)|(d7[4]<<16)|(d7[5]<<8)|d7[6])>>>0;
- for(let i=16;i<30;i++){let v=GEC_SCHED[i-16];if(i-2>=14)v+=(i===16?(gecSig1(w[i-2])^0x000b92c0):gecSig1(w[i-2]));if(i-7>=14)v+=w[i-7];if(i-15>=14)v+=(i===29?(gecSig0(w[i-15])^0x059c0b80):gecSig0(w[i-15]));w[i]=v>>>0}
- w[30]=(gecSig1(w[28])+w[23]+gecSig0(w[15])+w[14]+0xc9dc06a7-GEC_K[14])>>>0;
- gecExpand(w,31);
- const K=GEC_K.slice();K[14]=0xc9dc06a7;
- const work=gecRounds(GEC_STATE,w,14,K);
- return GEC_H0.map((x,i)=>(x+work[i])>>>0);
-}
-function gecDigest(data){
- let st=gecInit(data.subarray(0,7));
- const len=57+data.length;
- const all=Array.from(data.subarray(7));all.push(0x80);
- const zeros=((55-len)%64+64)%64;for(let i=0;i<zeros;i++)all.push(0);
- let bl=len*8;const lb=new Array(8);for(let i=7;i>=0;i--){lb[i]=bl%256;bl=Math.floor(bl/256)}
- for(const b of lb)all.push(b);
- for(let off=0;off<all.length;off+=64){const w=new Array(64).fill(0);for(let i=0;i<16;i++)w[i]=((all[off+i*4]<<24)|(all[off+i*4+1]<<16)|(all[off+i*4+2]<<8)|all[off+i*4+3])>>>0;gecExpand(w,16);const work=gecRounds(st,w,0,GEC_K);st=st.map((x,i)=>(x+work[i])>>>0)}
- return st;
-}
-function gecWordsLE(data){const p=Array.from(data);while(p.length%4)p.push(0);const w=[];for(let i=0;i<p.length;i+=4)w.push((p[i]|(p[i+1]<<8)|(p[i+2]<<16)|(p[i+3]<<24))>>>0);if(w.length%2)w.push(0);return w}
-function gecCs64(data,dw){
- const db=[];for(const w of dw)db.push((w>>>24)&255,(w>>>16)&255,(w>>>8)&255,w&255);
- const keyA=(((db[0]|(db[1]<<8)|(db[2]<<16)|(db[3]<<24))>>>0)|1)>>>0;
- const keyB=(((db[4]|(db[5]<<8)|(db[6]<<16)|(db[7]<<24))>>>0)|1)>>>0;
- const fac=[Math.imul(keyA,0x82893933)>>>0,Math.imul(keyB,0x82893933)>>>0];
- const terms=GEC_COEF.map((c,i)=>Math.imul(c[0],fac[i%2])>>>0);
- const offs=GEC_COEF.map(c=>c[1]>>>0);
- gecWordsLE([0].concat(Array.from(data))).forEach((word,index)=>{
-  let term=Math.imul(word,index%2===0?keyA:keyB);
-  let off=Math.imul(gecRol16(word),index%2===0?0xEF0569FB:0xC31713DB);
-  if(index===0){term+=Math.imul(0xf2f90b1a,fac[0]);off+=0x0b1a0000}
-  terms.push(term>>>0);offs.push(off>>>0);
- });
- let swapAcc=0,swapLast=0,state=0,acc=0;
- for(let i=0;i<terms.length;i+=2){
-  const x=terms[i],y=terms[i+1];
-  let q=Math.imul(gecRol16((offs[i]+x)>>>0),0x76F50F34)>>>0;
-  swapAcc+=(Math.imul(gecRol16(q),0xC3EFEA97)+q)>>>0;
-  q=Math.imul(gecRol16((offs[i+1]+y)>>>0),0x1881CE3C)>>>0;
-  swapLast=(Math.imul(gecRol16(q),0x35BD1EC9)+q)>>>0;
-  swapAcc=(swapAcc+swapLast)>>>0;
-  state=(Math.imul(state,keyA)+x)>>>0;
-  state=Math.imul(gecRol16(state),0xCF98B111)>>>0;
-  state=Math.imul(gecRol16(state),0x87085B9F)>>>0;
-  state=Math.imul(gecRol16(state),0x12CEB96D)>>>0;
-  state=Math.imul(gecRol16(state),0x257E1D83)>>>0;
-  acc+=state;
-  let t=(Math.imul(state,keyB)+y)>>>0;
-  t=Math.imul(gecRol16(t),0xA27416F5)>>>0;
-  t=Math.imul(gecRol16(t),0xD38396FF)>>>0;
-  state=Math.imul(gecRol16(Math.imul(gecRol16(t),0x7C932B89)>>>0),0xBFA49F69)>>>0;
-  acc=(acc+state)>>>0;
- }
- return[(swapLast^state)>>>0,(swapAcc^acc)>>>0];
-}
-function edgeGecToken(){
- let t=Date.now()/1000+11644473600;t-=t%300;t*=10000000;
- const data=new TextEncoder().encode(t.toFixed(0)+EDGE_TOKEN);
- const dw=gecDigest(data);
- const cs=gecCs64(data,dw);
- const le=w=>[w&255,(w>>>8)&255,(w>>>16)&255,(w>>>24)&255].map(b=>b.toString(16).padStart(2,'0')).join('').toUpperCase();
- const be=w=>[(w>>>24)&255,(w>>>16)&255,(w>>>8)&255,w&255].map(b=>b.toString(16).padStart(2,'0')).join('').toUpperCase();
- return le(cs[0])+le(cs[1])+'-'+dw.map(be).join('');
-}
-function edgeDateStr(){return new Date().toUTCString().replace('GMT','GMT+0000 (Coordinated Universal Time)')}
-function edgeUuid(){const u=crypto.randomUUID?crypto.randomUUID():'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.random()*16|0;return (c==='x'?r:(r&0x3|0x8)).toString(16)});return u.replace(/-/g,'')}
-async function edgeTTS(text,voiceName){
- const gec=await edgeGecToken();
- const url='wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken='+EDGE_TOKEN+'&Sec-MS-GEC='+gec+'&Sec-MS-GEC-Version=2-143.0.3650.75';
- return new Promise((resolve,reject)=>{
-  let ws;try{ws=new WebSocket(url)}catch(e){reject(new Error('Edge TTS websocket ဖွင့်မရပါ: '+(e.message||e)));return}
-  ws.binaryType='arraybuffer';
-  const chunks=[];let settled=false;
-  const done=(fn,val)=>{if(settled)return;settled=true;clearTimeout(timer);fn(val)};
-  const timer=setTimeout(()=>{try{ws.close()}catch(e){}done(reject,new Error('Edge TTS timeout — 60 စက္ကန့် အတွင်း အသံ ပြန်မရပါ'))},60000);
-  ws.onopen=()=>{
-   ws.send('X-Timestamp:'+edgeDateStr()+'\r\nContent-Type:application/json; charset=utf-8\r\nPath:speech.config\r\n\r\n'+JSON.stringify({context:{synthesis:{audio:{metadataoptions:{sentenceBoundaryEnabled:'false',wordBoundaryEnabled:'false'},outputFormat:'audio-24khz-48kbitrate-mono-mp3'}}}}));
-   ws.send('X-RequestId:'+edgeUuid()+'\r\nContent-Type:application/ssml+xml\r\nX-Timestamp:'+edgeDateStr()+'\r\nPath:ssml\r\n\r\n'+'<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="my-MM"><voice name="'+voiceName+'"><prosody pitch="+0Hz" rate="+0%" volume="+0%">'+ssmlEscape(text)+'</prosody></voice></speak>');
-  };
-  ws.onmessage=ev=>{
-   if(typeof ev.data==='string'){
-    if(ev.data.indexOf('Path:turn.end')>=0){
-     const total=chunks.reduce((a,c)=>a+c.length,0);const out=new Uint8Array(total);let off=0;for(const c of chunks){out.set(c,off);off+=c.length}
-     try{ws.close()}catch(e){}
-     if(!total)done(reject,new Error('Edge TTS မှ အသံ data ပြန်မရပါ'));else done(resolve,out);
-    }
-    return;
-   }
-   const buf=new Uint8Array(ev.data);if(buf.length<2)return;
-   const hlen=(buf[0]<<8)|buf[1];if(buf.length<2+hlen)return;
-   const header=new TextDecoder().decode(buf.subarray(2,2+hlen));
-   if(header.indexOf('Path:audio')>=0&&header.indexOf('audio.metadata')<0){const body=buf.subarray(2+hlen);if(body.length)chunks.push(body.slice())}
-  };
-  ws.onerror=()=>done(reject,new Error('Edge TTS websocket error — internet စစ်ပြီး ပြန်ကြိုးစားပါ'));
-  ws.onclose=ev=>done(reject,new Error('Edge TTS websocket ပိတ်သွားပါတယ် (code '+ev.code+')'));
- });
-}
-async function edgeTTSLong(text,voiceName){
+async function edgeTTSLong(text,voiceName,statusFn){
  const chunks=[];let cur='';const sents=String(text).split(/(?<=။)\s*/).filter(Boolean);
- for(const s of sents){if((cur+s).length<=400)cur+=s;else{if(cur)chunks.push(cur);cur=s}}if(cur)chunks.push(cur);if(!chunks.length)chunks.push(text);
- const parts=[];for(const ch of chunks)parts.push(await edgeTTS(ch,voiceName));
+ for(const s of sents){if((cur+s).length<=600)cur+=s;else{if(cur)chunks.push(cur);cur=s}}if(cur)chunks.push(cur);if(!chunks.length)chunks.push(text);
+ const flat=[];
+ for(const c of chunks){if(c.length<=600)flat.push(c);else for(let i=0;i<c.length;i+=600)flat.push(c.slice(i,i+600))}
+ const parts=[];for(const ch of flat)parts.push(await edgeServerTTS(ch,voiceName,statusFn));
  const total=parts.reduce((a,c)=>a+c.length,0);const out=new Uint8Array(total);let off=0;for(const c of parts){out.set(c,off);off+=c.length}return out;
 }
 /* ---------- voice dispatcher: ONE route for the voice step and the export fallback ---------- */
-async function generateVoice(ed,text){
- if(ed.ttsEngine==='edge'){const bytes=await edgeTTSLong(text,ed.edgeVoice);return{bytes,ext:'mp3'}}
+async function generateVoice(ed,text,statusFn){
+ if(ed.ttsEngine==='edge'){const bytes=await edgeTTSLong(text,ed.edgeVoice,statusFn);return{bytes,ext:'mp3'}}
  const bytes=await geminiTTSLong(getApiKey(),text,ed.voice);return{bytes,ext:'wav'};
 }
+
 /* ---------- Gemini TTS (visitor's own key, direct from browser) ---------- */
 async function geminiTTS(key,text,voice){
  const res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash-tts:generateContent',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify({contents:[{parts:[{text}]}],generationConfig:{responseModalities:['AUDIO'],speechConfig:{voiceConfig:{prebuiltVoiceConfig:{voiceName:voice}}}}})});
@@ -415,7 +300,7 @@ async function exportOne(ff,ed,seg,idx,total,log){
  const fetchFile=window.FFmpegUtil&&window.FFmpegUtil.fetchFile;
  await ff.writeFile('in.mp4',fetchFile?await fetchFile(ed.file):new Uint8Array(await ed.file.arrayBuffer()));
  let voiceArr=null,voiceFile='voice.wav';
- if(ed.audioMode==='voice'){if(ed._cachedVoice){log('✅ အဆင့် ၄ မှာ ထုတ်ထားသော အသံကို ပြန်သုံးပါတယ်');voiceArr=ed._cachedVoice;voiceFile='voice.'+(ed._cachedVoiceExt||'wav')}else{log('အသံ ထုတ်နေပါတယ်…');const gv=await generateVoice(ed,seg.cues.map(c=>c.text).join(' '));voiceArr=gv.bytes;voiceFile='voice.'+gv.ext}await ff.writeFile(voiceFile,voiceArr)}
+ if(ed.audioMode==='voice'){if(ed._cachedVoice){log('✅ အဆင့် ၄ မှာ ထုတ်ထားသော အသံကို ပြန်သုံးပါတယ်');voiceArr=ed._cachedVoice;voiceFile='voice.'+(ed._cachedVoiceExt||'wav')}else{log('အသံ ထုတ်နေပါတယ်…');const gv=await generateVoice(ed,seg.cues.map(c=>c.text).join(' '),log);voiceArr=gv.bytes;voiceFile='voice.'+gv.ext}await ff.writeFile(voiceFile,voiceArr)}
  const overlays=[]; /* {file,y} */
  if(useTitle){await ff.writeFile('title.png',await textPNG($('#'+ed.p+'-title').value.trim(),W,150,{size:52,color:'#FFE92E'}));overlays.push({file:'title.png',y:36,from:0,to:dur})}
  if(useSub){for(let i=0;i<seg.cues.length;i++){const fn='sub'+i+'.png';await ff.writeFile(fn,await textPNG(seg.cues[i].text,W,170,{size:46}));overlays.push({file:fn,y:subY,from:seg.cues[i].start-seg.start,to:seg.cues[i].end-seg.start})}}
@@ -497,10 +382,11 @@ async function exportEditor(ed){
 /* ================= AI Script pipeline (Gemini, visitor's own key) =================
    Flow: video audio → transcript → Myanmar script (2 modes) → script box → voiceover/SRT */
 const GEM_MODELS=['gemini-3.5-flash-lite','gemini-3.8-flash','gemini-2.5-flash','gemini-2.5-flash-lite'];
-async function geminiGen(key,parts,temp,statusFn){
+const GEM_MODELS_Q=['gemini-3.8-flash','gemini-3.5-flash-lite','gemini-2.5-flash','gemini-2.5-flash-lite'];
+async function geminiGen(key,parts,temp,statusFn,qFirst){
  const sleep=ms=>new Promise(r=>setTimeout(r,ms));
  let lastErr=null,quotaErr=null,busyErr=null;
- for(const model of GEM_MODELS){
+ for(const model of (qFirst?GEM_MODELS_Q:GEM_MODELS)){
   for(let attempt=0;attempt<2;attempt++){
    let res,data,timedOut=false;
    const ctl=(typeof AbortController!=='undefined')?new AbortController():null;
@@ -543,12 +429,15 @@ async function geminiGen(key,parts,temp,statusFn){
 }
 function cleanLines(txt){return String(txt||'').split('\n').map(s=>s.replace(/^```[a-z]*$/i,'').trim()).filter(Boolean)}
 function u8ToB64(u8){let s='';const STEP=0x8000;for(let i=0;i<u8.length;i+=STEP)s+=String.fromCharCode.apply(null,u8.subarray(i,Math.min(u8.length,i+STEP)));return btoa(s)}
-/* --- extract the trim-range audio as <=240s MP3 chunks via the shared ffmpeg instance --- */
+/* --- extract the trim-range audio as <=60s MP3 chunks via the shared ffmpeg instance ---
+   60s chunks: a single long transcription call can return partial output (proven live
+   2026-11-12: a 73s video came back as one tail fragment; a 99.8s test call returned
+   only the first ~50s). Per-chunk calls + ordered concatenation cover start to end. */
 const AI_NO_AUDIO='AI_NO_AUDIO';
 async function extractAiAudio(ff,ed,start,end){
  const fetchFile=window.FFmpegUtil&&window.FFmpegUtil.fetchFile;
  await ff.writeFile('ai_in.mp4',fetchFile?await fetchFile(ed.file):new Uint8Array(await ed.file.arrayBuffer()));
- const chunks=[];const CHUNK=240;
+ const chunks=[];const CHUNK=60;
  try{
   for(let s=start;s<end-0.05;s+=CHUNK){
    const e=Math.min(end,s+CHUNK);const fn='ai_a'+chunks.length+'.mp3';
@@ -563,14 +452,15 @@ async function extractAiAudio(ff,ed,start,end){
 async function transcribeChunks(key,chunks,statusFn){
  const texts=[];
  for(let ci=0;ci<chunks.length;ci++){const ch=chunks[ci];if(ci>0)await new Promise(r=>setTimeout(r,2500));
-  const parts=[{inlineData:{mimeType:'audio/mp3',data:u8ToB64(ch)}},{text:'Transcribe the speech in this audio exactly, in its original language. One sentence per line. Output ONLY the transcript lines — no translation, no labels, no commentary.'}];
+  if(statusFn&&chunks.length>1)statusFn('📝 စာသား ထုတ်နေပါတယ်… အပိုင်း '+(ci+1)+'/'+chunks.length);
+  const parts=[{inlineData:{mimeType:'audio/mp3',data:u8ToB64(ch)}},{text:'Transcribe ALL of the speech in this audio clip exactly, in its original language, from the very beginning to the very end. Every sentence, in the order spoken — do NOT skip, shorten, summarize or stop early, even if the clip is long. One sentence per line. If a word is unclear, write your best hearing of it and keep going until the end of the audio. Output ONLY the transcript lines — no translation, no labels, no commentary.'}];
   texts.push(await geminiGen(key,parts,0.2,statusFn));
  }
  return texts.join('\n');
 }
 async function translateFaithful(key,transcript,statusFn){
- const prompt='Translate the following transcript into natural SPOKEN Burmese (Myanmar language), the way a real person would SAY it out loud — NOT formal written style.\nRules:\n- Keep EXACTLY the same number of lines: one output line per input line, in the same order.\n- Keep names, places and facts accurate — translate faithfully, do not add or remove content.\n- Write ALL numbers as Burmese words (for example တစ်သောင်း, နှစ်ဆယ်, သုံးရာ) — never use digits.\n- Transliterate foreign words into Burmese script where natural, because this text will be read aloud by a voice.\n- Output ONLY the Burmese lines — no labels, no notes, no blank lines.\n\nTranscript:\n'+transcript;
- return geminiGen(key,[{text:prompt}],0.2,statusFn);
+ const prompt='Translate the following transcript into natural SPOKEN Burmese (Myanmar language) — translate the MEANING of every sentence, the way a real person would SAY it out loud in Burmese, NOT formal written style.\nRules:\n- Translate sentence by sentence: keep EXACTLY the same number of lines, one output line per input line, in the same order.\n- Translate what each sentence MEANS. Every ordinary word must be replaced by its Burmese meaning — NEVER write a foreign word as a Burmese sound-spelling of how it sounds. Sound-spelling (transliterating) ordinary words is FORBIDDEN.\n- The ONLY exception: names of people and places (proper names) that have no Burmese equivalent may be written in Burmese script the way they sound.\n- Keep facts accurate — translate faithfully, do not add or remove content, do not invent facts.\n- Write ALL numbers as Burmese words (for example တစ်သောင်း, နှစ်ဆယ်, သုံးရာ) — never use digits.\n- Use natural spoken forms, not stiff written forms.\n- Output ONLY the Burmese lines — no labels, no notes, no blank lines.\n\nTranscript:\n'+transcript;
+ return geminiGen(key,[{text:prompt}],0.2,statusFn,true);
 }
 async function sampleFrames(ed,start,end){
  const v=$('#'+ed.p+'-video');if(!v||!v.videoWidth||!ed.url)return[];
@@ -591,7 +481,7 @@ async function writeSceneScript(key,frames,transcript,dur,statusFn){
  if(transcript)prompt+='\n\nTranscript of the original audio (use it for facts and context):\n'+transcript;
  prompt+='\n\nWrite the recap narration in Burmese (Myanmar language), following ALL of these rules:\n- About '+target+' lines. One short cue per line (each line at most about 25 words — one subtitle cue, one breath).\n- The FIRST line must be a strong curiosity hook that makes viewers keep watching.\n- Then tell the story in scene order. Cover the key facts COMPLETELY.\n- Use ONLY facts visible in the frames'+(transcript?' or stated in the transcript':'')+'. Do NOT invent facts. No exaggeration.\n- Write in natural, conversational SPOKEN Burmese (သဘာဝကျကျ ပြောတဲ့ပုံစံ) — like a real person telling the story, NOT formal written Burmese.\n- Write ALL numbers as Burmese words — never use digits.\n- Output ONLY the script lines — no title, no labels, no notes.';
  parts.push({text:prompt});
- return geminiGen(key,parts,0.4,statusFn);
+ return geminiGen(key,parts,0.4,statusFn,true);
 }
 /* --- SRT helpers --- */
 function srtTime(sec){sec=Math.max(0,sec||0);let ms=Math.round((sec%1)*1000);let t=Math.floor(sec);if(ms===1000){ms=0;t+=1}const p=(n,l)=>String(n).padStart(l,'0');return p(Math.floor(t/3600),2)+':'+p(Math.floor(t%3600/60),2)+':'+p(t%60,2)+','+p(ms,3)}
@@ -674,7 +564,7 @@ function downloadText(name,text){const b=new Blob([text],{type:'text/plain;chars
     if(ae&&ae.message===AI_NO_AUDIO){setTxStatus('⚠️ ဒီ video မှာ အသံ မပါပါ');showNotice('⚠️ ဒီ video မှာ အသံထွက် မပါပါ — စာသား ထုတ်မရပါ။ အဆင့် ၃ မှာ "Scene အသစ် Recap" ပုံစံဖြင့် script ရေးနိုင်ပါတယ်','err');return}
     throw ae;
    }
-   setTxStatus('📝 စာသား ထုတ်နေပါတယ်… (အသံ အပိုင်း '+chunks.length+' ပိုင်း)');showNotice('📝 စာသား ထုတ်နေပါတယ်…','info');
+   setTxStatus('🔊 အသံ '+Math.round(v.end-v.start)+' စက္ကန့် ထုတ်ပြီး — 📝 စာသား ထုတ်နေပါတယ်… (အသံ အပိုင်း '+chunks.length+' ပိုင်း)');showNotice('📝 စာသား ထုတ်နေပါတယ်…','info');
    const transcript=cleanLines(await transcribeChunks(v.key,chunks,setTxStatus)).join('\n');
    if(!transcript){setTxStatus('⚠️ စကားပြော မကြားရပါ');showNotice('⚠️ အသံထဲက စကားပြော မကြားရပါ — စကားပြော မရှိသော video ဖြစ်နိုင်ပါတယ်။ အဆင့် ၃ မှာ Scene ပုံစံဖြင့် ဆက်နိုင်ပါတယ်','err');return}
    const wrap=E('aiTxWrap');if(wrap)wrap.style.display='block';
@@ -746,7 +636,7 @@ function downloadText(name,text){const b=new Blob([text],{type:'text/plain;chars
  E('engineBtn').onclick=()=>{
   openSheet('TTS Engine ရွေးပါ',
    '<button class="opt'+(ed.ttsEngine==='gemini'?' sel':'')+'" data-v="gemini"><b>✨ Gemini TTS</b><span>သင့် Gemini key သုံးမည် — အသံ: Kore / Puck / Charon / Leda / Aoede</span></button>'
-  +'<button class="opt'+(ed.ttsEngine==='edge'?' sel':'')+'" data-v="edge"><b>🌐 Edge TTS</b><span>Key မလိုပါ — မြန်မာ အသံ: Thiha / Nilar</span></button>');
+  +'<button class="opt'+(ed.ttsEngine==='edge'?' sel':'')+'" data-v="edge"><b>🌐 Edge TTS</b><span>Key မလိုပါ — server မှတဆင့် အလုပ်လုပ်ပါတယ် (ပထမ အကြိမ် ~၁ မိနစ် ကြာနိုင်ပါတယ်) — မြန်မာ အသံ: Thiha / Nilar</span></button>');
   $$('#sheetBody .opt').forEach(o=>o.onclick=()=>{ed.ttsEngine=o.dataset.v;closeSheet();refreshEngineBtn();if(ed.refresh)ed.refresh();checkVoiceStale();showNotice('✅ Engine ပြောင်းပါပြီ: '+(ed.ttsEngine==='edge'?'Edge TTS':'Gemini TTS'),'ok')});
  };
  async function runVoiceGen(){
@@ -757,7 +647,7 @@ function downloadText(name,text){const b=new Blob([text],{type:'text/plain;chars
   ed.voiceBusy=true;const btn=E('voiceGen');busyBtn(btn,true,'အသံ ထုတ်နေပါတယ်…');
   setVoiceStatus('🎙️ အသံ ထုတ်နေပါတယ်…');showNotice('▶️ အသံ ထုတ်ခြင်း စတင်ပါပြီ','info');
   try{
-   const gv=await generateVoice(ed,txt);
+   const gv=await generateVoice(ed,txt,setVoiceStatus);
    ed.voiceCache={text:txt,engine:ed.ttsEngine,voice:effVoice(),bytes:gv.bytes,ext:gv.ext};
    if(ed.voiceUrl)URL.revokeObjectURL(ed.voiceUrl);
    ed.voiceUrl=URL.createObjectURL(new Blob([gv.bytes],{type:gv.ext==='mp3'?'audio/mpeg':'audio/wav'}));

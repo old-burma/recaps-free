@@ -3,338 +3,371 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Recaps — Dashboard</title>
+<title>Recaps — Video Recap လုပ်ရန်</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Padauk:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Padauk:wght@400;700&family=Noto+Sans+Myanmar:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
+<script src="https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.js"></script>
 <style>
-  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-  html,body { height:100%; }
-  body {
-    font-family:'Inter','Padauk',system-ui,sans-serif;
-    color:#eafcff;
-    background:
-      radial-gradient(1100px 750px at 88% -12%, rgba(72,225,205,.38), rgba(72,225,205,0) 60%),
-      radial-gradient(900px 700px at -12% 112%, rgba(0,170,205,.32), rgba(0,170,205,0) 62%),
-      radial-gradient(600px 420px at 55% 120%, rgba(20,190,200,.20), rgba(20,190,200,0) 65%),
-      linear-gradient(155deg, #03222b 0%, #065263 46%, #0a7d8c 100%);
-    background-attachment: fixed;
-    min-height:100vh;
-  }
-  .layout { display:block; padding:18px 18px 118px; max-width:1180px; margin:0 auto; min-height:100vh; }
-
-  /* ---------- Sidebar (dark glass) ---------- */
-  .sidebar {
-    width:238px; flex:0 0 238px; display:flex; flex-direction:column; gap:6px;
-    background:rgba(3,40,50,.55);
-    border:1px solid rgba(255,255,255,.14);
-    border-radius:24px; padding:20px 14px;
-    backdrop-filter: blur(18px) saturate(1.3); -webkit-backdrop-filter: blur(18px) saturate(1.3);
-    box-shadow: 0 24px 50px rgba(0,20,28,.35);
-    position:sticky; top:18px; height:calc(100vh - 36px);
-  }
-  .logo { display:flex; align-items:center; gap:11px; padding:2px 8px 16px; }
-  .logo-badge {
-    width:42px; height:42px; border-radius:13px; display:grid; place-items:center; font-size:21px;
-    background:linear-gradient(135deg,#1fd3e8,#0a8fa8);
-    box-shadow:0 8px 20px rgba(20,200,225,.45), inset 0 1px 0 rgba(255,255,255,.5);
-  }
-  .logo h1 { font-size:19px; font-weight:800; letter-spacing:.2px; color:#fff; line-height:1.1; }
-  .logo small { font-size:11px; color:rgba(220,250,255,.65); font-weight:500; }
-  .nav-label { font-size:10.5px; letter-spacing:.14em; text-transform:uppercase; color:rgba(200,240,248,.45); padding:10px 10px 6px; font-weight:700; }
-  .nav-item {
-    display:flex; align-items:center; gap:11px; padding:11px 12px; border-radius:13px;
-    color:rgba(225,250,255,.82); font-size:14.5px; font-weight:600; cursor:pointer; border:1px solid transparent;
-    transition: all .18s ease; user-select:none;
-  }
-  .nav-item .ic { font-size:17px; width:22px; text-align:center; }
-  .nav-item:hover { background:rgba(255,255,255,.08); color:#fff; }
-  .nav-item.active {
-    background:linear-gradient(90deg,#15c3da,#0b9db8); color:#fff; border-color:rgba(255,255,255,.25);
-    box-shadow:0 10px 22px rgba(10,170,200,.40), inset 0 1px 0 rgba(255,255,255,.35);
-  }
-  .side-spacer { flex:1; }
-  .user-chip {
-    display:flex; align-items:center; gap:10px; padding:10px; border-radius:15px;
-    background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.10);
-  }
-  .avatar {
-    width:36px; height:36px; border-radius:50%; display:grid; place-items:center; font-weight:800; font-size:14px; color:#04303d;
-    background:linear-gradient(135deg,#ffe259,#ffa751);
-  }
-  .user-chip b { font-size:13px; color:#fff; display:block; line-height:1.2; }
-  .user-chip span { font-size:11px; color:rgba(215,245,250,.6); }
-
-  /* ---------- Main sheet (light glass) ---------- */
-  .main {
-    flex:1; min-width:0;
-    background:rgba(226,248,250,.14);
-    border:1px solid rgba(255,255,255,.22);
-    border-radius:26px; padding:24px;
-    backdrop-filter: blur(20px) saturate(1.25); -webkit-backdrop-filter: blur(20px) saturate(1.25);
-    box-shadow: 0 24px 60px rgba(0,25,35,.30);
-  }
-  .topbar { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; flex-wrap:wrap; }
-  .topbar h2 { font-size:26px; font-weight:800; color:#fff; text-shadow:0 2px 14px rgba(0,40,50,.35); }
-  .topbar p { color:rgba(230,252,255,.75); font-size:13.5px; margin-top:3px; font-weight:500; }
-  .top-actions { display:flex; align-items:center; gap:10px; }
-  .search {
-    display:flex; align-items:center; gap:8px; padding:10px 15px; border-radius:999px; min-width:210px;
-    background:rgba(255,255,255,.85); color:#5b7d85; font-size:13.5px; font-weight:500;
-    box-shadow: inset 0 1px 0 rgba(255,255,255,.9), 0 6px 16px rgba(0,40,50,.12);
-  }
-  .btn-dark {
-    padding:11px 18px; border-radius:999px; border:none; cursor:pointer;
-    background:#06333f; color:#eafcff; font-size:13.5px; font-weight:700; font-family:inherit;
-    box-shadow:0 10px 20px rgba(0,30,40,.35); transition:transform .15s ease;
-  }
-  .btn-dark:hover { transform:translateY(-1px); }
-
-  /* ---------- Cards ---------- */
-  .card {
-    background:rgba(255,255,255,.90);
-    border:1px solid rgba(255,255,255,.65);
-    border-radius:20px; padding:20px; color:#07303c;
-    box-shadow:0 14px 30px rgba(0,45,58,.14), inset 0 1px 0 rgba(255,255,255,.95);
-  }
-  .actions { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-top:22px; }
-  .action-card { cursor:pointer; transition:transform .18s ease, box-shadow .18s ease; }
-  .action-card:hover { transform:translateY(-4px); box-shadow:0 22px 40px rgba(0,45,58,.20), inset 0 1px 0 #fff; }
-  .action-ic {
-    width:48px; height:48px; border-radius:15px; display:grid; place-items:center; font-size:23px; margin-bottom:13px;
-    background:linear-gradient(135deg,#19c2da,#0a8fa8); color:#fff;
-    box-shadow:0 10px 20px rgba(12,165,190,.40), inset 0 1px 0 rgba(255,255,255,.5);
-  }
-  .action-card:nth-child(2) .action-ic { background:linear-gradient(135deg,#ffb03a,#f07f3c); box-shadow:0 10px 20px rgba(240,140,50,.40), inset 0 1px 0 rgba(255,255,255,.5); }
-  .action-card:nth-child(3) .action-ic { background:linear-gradient(135deg,#8a7cf0,#6656d8); box-shadow:0 10px 20px rgba(110,95,220,.40), inset 0 1px 0 rgba(255,255,255,.5); }
-  .action-card h3 { font-size:16.5px; font-weight:800; margin-bottom:5px; }
-  .action-card p { font-size:13px; color:#527884; line-height:1.55; font-weight:500; }
-
-  .stats { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-top:16px; }
-  .stat-card { padding:17px 19px; }
-  .stat-top { display:flex; justify-content:space-between; align-items:center; }
-  .stat-top .ic { width:34px; height:34px; border-radius:11px; display:grid; place-items:center; font-size:16px; background:rgba(10,160,185,.12); }
-  .stat-card .num { font-size:27px; font-weight:800; margin-top:9px; letter-spacing:-.5px; }
-  .stat-card .lbl { font-size:12.5px; color:#527884; font-weight:600; margin-top:2px; }
-  .delta { font-size:11.5px; font-weight:700; color:#0a9d6c; background:rgba(10,180,120,.12); padding:3px 8px; border-radius:999px; }
-
-  .cols { display:grid; grid-template-columns:1.65fr 1fr; gap:16px; margin-top:16px; }
-  .card h4 { font-size:15.5px; font-weight:800; display:flex; align-items:center; gap:8px; }
-  .card .sub { font-size:12.5px; color:#5b828d; margin-top:3px; font-weight:500; }
-  .empty {
-    margin-top:16px; border:1.6px dashed rgba(8,90,108,.28); border-radius:16px; padding:30px 18px; text-align:center;
-    color:#40626d; background:rgba(255,255,255,.45);
-  }
-  .empty .big { font-size:30px; margin-bottom:8px; }
-  .empty b { font-size:14.5px; color:#07303c; display:block; margin-bottom:4px; }
-  .empty span { font-size:12.5px; }
-  .set-row { display:flex; justify-content:space-between; align-items:center; padding:13px 2px; border-bottom:1px solid rgba(8,80,98,.09); }
-  .set-row:last-child { border-bottom:none; }
-  .set-row b { font-size:13.5px; font-weight:700; }
-  .set-row span { display:block; font-size:11.5px; color:#5b828d; font-weight:500; margin-top:1px; }
-  .chip {
-    font-size:12px; font-weight:700; color:#086a7d; background:rgba(12,170,195,.13);
-    border:1px solid rgba(12,170,195,.25); padding:6px 12px; border-radius:999px; white-space:nowrap;
-  }
-  .foot { margin-top:18px; text-align:center; font-size:12px; color:rgba(225,250,255,.55); font-weight:500; }
-
-  /* ---------- Brand (in topbar) ---------- */
-  .brand { display:flex; align-items:center; gap:11px; width:100%; margin-bottom:14px; }
-  .brand .logo-badge { width:40px; height:40px; border-radius:12px; font-size:20px; }
-  .brand h1 { font-size:18px; font-weight:800; color:#fff; line-height:1.1; }
-  .brand small { font-size:11px; color:rgba(220,250,255,.65); font-weight:500; }
-
-  /* ---------- Glassy pill navigation (reference: bottom style) ---------- */
-  .pillnav {
-    position:fixed; left:50%; transform:translateX(-50%); bottom:18px; z-index:60;
-    width:min(560px, calc(100% - 24px));
-    display:flex; align-items:stretch; justify-content:space-between;
-    padding:9px 12px 7px;
-    background:rgba(255,255,255,.55);
-    border:1px solid rgba(255,255,255,.65);
-    border-radius:999px;
-    backdrop-filter: blur(22px) saturate(1.5); -webkit-backdrop-filter: blur(22px) saturate(1.5);
-    box-shadow: 0 18px 42px rgba(0,28,38,.30), inset 0 1px 0 rgba(255,255,255,.85), inset 0 -8px 18px rgba(255,255,255,.18);
-  }
-  .pill-item {
-    flex:1; display:flex; flex-direction:column; align-items:center; gap:2px;
-    padding:5px 2px 3px; border-radius:999px; cursor:pointer; user-select:none;
-    color:rgba(7,48,60,.55); transition:color .16s ease, background .16s ease;
-  }
-  .pill-item svg { width:22px; height:22px; }
-  .pill-item .plabel { font-size:10.5px; font-weight:600; line-height:1.15; white-space:nowrap; }
-  .pill-item .pdot { width:5px; height:5px; border-radius:50%; background:#0aa2c0; opacity:0; transform:scale(.4); transition:all .16s ease; }
-  .pill-item:hover { color:#075a6d; }
-  .pill-item.active { color:#075a6d; }
-  .pill-item.active .plabel { font-weight:800; }
-  .pill-item.active .pdot { opacity:1; transform:scale(1); }
-  .pill-item.center svg { width:25px; height:25px; }
-
-  @media (max-width: 960px) {
-    .stats { grid-template-columns:repeat(2,1fr); }
-    .actions { grid-template-columns:1fr; }
-    .cols { grid-template-columns:1fr; }
-  }
-  @media (max-width: 720px) {
-    .layout { padding:12px 12px 110px; }
-    .main { padding:17px 14px 26px; border-radius:22px; }
-    .topbar h2 { font-size:21px; }
-    .search { min-width:0; flex:1; }
-    .top-actions { width:100%; }
-    .pillnav { bottom:12px; padding:8px 9px 6px; }
-    .pill-item .plabel { font-size:10px; }
-  }
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+input,textarea{user-select:text;-webkit-user-select:text}
+html,body{height:100%}
+body{font-family:'Inter','Padauk','Noto Sans Myanmar',system-ui,sans-serif;color:#eafcff;background:radial-gradient(1100px 750px at 88% -12%,rgba(72,225,205,.38),rgba(72,225,205,0) 60%),radial-gradient(900px 700px at -12% 112%,rgba(0,170,205,.32),rgba(0,170,205,0) 62%),linear-gradient(155deg,#03222b 0%,#065263 46%,#0a7d8c 100%);background-attachment:fixed;min-height:100vh}
+.layout{padding:14px 14px 118px;max-width:980px;margin:0 auto}
+.main{background:rgba(226,248,250,.14);border:1px solid rgba(255,255,255,.22);border-radius:26px;padding:20px;backdrop-filter:blur(20px) saturate(1.25);-webkit-backdrop-filter:blur(20px) saturate(1.25);box-shadow:0 24px 60px rgba(0,25,35,.30)}
+.brand{display:flex;align-items:center;gap:11px;margin-bottom:12px}
+.logo-badge{width:42px;height:42px;border-radius:13px;display:grid;place-items:center;font-size:21px;background:linear-gradient(135deg,#1fd3e8,#0a8fa8);box-shadow:0 8px 20px rgba(20,200,225,.45)}
+.brand h1{font-size:19px;font-weight:800;color:#fff}.brand small{font-size:11px;color:rgba(220,250,255,.65)}
+h2.page-title{font-size:23px;font-weight:800;color:#fff;text-shadow:0 2px 14px rgba(0,40,50,.35)}
+.page-sub{color:rgba(230,252,255,.78);font-size:13.5px;margin:3px 0 16px;font-weight:500}
+.tabpage{display:none}.tabpage.active{display:block}
+.card{background:rgba(255,255,255,.92);border:1px solid rgba(255,255,255,.65);border-radius:20px;padding:18px;color:#07303c;box-shadow:0 14px 30px rgba(0,45,58,.14);margin-bottom:14px}
+.card h3{font-size:16px;font-weight:800;margin-bottom:6px}.card p{font-size:13px;color:#527884;line-height:1.55}
+.actions{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:14px}
+.action-card{cursor:pointer}.action-ic{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;font-size:22px;margin-bottom:10px;background:linear-gradient(135deg,#19c2da,#0a8fa8);color:#fff}
+.action-card:nth-child(2) .action-ic{background:linear-gradient(135deg,#ffb03a,#f07f3c)}
+.action-card:nth-child(3) .action-ic{background:linear-gradient(135deg,#8a7cf0,#6656d8)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:14px}
+.stat-card .num{font-size:26px;font-weight:800;margin-top:6px}.stat-card .lbl{font-size:12.5px;color:#527884;font-weight:600}
+.btn{padding:12px 18px;border-radius:999px;border:none;cursor:pointer;background:#06333f;color:#eafcff;font-size:14px;font-weight:700;font-family:inherit;display:inline-flex;align-items:center;gap:8px;justify-content:center}
+.btn.primary{background:linear-gradient(90deg,#15c3da,#0b9db8);color:#fff;width:100%}
+.btn.light{background:rgba(12,170,195,.13);color:#086a7d;border:1px solid rgba(12,170,195,.3)}
+.btn.danger{background:#b3261e;color:#fff}.btn.small{padding:8px 13px;font-size:12.5px}
+.btn:disabled{opacity:.55}
+.field{margin-bottom:14px}.field label{display:block;font-size:13px;font-weight:700;margin-bottom:6px;color:#07303c}
+.field input[type=text],.field input[type=number],.field input[type=password],.field textarea{width:100%;padding:11px 13px;border-radius:13px;border:1.5px solid rgba(8,90,108,.25);font-family:inherit;font-size:14px;background:#fff;color:#07303c}
+.field textarea{min-height:110px;line-height:1.7;resize:vertical}
+.field .hint{font-size:11.5px;color:#6b8b94;margin-top:4px}
+.field.bad input,.field.bad textarea{border-color:#d32f2f;box-shadow:0 0 0 3px rgba(211,47,47,.18)}
+.err-text{display:none;font-size:12.5px;color:#b3261e;font-weight:600;margin-top:5px}.err-text.show{display:block}
+input[type=range]{width:100%;accent-color:#0b9db8}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.picker-row{display:flex;gap:10px;flex-wrap:wrap}
+.pick-btn{flex:1;padding:12px;border-radius:14px;border:1.5px solid rgba(12,170,195,.35);background:rgba(12,170,195,.08);cursor:pointer;font-family:inherit;text-align:left}
+.pick-btn b{display:block;font-size:13.5px;color:#07303c}.pick-btn span{font-size:12px;color:#527884}
+.switch-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0}
+.tgl{width:50px;height:28px;border-radius:999px;background:#b9ccd1;position:relative;cursor:pointer;flex:0 0 50px}
+.tgl::after{content:'';position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:all .18s}
+.tgl.on{background:#0b9db8}.tgl.on::after{left:25px}
+video.preview{width:100%;max-height:52vh;border-radius:14px;background:#000}
+.file-info{font-size:12.5px;color:#527884;margin-top:6px;word-break:break-all}
+.lib-item{display:flex;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid rgba(8,80,98,.1)}
+.lib-item:last-child{border-bottom:none}.lib-item video{width:64px;height:96px;object-fit:cover;border-radius:10px;background:#000}
+.lib-meta{flex:1;min-width:0}.lib-meta b{font-size:13.5px;display:block;word-break:break-all}.lib-meta span{font-size:12px;color:#527884}
+.empty{border:1.6px dashed rgba(8,90,108,.28);border-radius:16px;padding:26px 16px;text-align:center;color:#40626d;background:rgba(255,255,255,.45)}
+/* waveform loading */
+.wave{display:none;align-items:flex-end;gap:2.5px;height:16px}
+.wave i{display:block;width:3.5px;background:#fff;border-radius:2px;animation:wv 0.9s ease-in-out infinite}
+.wave i:nth-child(2){animation-delay:.12s}.wave i:nth-child(3){animation-delay:.24s}.wave i:nth-child(4){animation-delay:.36s}.wave i:nth-child(5){animation-delay:.48s}
+@keyframes wv{0%,100%{height:5px}50%{height:16px}}
+.btn.loading .wave{display:inline-flex}.btn.loading .btn-label{opacity:.85}
+/* pill nav */
+.pillnav{position:fixed;left:50%;transform:translateX(-50%);bottom:16px;z-index:60;width:min(560px,calc(100% - 24px));display:flex;padding:9px 12px 7px;background:rgba(255,255,255,.55);border:1px solid rgba(255,255,255,.65);border-radius:999px;backdrop-filter:blur(22px) saturate(1.5);-webkit-backdrop-filter:blur(22px) saturate(1.5);box-shadow:0 18px 42px rgba(0,28,38,.30)}
+.pill-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:5px 2px 3px;cursor:pointer;color:rgba(7,48,60,.55)}
+.pill-item svg{width:22px;height:22px}.pill-item .plabel{font-size:10.5px;font-weight:600;white-space:nowrap}
+.pill-item .pdot{width:5px;height:5px;border-radius:50%;background:#0aa2c0;opacity:0}
+.pill-item.active{color:#075a6d}.pill-item.active .plabel{font-weight:800}.pill-item.active .pdot{opacity:1}
+body.locked{overflow:hidden}
+/* bottom sheet */
+.sheet-wrap{position:fixed;inset:0;z-index:100;display:none}
+.sheet-wrap.open{display:block}
+.sheet-bg{position:absolute;inset:0;background:rgba(2,25,32,.55)}
+.sheet{position:absolute;left:0;right:0;bottom:0;max-width:640px;margin:0 auto;background:#f4fbfc;border-radius:24px 24px 0 0;padding:20px 18px 28px;color:#07303c;max-height:82vh;overflow:auto}
+.sheet h3{font-size:16px;font-weight:800;margin-bottom:12px}
+.opt{width:100%;text-align:left;padding:14px;border-radius:14px;border:1.5px solid rgba(8,90,108,.18);background:#fff;margin-bottom:9px;cursor:pointer;font-family:inherit}
+.opt b{display:block;font-size:14px;color:#07303c}.opt span{font-size:12.5px;color:#527884}
+.opt.sel{border-color:#0b9db8;background:rgba(12,170,195,.08)}
+/* notices */
+#notice{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:200;width:min(520px,calc(100% - 28px));display:none;padding:13px 16px;border-radius:15px;font-size:13.5px;font-weight:600;box-shadow:0 14px 34px rgba(0,20,28,.35)}
+#notice.show{display:block}#notice.ok{background:#e6f7ee;color:#0a5c36;border:1px solid #7fd6a8}#notice.err{background:#fdecea;color:#8c1d18;border:1px solid #f0a49e}#notice.info{background:#e8f7fb;color:#075a6d;border:1px solid #8fd4e4}
+#donePop{position:fixed;inset:0;z-index:210;display:none;place-items:center;background:rgba(2,25,32,.5)}
+#donePop.show{display:grid}
+#donePop .box{background:#fff;color:#07303c;border-radius:22px;padding:26px 22px;width:min(400px,calc(100% - 40px));text-align:center}
+.logbox{background:#04222b;color:#bfeef7;border-radius:13px;padding:11px 13px;font-size:11.5px;max-height:130px;overflow:auto;white-space:pre-wrap;word-break:break-all;margin-top:10px;display:none}
+@media(max-width:720px){.actions{grid-template-columns:1fr}.stats{grid-template-columns:1fr 1fr}.layout{padding:10px 10px 110px}.main{padding:16px 13px 24px}}
 </style>
 </head>
 <body>
-<div class="layout">
+<div class="layout"><main class="main">
+<div class="brand"><div class="logo-badge">🎬</div><div><h1>Recaps</h1><small>recaps-free.work.gd</small></div></div>
 
-  <!-- Main -->
-  <main class="main">
-    <div class="brand">
-      <div class="logo-badge">🎬</div>
-      <div>
-        <h1>Recaps</h1>
-        <small>recaps-free.work.gd</small>
-      </div>
-    </div>
-    <div class="topbar">
-      <div>
-        <h2 id="greeting">မင်္ဂလာပါ 👋</h2>
-        <p>Recaps Dashboard — ဒီနေ့ ဘာလုပ်မလဲ?</p>
-      </div>
-      <div class="top-actions">
-        <div class="search">🔍 <span>Recap ရှာရန်…</span></div>
-        <button class="btn-dark">＋ Recap အသစ်</button>
-        <div class="avatar" title="Old Burma">O</div>
-      </div>
-    </div>
-
-    <!-- Quick actions -->
-    <section class="actions">
-      <div class="card action-card">
-        <div class="action-ic">📱</div>
-        <h3>ဖုန်းထဲက Video</h3>
-        <p>Phone ထဲက video တင်လိုက်တာနဲ့ စာတန်းထိုး + နောက်ခံစကားပြောနဲ့ Recap လုပ်ပေးမယ်</p>
-      </div>
-      <div class="card action-card">
-        <div class="action-ic">🔗</div>
-        <h3>URL မှ Recap</h3>
-        <p>YouTube / TikTok link ထည့်လိုက်ရုံနဲ့ download လုပ်ပြီး Recap အဖြစ် ပြောင်းပေးမယ်</p>
-      </div>
-      <div class="card action-card">
-        <div class="action-ic">✂️</div>
-        <h3>Long to Short</h3>
-        <p>Video အရှည်ကို အတိုဆုံး အကောင်းဆုံး အပိုင်းတွေ ရွေးပြီး Short အဖြစ် ဖြတ်ပေးမယ်</p>
-      </div>
-    </section>
-
-    <!-- Stats -->
-    <section class="stats">
-      <div class="card stat-card">
-        <div class="stat-top"><span class="ic">🎬</span><span class="delta">အသစ်</span></div>
-        <div class="num">0</div>
-        <div class="lbl">စုစုပေါင်း Recap</div>
-      </div>
-      <div class="card stat-card">
-        <div class="stat-top"><span class="ic">✅</span><span class="delta">ဒီလ</span></div>
-        <div class="num">0</div>
-        <div class="lbl">ဒီလ လုပ်ပြီး</div>
-      </div>
-      <div class="card stat-card">
-        <div class="stat-top"><span class="ic">⏳</span><span class="delta">ဆောင်ဆဲ</span></div>
-        <div class="num">0</div>
-        <div class="lbl">လုပ်ဆောင်နေဆဲ</div>
-      </div>
-      <div class="card stat-card">
-        <div class="stat-top"><span class="ic">⏱️</span><span class="delta">ပျမ်းမျှ</span></div>
-        <div class="num">—</div>
-        <div class="lbl">ပျမ်းမျှ အရှည်</div>
-      </div>
-    </section>
-
-    <!-- Columns -->
-    <section class="cols">
-      <div class="card">
-        <h4>🗂️ နောက်ဆုံး Recap များ</h4>
-        <p class="sub">လုပ်ပြီးသား recap တွေ ဒီမှာ ပေါ်လာမယ်</p>
-        <div class="empty">
-          <div class="big">🎞️</div>
-          <b>Recap မရှိသေးပါ</b>
-          <span>အပေါ်က ကတ်တစ်ခုခုကို နှိပ်ပြီး ပထမဆုံး Recap စလုပ်ပါ</span>
-        </div>
-      </div>
-
-      <div class="card">
-        <h4>⚙️ ဆက်တင် အကျဉ်း</h4>
-        <p class="sub">Recap တိုင်းမှာ စိတ်ကြိုက် ပြင်လို့ရတယ်</p>
-        <div style="margin-top:8px">
-          <div class="set-row">
-            <div><b>Blur</b><span>နောက်ခံ blur အဆင့်</span></div>
-            <span class="chip">ပြင်ရန်</span>
-          </div>
-          <div class="set-row">
-            <div><b>ခေါင်းစဉ် (Title)</b><span>Video ပေါ်က ခေါင်းစဉ်စာ</span></div>
-            <span class="chip">ပြင်ရန်</span>
-          </div>
-          <div class="set-row">
-            <div><b>Aspect Ratio</b><span>9:16 · 16:9 · 1:1</span></div>
-            <span class="chip">9:16</span>
-          </div>
-          <div class="set-row">
-            <div><b>စာတန်း + အသံ</b><span>စာတန်းထိုး + နောက်ခံစကားပြော</span></div>
-            <span class="chip">ဖွင့်ထား</span>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <div class="foot">Recaps Web App — recaps-free.work.gd · Dashboard v1</div>
-  </main>
+<!-- ===== Dashboard ===== -->
+<section class="tabpage active" id="page-home">
+<h2 class="page-title" id="greeting">မင်္ဂလာပါ 👋</h2>
+<p class="page-sub">Recaps Dashboard — ဒီနေ့ ဘာလုပ်မလဲ?</p>
+<div class="actions">
+<div class="card action-card" data-goto="recap"><div class="action-ic">📱</div><h3>ဖုန်းထဲက Video</h3><p>Phone ထဲက video တင်ပြီး စာတန်း + အသံသစ်နဲ့ Recap လုပ်ပါ</p></div>
+<div class="card action-card" id="urlCard"><div class="action-ic">🔗</div><h3>URL မှ Recap</h3><p>YouTube / TikTok link မှ Recap — နောက်အဆင့်တွင် လာမည်</p></div>
+<div class="card action-card" data-goto="short"><div class="action-ic">✂️</div><h3>Long to Short</h3><p>Video အရှည်ကို အပိုင်းခွဲပြီး Short များ ထုတ်ပါ</p></div>
 </div>
+<div class="stats">
+<div class="card stat-card"><div class="lbl">🎬 စုစုပေါင်း ထုတ်ပြီး</div><div class="num" id="statCount">0</div></div>
+<div class="card stat-card"><div class="lbl">💾 စုစုပေါင်း အရွယ်အစား</div><div class="num" id="statSize">0 MB</div></div>
+<div class="card stat-card"><div class="lbl">🕘 နောက်ဆုံး ထုတ်ချိန်</div><div class="num" id="statLast" style="font-size:16px">—</div></div>
+</div>
+<div class="card"><h3>🗂️ နောက်ဆုံး Recap များ</h3><div id="recentList"><div class="empty"><b>Recap မရှိသေးပါ</b><br><span style="font-size:12.5px">အပေါ်က ကတ်တစ်ခုခုကို နှိပ်ပြီး ပထမဆုံး Recap စလုပ်ပါ</span></div></div></div>
+</section>
 
-<!-- Glassy pill navigation -->
+<!-- editor pages are injected by JS (shared template, two instances) -->
+<section class="tabpage" id="page-short"></section>
+<section class="tabpage" id="page-recap"></section>
+
+<!-- ===== Library ===== -->
+<section class="tabpage" id="page-library">
+<h2 class="page-title">စာကြည့်တိုက်</h2><p class="page-sub">ထုတ်ပြီးသား video များ — ဒီ browser ထဲမှာပဲ သိမ်းထားပါတယ်</p>
+<div class="card"><div id="libraryList"><div class="empty"><b>ဘာမှ မရှိသေးပါ</b></div></div></div>
+</section>
+
+<!-- ===== Settings ===== -->
+<section class="tabpage" id="page-settings">
+<h2 class="page-title">ဆက်တင်</h2><p class="page-sub">ဆက်တင်အားလုံး ဒီ browser ထဲမှာပဲ သိမ်းပါတယ်</p>
+<div class="card"><h3>🎞️ မူလ ပုံစံ</h3>
+<div class="field"><label>မူလ Aspect</label><button class="btn light" id="setAspectBtn" style="width:100%">ရွေးရန်</button></div>
+<div class="field"><label>မူလ Blur အား — <span id="setBlurVal"></span></label><input type="range" id="setBlur" min="5" max="60" step="1"></div>
+<button class="btn light small" id="resetFormat">↺ Reset — ပုံစံ</button></div>
+<div class="card"><h3>🔑 Gemini API Key</h3>
+<div class="field"><label>API Key (သင့်ကိုယ်ပိုင် key)</label><input type="password" id="setApiKey" placeholder="AIza…"><p class="hint">⚠️ Key ကို ဒီ browser ၏ localStorage ထဲမှာပဲ သိမ်းပါတယ် — server သို့ မပို့ပါ။ Google AI Studio မှ အခမဲ့ ရယူနိုင်ပါတယ်။</p></div>
+<div class="field"><label>မူလ အသံ (Voice)</label><button class="btn light" id="setVoiceBtn" style="width:100%">ရွေးရန်</button></div>
+<button class="btn light small" id="resetKey">↺ Reset — Key နှင့် အသံ</button></div>
+<div class="card"><h3>🗑️ အားလုံး Reset</h3><p style="margin-bottom:10px">ဆက်တင်အားလုံးကို မူလအတိုင်း ပြန်ထားမည် (စာကြည့်တိုက်ထဲက video များ မပျက်ပါ)</p><button class="btn danger small" id="resetAll">↺ Reset အားလုံး</button></div>
+</section>
+</main></div>
+
 <nav class="pillnav">
-  <div class="pill-item active" data-nav>
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9.5 21v-6h5v6"/></svg>
-    <span class="plabel">ခြုံငုံ</span>
-    <span class="pdot"></span>
-  </div>
-  <div class="pill-item" data-nav>
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><path d="M8 7.5 20 19"/><path d="M8 16.5 20 5"/></svg>
-    <span class="plabel">အတိုချုပ်</span>
-    <span class="pdot"></span>
-  </div>
-  <div class="pill-item center" data-nav>
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>
-    <span class="plabel">Recap</span>
-    <span class="pdot"></span>
-  </div>
-  <div class="pill-item" data-nav>
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
-    <span class="plabel">စာကြည့်တိုက်</span>
-    <span class="pdot"></span>
-  </div>
-  <div class="pill-item" data-nav>
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg>
-    <span class="plabel">ဆက်တင်</span>
-    <span class="pdot"></span>
-  </div>
+<div class="pill-item active" data-tab="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg><span class="plabel">ခြုံငုံ</span><span class="pdot"></span></div>
+<div class="pill-item" data-tab="short"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><path d="M8 7.5 20 19"/><path d="M8 16.5 20 5"/></svg><span class="plabel">အတိုချုပ်</span><span class="pdot"></span></div>
+<div class="pill-item" data-tab="recap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg><span class="plabel">Recap</span><span class="pdot"></span></div>
+<div class="pill-item" data-tab="library"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span class="plabel">စာကြည့်တိုက်</span><span class="pdot"></span></div>
+<div class="pill-item" data-tab="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg><span class="plabel">ဆက်တင်</span><span class="pdot"></span></div>
 </nav>
 
+<div class="sheet-wrap" id="sheetWrap"><div class="sheet-bg" id="sheetBg"></div><div class="sheet"><h3 id="sheetTitle"></h3><div id="sheetBody"></div></div></div>
+<div id="notice"></div>
+<div id="donePop"><div class="box"><div style="font-size:34px">✅</div><h3 style="margin:8px 0" id="doneTitle">ရပါပြီ</h3><p id="doneText" style="font-size:13.5px;color:#527884"></p><button class="btn primary" id="doneOk" style="margin-top:14px">ဟုတ်ကဲ့</button></div></div>
+<input type="file" id="globalFile" accept="video/*" style="display:none">
 <script>
-  // Time-aware Burmese greeting
-  (function () {
-    var h = new Date().getHours();
-    var g = h < 12 ? 'မင်္ဂလာ မနက်ခင်းပါ 🌅' : (h < 17 ? 'မင်္ဂလာ နေ့လည်ခင်းပါ ☀️' : 'မင်္ဂလာ ညနေခင်းပါ 🌇');
-    document.getElementById('greeting').textContent = g;
-  })();
-  // Sidebar active state
-  document.querySelectorAll('[data-nav]').forEach(function (el) {
-    el.addEventListener('click', function () {
-      document.querySelectorAll('[data-nav]').forEach(function (n) { n.classList.remove('active'); });
-      el.classList.add('active');
-    });
-  });
+'use strict';
+/* ================= Recaps Stage 1 — 100% client-side =================
+   FFmpeg core (single-thread, no COOP/COEP needed):
+   https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm/ffmpeg-core.js
+   https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm/ffmpeg-core.wasm
+   FFmpeg UMD: https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js
+   Util UMD:   https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.js  */
+const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
+const FF_CORE='https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm/ffmpeg-core.js';
+const FF_WASM='https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm/ffmpeg-core.wasm';
+const ASPECTS={blurpad:{label:'9:16 — 1:1 ပုံ + Blur နောက်ခံ',desc:'ပုံ အလယ် 1:1၊ အပေါ်/အောက် blur၊ စာတန်း ပုံအောက်တွင်'},full916:{label:'9:16 — အပြည့် ဖြတ်',desc:'9:16 အပြည့် crop'},original:{label:'မူရင်း Aspect',desc:'မူရင်း အချိုးအတိုင်း'}};
+const VOICES=['Kore','Puck','Charon','Leda','Aoede'];
+const DEF={aspect:'blurpad',blur:28,voice:'Kore'};
+function loadSettings(){try{return Object.assign({},DEF,JSON.parse(localStorage.getItem('recaps_settings')||'{}'))}catch(e){return Object.assign({},DEF)}}
+let SETTINGS=loadSettings();
+function saveSettings(){localStorage.setItem('recaps_settings',JSON.stringify(SETTINGS))}
+function getApiKey(){return (localStorage.getItem('recaps_gemini_key')||'').trim()}
+function fmtSize(b){if(!b&&b!==0)return'—';if(b<1048576)return(b/1024).toFixed(0)+' KB';if(b<1073741824)return(b/1048576).toFixed(1)+' MB';return(b/1073741824).toFixed(2)+' GB'}
+function fmtDur(s){s=Math.max(0,Math.round(s||0));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')}
+/* notices */
+let noticeTimer=null;
+function showNotice(msg,type){const n=$('#notice');n.textContent=msg;n.className='show '+(type||'info');clearTimeout(noticeTimer);noticeTimer=setTimeout(()=>{n.className=''},5200)}
+function showDone(title,text){$('#doneTitle').textContent=title;$('#doneText').textContent=text;$('#donePop').classList.add('show')}
+$('#doneOk').addEventListener('click',()=>$('#donePop').classList.remove('show'));
+/* greeting */
+(function(){const h=new Date().getHours();$('#greeting').textContent=h<12?'မင်္ဂလာ မနက်ခင်းပါ 🌅':(h<17?'မင်္ဂလာ နေ့လည်ခင်းပါ ☀️':'မင်္ဂလာ ညနေခင်းပါ 🌇')})();
+/* navigation */
+function goTab(name){$$('.pill-item').forEach(p=>p.classList.toggle('active',p.dataset.tab===name));$$('.tabpage').forEach(p=>p.classList.remove('active'));const pg=$('#page-'+name);if(pg)pg.classList.add('active');if(name==='library')renderLibrary();if(name==='home')renderHome();window.scrollTo(0,0)}
+$$('.pill-item').forEach(p=>p.addEventListener('click',()=>goTab(p.dataset.tab)));
+$$('[data-goto]').forEach(el=>el.addEventListener('click',()=>goTab(el.dataset.goto)));
+/* bottom sheet */
+function openSheet(title,html){$('#sheetTitle').textContent=title;$('#sheetBody').innerHTML=html;$('#sheetWrap').classList.add('open');document.body.classList.add('locked')}
+function closeSheet(){$('#sheetWrap').classList.remove('open');document.body.classList.remove('locked')}
+$('#sheetBg').addEventListener('click',closeSheet);
+$('#urlCard').addEventListener('click',()=>{openSheet('🔗 URL မှ Recap','<p style="font-size:14px;line-height:1.7;color:#40626d">URL (YouTube / TikTok link) မှ Recap လုပ်ခြင်း သည် <b>နောက်အဆင့် (Stage 2)</b> တွင် လာပါမည် — server လိုအပ်သောကြောင့် ဖြစ်ပါတယ်။<br><br>လောလောဆယ် <b>ဖုန်းထဲက Video</b> တင်ပြီး Recap လုပ်နိုင်ပါတယ်။</p><button class="btn primary" style="margin-top:14px" onclick="closeSheet();goTab(\'recap\')">📱 Video တင်ရန် သွားမယ်</button>')});
+/* IndexedDB library */
+const DBP=new Promise((res,rej)=>{const r=indexedDB.open('RecapsDB',1);r.onupgradeneeded=()=>{r.result.createObjectStore('videos',{keyPath:'id',autoIncrement:true})};r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
+async function idbAll(){const db=await DBP;return new Promise((res,rej)=>{const q=db.transaction('videos').objectStore('videos').getAll();q.onsuccess=()=>res(q.result||[]);q.onerror=()=>rej(q.error)})}
+async function idbAdd(item){const db=await DBP;return new Promise((res,rej)=>{const q=db.transaction('videos','readwrite').objectStore('videos').add(item);q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)})}
+async function idbDel(id){const db=await DBP;return new Promise((res,rej)=>{const q=db.transaction('videos','readwrite').objectStore('videos').delete(id);q.onsuccess=()=>res();q.onerror=()=>rej(q.error)})}
+async function renderHome(){try{const items=await idbAll();items.sort((a,b)=>b.date-a.date);$('#statCount').textContent=items.length;$('#statSize').textContent=fmtSize(items.reduce((a,x)=>a+(x.size||0),0));$('#statLast').textContent=items.length?new Date(items[0].date).toLocaleDateString('my-MM'):'—';const box=$('#recentList');if(!items.length){box.innerHTML='<div class="empty"><b>Recap မရှိသေးပါ</b><br><span style="font-size:12.5px">Recap tab မှာ ပထမဆုံး video စလုပ်ပါ</span></div>';return}box.innerHTML='';items.slice(0,5).forEach(it=>{const d=document.createElement('div');d.className='lib-item';d.innerHTML='<div class="lib-meta"><b></b><span></span></div>';d.querySelector('b').textContent=it.name;d.querySelector('span').textContent=new Date(it.date).toLocaleString()+' · '+fmtSize(it.size);box.appendChild(d)})}catch(e){showNotice('စာကြည့်တိုက် ဖတ်မရပါ: '+(e.message||e),'err')}}
+async function renderLibrary(){const box=$('#libraryList');try{const items=await idbAll();items.sort((a,b)=>b.date-a.date);if(!items.length){box.innerHTML='<div class="empty"><b>ဘာမှ မရှိသေးပါ</b><br><span style="font-size:12.5px">Export လုပ်ပြီးရင် ဒီမှာ သိမ်းပေးပါမယ်</span></div>';return}box.innerHTML='';items.forEach(it=>{const url=URL.createObjectURL(it.blob);const d=document.createElement('div');d.className='lib-item';const v=document.createElement('video');v.src=url;v.controls=true;v.preload='metadata';const meta=document.createElement('div');meta.className='lib-meta';const b=document.createElement('b');b.textContent=it.name;const sp=document.createElement('span');sp.textContent=new Date(it.date).toLocaleString()+' · '+fmtSize(it.size);meta.appendChild(b);meta.appendChild(sp);const acts=document.createElement('div');const dl=document.createElement('button');dl.className='btn light small';dl.textContent='⬇️ ဒေါင်း';dl.onclick=()=>{const a=document.createElement('a');a.href=url;a.download=it.name;a.click()};const del=document.createElement('button');del.className='btn danger small';del.textContent='ဖျက်';del.style.marginTop='6px';del.onclick=async()=>{await idbDel(it.id);showNotice('ဖျက်ပြီးပါပြီ','ok');renderLibrary();renderHome()};acts.appendChild(dl);acts.appendChild(document.createElement('br'));acts.appendChild(del);d.appendChild(v);d.appendChild(meta);d.appendChild(acts);box.appendChild(d)})}catch(e){box.innerHTML='<div class="empty"><b>ဖတ်မရပါ</b><br>'+String(e.message||e)+'</div>'}}
+/* settings UI */
+function refreshSettingsUI(){$('#setAspectBtn').textContent=ASPECTS[SETTINGS.aspect].label;$('#setBlur').value=SETTINGS.blur;$('#setBlurVal').textContent=SETTINGS.blur;$('#setVoiceBtn').textContent=SETTINGS.voice;$('#setApiKey').value=getApiKey()}
+$('#setBlur').addEventListener('input',e=>{SETTINGS.blur=+e.target.value;saveSettings();refreshSettingsUI();syncEditorsFromSettings()});
+$('#setApiKey').addEventListener('change',e=>{localStorage.setItem('recaps_gemini_key',e.target.value.trim());showNotice('✅ API Key သိမ်းပြီးပါပြီ (ဒီ browser ထဲမှာပဲ)','ok')});
+function pickAspect(current,cb){openSheet('Aspect ရွေးပါ',Object.keys(ASPECTS).map(k=>'<button class="opt'+(k===current?' sel':'')+'" data-v="'+k+'"><b>'+ASPECTS[k].label+'</b><span>'+ASPECTS[k].desc+'</span></button>').join(''));$$('#sheetBody .opt').forEach(o=>o.onclick=()=>{closeSheet();cb(o.dataset.v)})}
+function pickVoice(current,cb){openSheet('အသံ ရွေးပါ',VOICES.map(v=>'<button class="opt'+(v===current?' sel':'')+'" data-v="'+v+'"><b>'+v+'</b><span>Gemini TTS အသံ</span></button>').join(''));$$('#sheetBody .opt').forEach(o=>o.onclick=()=>{closeSheet();cb(o.dataset.v)})}
+$('#setAspectBtn').addEventListener('click',()=>pickAspect(SETTINGS.aspect,v=>{SETTINGS.aspect=v;saveSettings();refreshSettingsUI();syncEditorsFromSettings()}));
+$('#setVoiceBtn').addEventListener('click',()=>pickVoice(SETTINGS.voice,v=>{SETTINGS.voice=v;saveSettings();refreshSettingsUI();syncEditorsFromSettings()}));
+$('#resetFormat').addEventListener('click',()=>{SETTINGS.aspect=DEF.aspect;SETTINGS.blur=DEF.blur;saveSettings();refreshSettingsUI();syncEditorsFromSettings();showNotice('↺ ပုံစံ ဆက်တင် Reset လုပ်ပြီးပါပြီ','ok')});
+$('#resetKey').addEventListener('click',()=>{localStorage.removeItem('recaps_gemini_key');SETTINGS.voice=DEF.voice;saveSettings();refreshSettingsUI();syncEditorsFromSettings();showNotice('↺ Key နှင့် အသံ Reset လုပ်ပြီးပါပြီ','ok')});
+$('#resetAll').addEventListener('click',()=>{localStorage.removeItem('recaps_settings');localStorage.removeItem('recaps_gemini_key');SETTINGS=loadSettings();refreshSettingsUI();syncEditorsFromSettings();showNotice('↺ ဆက်တင် အားလုံး Reset လုပ်ပြီးပါပြီ','ok')});
+</script>
+<script>
+/* ================= Shared editor (Recap + Short instances) ================= */
+function editorHTML(p,isShort){
+return '<h2 class="page-title">'+(isShort?'အတိုချုပ် — Long to Short':'Recap လုပ်ရန်')+'</h2><p class="page-sub">'+(isShort?'Video အရှည်ကို ဖြတ်၍ အပိုင်းများ ထုတ်ပါ (Manual split)':'ဖုန်းထဲက video တင်ပြီး Recap ထုတ်ပါ')+'</p>'
++'<div class="card"><h3>၁။ Video ရွေးပါ</h3><input type="file" id="'+p+'-file" accept="video/*" style="display:none"><button class="btn primary" id="'+p+'-pick">📱 Video ရွေးရန်</button><div class="file-info" id="'+p+'-fileinfo">ဖိုင် မရွေးရသေးပါ</div><video class="preview" id="'+p+'-video" controls playsinline style="display:none;margin-top:10px"></video></div>'
++'<div class="card"><h3>၂။ ဖြတ်ရန် အပိုင်း (Trim)</h3><div class="row2"><div class="field" id="'+p+'-f-start"><label>စချိန် (စက္ကန့်)</label><input type="number" id="'+p+'-start" value="0" min="0" step="0.1"><div class="err-text" id="'+p+'-e-start"></div></div><div class="field" id="'+p+'-f-end"><label>ဆုံးချိန် (စက္ကန့်)</label><input type="number" id="'+p+'-end" value="0" min="0" step="0.1"><div class="err-text" id="'+p+'-e-end"></div></div></div>'
++'<div class="field"><label>စချိန် slider</label><input type="range" id="'+p+'-rstart" value="0" min="0" max="100" step="0.1"></div><div class="field"><label>ဆုံးချိန် slider</label><input type="range" id="'+p+'-rend" value="0" min="0" max="100" step="0.1"></div><p class="hint" style="font-size:12px;color:#527884">ကြာချိန်: <b id="'+p+'-durinfo">—</b></p></div>'
++'<div class="card"><h3>၃။ ပုံစံ (Aspect) နှင့် Blur</h3><div class="field"><label>Aspect</label><button class="btn light" id="'+p+'-aspectBtn" style="width:100%"></button></div><div class="field"><label>Blur အား — <span id="'+p+'-blurVal"></span></label><input type="range" id="'+p+'-blur" min="5" max="60" step="1"><p class="hint">Blur pad သုံးသော ပုံစံတွင်သာ သက်ရောက်ပါတယ်</p></div>'
++'<div class="switch-row"><div><b style="font-size:14px">ခေါင်းစဉ် (Title)</b><div style="font-size:12px;color:#527884">Video အပေါ်ပိုင်းတွင် ပြမည်</div></div><div class="tgl on" id="'+p+'-titleTgl"></div></div><div class="field" id="'+p+'-f-title"><label>ခေါင်းစဉ် စာသား</label><input type="text" id="'+p+'-title" placeholder="ဥပမာ — အံ့ဩဖွယ် ဖြစ်ရပ်"><div class="err-text" id="'+p+'-e-title"></div></div></div>'
++'<div class="card"><h3>၄။ စာတန်း (Subtitles)</h3><div class="switch-row"><div><b style="font-size:14px">စာတန်း ဖွင့်ရန်</b><div style="font-size:12px;color:#527884">တစ်ကြောင်း = စာတန်း တစ်ခု၊ အချိန် အလိုအလျောက် ခွဲပေးမည်</div></div><div class="tgl on" id="'+p+'-subTgl"></div></div><div class="field" id="'+p+'-f-subs"><label>စာတန်း / ဇာတ်ကြောင်း စာသား</label><textarea id="'+p+'-subs" placeholder="ပထမ စာတန်း&#10;ဒုတိယ စာတန်း&#10;တတိယ စာတန်း"></textarea><div class="err-text" id="'+p+'-e-subs"></div><p class="hint">အသံအသစ် ရွေးထားရင် ဒီစာသားကိုပဲ အသံအဖြစ် ပြောပေးပါမယ် (တစ်ကြောင်းချင်း ချိတ်ဆက်၍)</p></div></div>'
++'<div class="card"><h3>၅။ အသံ</h3><div class="field"><label>အသံ ပုံစံ</label><button class="btn light" id="'+p+'-audioBtn" style="width:100%"></button></div><div class="field"><label>အသံ (Voice) — အသံအသစ် အတွက်</label><button class="btn light" id="'+p+'-voiceBtn" style="width:100%"></button></div></div>'
++(isShort?'<div class="card"><h3>၆။ အပိုင်းခွဲရန် (Split)</h3><div class="field"><label>ခွဲပုံ</label><button class="btn light" id="'+p+'-splitBtn" style="width:100%"></button></div><div class="row2"><div class="field"><label>အပိုင်း အရေအတွက် (N)</label><input type="number" id="'+p+'-splitN" value="3" min="2" max="20" step="1"></div><div class="field"><label>တစ်ပိုင်း ကြာချိန် (စက္ကန့်)</label><input type="number" id="'+p+'-splitLen" value="60" min="5" step="1"></div></div><p class="hint" style="font-size:12px;color:#527884">ရွေးထားသော ခွဲပုံအတိုင်းသာ သက်ဆိုင်ရာ အကွက် အသုံးဝင်ပါတယ်</p></div>':'')
++'<div class="card"><button class="btn primary" id="'+p+'-export"><span class="wave"><i></i><i></i><i></i><i></i><i></i></span><span class="btn-label">🎬 Export ထုတ်မယ်</span></button><div class="logbox" id="'+p+'-log"></div><div id="'+p+'-result" style="margin-top:12px"></div></div>';
+}
+$('#page-recap').innerHTML=editorHTML('recap',false);
+$('#page-short').innerHTML=editorHTML('short',true);
+const editors={};
+function fieldErr(p,key,msg){const f=$('#'+p+'-f-'+key),e=$('#'+p+'-e-'+key);if(f)f.classList.add('bad');if(e){e.textContent=msg;e.classList.add('show')}if(f)f.scrollIntoView({behavior:'smooth',block:'center'})}
+function clearErrs(p){['start','end','title','subs'].forEach(k=>{const f=$('#'+p+'-f-'+k),e=$('#'+p+'-e-'+k);if(f)f.classList.remove('bad');if(e)e.classList.remove('show')});const fi=$('#'+p+'-fileinfo');if(fi)fi.style.color=''}
+function makeEditor(p,isShort){
+ const ed={p,isShort,file:null,url:null,duration:0,aspect:SETTINGS.aspect,blur:SETTINGS.blur,audioMode:'original',voice:SETTINGS.voice,splitMode:'count',busy:false};
+ editors[p]=ed;
+ const E=id=>$('#'+p+'-'+id);
+ function refreshLabels(){E('aspectBtn').textContent=ASPECTS[ed.aspect].label;E('blurVal').textContent=ed.blur;E('blur').value=ed.blur;E('audioBtn').textContent=ed.audioMode==='voice'?'🎙️ အသံအသစ် (Gemini voiceover)':'🔊 မူရင်းအသံ';E('voiceBtn').textContent=ed.voice;if(isShort)E('splitBtn').textContent=ed.splitMode==='count'?'အပိုင်း N ခွဲမည်':'စက္ကန့် အလိုက် ခွဲမည်';const s=parseFloat(E('start').value)||0,en=parseFloat(E('end').value)||0;E('durinfo').textContent=ed.duration?fmtDur(Math.max(0,en-s))+' (မူရင်း '+fmtDur(ed.duration)+')':'—'}
+ ed.refresh=refreshLabels;
+ E('pick').onclick=()=>E('file').click();
+ E('file').addEventListener('change',()=>{const f=E('file').files[0];if(!f)return;ed.file=f;if(ed.url)URL.revokeObjectURL(ed.url);ed.url=URL.createObjectURL(f);const v=E('video');v.src=ed.url;v.style.display='block';E('fileinfo').textContent=f.name+' · '+fmtSize(f.size);if(f.size>200*1048576)showNotice('⚠️ ဖိုင် 200 MB ထက် ကြီးနေပါတယ် ('+fmtSize(f.size)+') — browser ထဲတွင် Export ကြာနိုင် / မအောင်မြင်နိုင်ပါတယ်။ ဖိုင် သေးတာ သုံးရန် အကြံပြုပါတယ်။','info');v.onloadedmetadata=()=>{ed.duration=v.duration;E('start').value=0;E('end').value=Math.floor(v.duration*10)/10;E('rstart').max=v.duration;E('rend').max=v.duration;E('rstart').value=0;E('rend').value=v.duration;refreshLabels();showNotice('✅ Video တင်ပြီးပါပြီ — ကြာချိန် '+fmtDur(v.duration),'ok')}});
+ [['start','rstart'],['end','rend']].forEach(([a,b])=>{E(a).addEventListener('input',()=>{E(b).value=E(a).value;refreshLabels()});E(b).addEventListener('input',()=>{E(a).value=E(b).value;refreshLabels()})});
+ E('aspectBtn').onclick=()=>pickAspect(ed.aspect,v=>{ed.aspect=v;refreshLabels()});
+ E('blur').addEventListener('input',()=>{ed.blur=+E('blur').value;refreshLabels()});
+ E('audioBtn').onclick=()=>{openSheet('အသံ ရွေးပါ','<button class="opt'+(ed.audioMode==='original'?' sel':'')+'" data-v="original"><b>🔊 မူရင်းအသံ</b><span>Video ၏ မူရင်း အသံကို ပဲ သုံးမည်</span></button><button class="opt'+(ed.audioMode==='voice'?' sel':'')+'" data-v="voice"><b>🎙️ အသံအသစ်</b><span>Gemini အသံဖြင့် ဇာတ်ကြောင်း ပြောမည် — မူရင်း အသံ ပိတ်မည်၊ သင့် API key လိုပါတယ်</span></button>');$$('#sheetBody .opt').forEach(o=>o.onclick=()=>{ed.audioMode=o.dataset.v;closeSheet();refreshLabels()})};
+ E('voiceBtn').onclick=()=>pickVoice(ed.voice,v=>{ed.voice=v;refreshLabels()});
+ if(isShort)E('splitBtn').onclick=()=>{openSheet('ခွဲပုံ ရွေးပါ','<button class="opt'+(ed.splitMode==='count'?' sel':'')+'" data-v="count"><b>အပိုင်း N ခွဲမည်</b><span>ရွေးထားသော အပိုင်းကို N ပိုင်း အညီ ခွဲမည်</span></button><button class="opt'+(ed.splitMode==='len'?' sel':'')+'" data-v="len"><b>စက္ကန့် အလိုက် ခွဲမည်</b><span>ဥပမာ 60 စက္ကန့် တစ်ပိုင်းစီ ခွဲမည်</span></button>');$$('#sheetBody .opt').forEach(o=>o.onclick=()=>{ed.splitMode=o.dataset.v;closeSheet();refreshLabels()})};
+ [['titleTgl'],['subTgl']].forEach(([id])=>{E(id).onclick=()=>E(id).classList.toggle('on')});
+ E('export').onclick=()=>exportEditor(ed);
+ refreshLabels();return ed;
+}
+makeEditor('recap',false);makeEditor('short',true);
+function syncEditorsFromSettings(){Object.values(editors).forEach(ed=>{ed.aspect=SETTINGS.aspect;ed.blur=SETTINGS.blur;ed.voice=SETTINGS.voice;if(ed.refresh)ed.refresh()})}
+/* ---------- canvas text PNGs (browser shapes Myanmar correctly) ---------- */
+function wrapLines(ctx,text,maxW,maxLines){const words=String(text).split(/\s+/);const lines=[];let cur='';for(const w of words){const t=cur?cur+' '+w:w;if(ctx.measureText(t).width<=maxW||!cur)cur=t;else{lines.push(cur);cur=w;if(lines.length>=maxLines)break}}if(cur&&lines.length<maxLines)lines.push(cur);if(lines.length>maxLines)lines.length=maxLines;return lines}
+function textPNG(text,W,H,opts){opts=opts||{};const fs=opts.size||44;const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');x.font='700 '+fs+'px Padauk, "Noto Sans Myanmar", sans-serif';x.textAlign='center';x.textBaseline='middle';const lines=wrapLines(x,text,W-40,2);const lh=fs*1.45;const y0=H/2-((lines.length-1)*lh)/2;lines.forEach((ln,i)=>{const y=y0+i*lh;x.lineWidth=Math.max(6,fs/6);x.strokeStyle='rgba(0,0,0,0.85)';x.lineJoin='round';x.strokeText(ln,W/2,y);x.shadowColor='rgba(0,0,0,0.7)';x.shadowBlur=6;x.fillStyle=opts.color||'#ffffff';x.fillText(ln,W/2,y)});return new Promise(res=>c.toBlob(b=>b.arrayBuffer().then(ab=>res(new Uint8Array(ab))),'image/png'))}
+/* ---------- Gemini TTS (visitor's own key, direct from browser) ---------- */
+async function geminiTTS(key,text,voice){
+ const res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash-tts:generateContent',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify({contents:[{parts:[{text}]}],generationConfig:{responseModalities:['AUDIO'],speechConfig:{voiceConfig:{prebuiltVoiceConfig:{voiceName:voice}}}}})});
+ const data=await res.json().catch(()=>({}));
+ if(!res.ok)throw new Error('Gemini အမှား '+res.status+': '+(((data.error||{}).message)||'unknown'));
+ const parts=(((data.candidates||[])[0]||{}).content||{}).parts||[];const ip=parts.find(pp=>pp.inlineData&&pp.inlineData.data);
+ if(!ip)throw new Error('Gemini မှ အသံ ပြန်မရပါ');
+ const bin=atob(ip.inlineData.data);const arr=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);
+ const m=/rate=(\d+)/.exec(ip.inlineData.mimeType||'');return pcmToWav(arr,m?parseInt(m[1],10):24000)}
+function pcmBytesToWav(pcm,sampleRate){const buf=new ArrayBuffer(44+pcm.length);const v=new DataView(buf);const ws=(o,s)=>{for(let i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i))};ws(0,'RIFF');v.setUint32(4,36+pcm.length,true);ws(8,'WAVE');ws(12,'fmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);v.setUint32(24,sampleRate,true);v.setUint32(28,sampleRate*2,true);v.setUint16(32,2,true);v.setUint16(34,16,true);ws(36,'data');v.setUint32(40,pcm.length,true);new Uint8Array(buf,44).set(pcm);return new Uint8Array(buf)}
+function pcmToWav(pcm,rate){return pcmBytesToWav(pcm,rate)}
+async function geminiTTSLong(key,text,voice){ /* chunk long narration, concat PCM->WAV via re-decode */
+ const chunks=[];let cur='';const sents=text.split(/(?<=။)\s*/).filter(Boolean);
+ for(const s of sents){if((cur+s).length<=520)cur+=s;else{if(cur)chunks.push(cur);cur=s}}if(cur)chunks.push(cur);if(!chunks.length)chunks.push(text);
+ if(chunks.length===1)return geminiTTS(key,text,voice);
+ /* decode each WAV and re-encode as one WAV using AudioContext */
+ const ctx=new (window.AudioContext||window.webkitAudioContext)();const bufs=[];
+ for(const ch of chunks){const wav=await geminiTTS(key,ch,voice);bufs.push(await ctx.decodeAudioData(wav.buffer.slice(0)))}
+ const sr=bufs[0].sampleRate,total=bufs.reduce((a,b)=>a+b.length,0);const pcm=new Uint8Array(total*2);const dv=new DataView(pcm.buffer);let off=0;
+ for(const b of bufs){const d=b.getChannelData(0);for(let i=0;i<d.length;i++){const s=Math.max(-1,Math.min(1,d[i]));dv.setInt16(off,s<0?s*0x8000:s*0x7FFF,true);off+=2}}
+ return pcmBytesToWav(pcm,sr)}
+</script>
+<script>
+/* ================= Export engine — ffmpeg.wasm single-thread ================= */
+let ffInstance=null,ffLoading=null;
+async function getFFmpeg(logFn){
+ if(ffInstance)return ffInstance;
+ if(ffLoading)return ffLoading;
+ ffLoading=(async()=>{const FFmpegWASM=window.FFmpegWASM;if(!FFmpegWASM)throw new Error('ffmpeg library မတင်ရသေးပါ — internet စစ်ပြီး ပြန်ကြိုးစားပါ');
+  const ff=new FFmpegWASM.FFmpeg();ff.on('log',({message})=>{if(logFn)logFn(message)});
+  await ff.load({coreURL:FF_CORE,wasmURL:FF_WASM});ffInstance=ff;return ff})();
+ try{return await ffLoading}catch(e){ffLoading=null;throw e}}
+async function exportOne(ff,ed,seg,idx,total,log){
+ /* seg = {start,end,cues:[{text,start,end}]} times absolute; output times relative */
+ const dur=seg.end-seg.start;
+ let W,H,picW,picH,picY,subY;
+ if(ed.aspect==='blurpad'){W=720;H=1280;picW=720;picH=720;picY=280;subY=1035}
+ else if(ed.aspect==='full916'){W=720;H=1280;picW=720;picH=1280;picY=0;subY=1060}
+ else{const vw=ed.videoW||1280,vh=ed.videoH||720;const sc=Math.min(1,720/vw);W=Math.max(2,Math.round(vw*sc/2)*2);H=Math.max(2,Math.round(vh*sc/2)*2);picW=W;picH=H;picY=0;subY=H-170}
+ const useSub=$('#'+ed.p+'-subTgl').classList.contains('on')&&seg.cues.length;
+ const useTitle=$('#'+ed.p+'-titleTgl').classList.contains('on')&&($('#'+ed.p+'-title').value||'').trim();
+ const fetchFile=window.FFmpegUtil&&window.FFmpegUtil.fetchFile;
+ await ff.writeFile('in.mp4',fetchFile?await fetchFile(ed.file):new Uint8Array(await ed.file.arrayBuffer()));
+ let voiceArr=null;
+ if(ed.audioMode==='voice'){log('Gemini အသံ ထုတ်နေပါတယ်…');voiceArr=await geminiTTSLong(getApiKey(),seg.cues.map(c=>c.text).join(' '),ed.voice);await ff.writeFile('voice.wav',voiceArr)}
+ const overlays=[]; /* {file,y} */
+ if(useTitle){await ff.writeFile('title.png',await textPNG($('#'+ed.p+'-title').value.trim(),W,150,{size:52,color:'#FFE92E'}));overlays.push({file:'title.png',y:36,from:0,to:dur})}
+ if(useSub){for(let i=0;i<seg.cues.length;i++){const fn='sub'+i+'.png';await ff.writeFile(fn,await textPNG(seg.cues[i].text,W,170,{size:46}));overlays.push({file:fn,y:subY,from:seg.cues[i].start-seg.start,to:seg.cues[i].end-seg.start})}}
+ /* build filter graph */
+ const blur=Math.max(2,Math.round(ed.blur/2));
+ let fc='',base;
+ if(ed.aspect==='blurpad'){
+  fc+='[0:v]trim=start='+seg.start+':end='+seg.end+',setpts=PTS-STARTPTS,split=2[vbg][vfg];';
+  fc+='[vbg]scale='+W+':'+H+':force_original_aspect_ratio=increase,crop='+W+':'+H+',boxblur='+blur+':3,eq=brightness=-0.10:saturation=0.85[bg];';
+  fc+='[vfg]scale='+picW+':'+picH+':force_original_aspect_ratio=decrease[fg];';
+  fc+='[bg][fg]overlay=(W-w)/2:'+picY+'[base0];';base='base0';
+ }else if(ed.aspect==='full916'){
+  fc+='[0:v]trim=start='+seg.start+':end='+seg.end+',setpts=PTS-STARTPTS,scale='+W+':'+H+':force_original_aspect_ratio=increase,crop='+W+':'+H+'[base0];';base='base0';
+ }else{
+  fc+='[0:v]trim=start='+seg.start+':end='+seg.end+',setpts=PTS-STARTPTS,scale='+W+':'+H+'[base0];';base='base0';
+ }
+ let inIdx=1;const voiceIdx=ed.audioMode==='voice'?1:-1;if(ed.audioMode==='voice')inIdx=2;
+ overlays.forEach((ov,i)=>{const out=i===overlays.length-1?'vout':'vo'+i;fc+='['+base+']['+(inIdx+i)+':v]overlay=0:'+ov.y+":enable='between(t,"+ov.from.toFixed(2)+','+ov.to.toFixed(2)+")'["+out+'];';base=out});
+ if(!overlays.length){fc+='['+base+']null[vout];'}
+ fc=fc.replace(/;\s*$/,'');
+ const args=['-i','in.mp4'];if(ed.audioMode==='voice')args.push('-i','voice.wav');overlays.forEach(ov=>args.push('-i',ov.file));
+ args.push('-filter_complex',fc);
+ if(ed.audioMode==='voice'){args.push('-map','[vout]','-map','1:a','-af','apad,atrim=0:'+dur.toFixed(2))}
+ else{args.push('-map','[vout]','-map','0:a?','-af','atrim=0:'+dur.toFixed(2)+',asetpts=PTS-STARTPTS')}
+ args.push('-t',dur.toFixed(2),'-c:v','libx264','-preset','veryfast','-crf','23','-pix_fmt','yuv420p','-c:a','aac','-b:a','128k','-movflags','+faststart','out'+idx+'.mp4');
+ log('Video ထုတ်နေပါတယ် ('+(idx+1)+'/'+total+') — '+dur.toFixed(1)+' စက္ကန့်…');
+ const code=await ff.exec(args,3600000);
+ if(code!==0)throw new Error('ffmpeg exit code '+code+' — အသေးစိတ်ကို log တွင် ကြည့်ပါ');
+ const data=await ff.readFile('out'+idx+'.mp4');
+ const blob=new Blob([data.buffer||data],{type:'video/mp4'});
+ try{await ff.deleteFile('in.mp4')}catch(e){}
+ return blob}
+async function exportEditor(ed){
+ if(ed.busy)return;const p=ed.p,E=id=>$('#'+p+'-'+id);clearErrs(p);
+ /* --- validation BEFORE any processing (instructive errors) --- */
+ if(!ed.file){E('fileinfo').style.color='#b3261e';E('fileinfo').textContent='⚠️ Video ဖိုင် မရွေးရသေးပါ — အပေါ်က "Video ရွေးရန်" ကို နှိပ်ပြီး ဖိုင် ရွေးပါ';E('pick').scrollIntoView({behavior:'smooth',block:'center'});showNotice('⚠️ Video ဖိုင် လိုပါတယ် — အရင် ဖိုင် ရွေးပါ','err');return}
+ const start=parseFloat(E('start').value),end=parseFloat(E('end').value);
+ if(isNaN(start)||start<0){fieldErr(p,'start','စချိန် မှားနေပါတယ် — 0 သို့မဟုတ် အထက် ထည့်ပါ');showNotice('⚠️ စချိန် ပြင်ပါ','err');return}
+ if(isNaN(end)||end<=start){fieldErr(p,'end','ဆုံးချိန် သည် စချိန်ထက် ကြီးရပါမည်');showNotice('⚠️ ဆုံးချိန် ပြင်ပါ','err');return}
+ if(ed.duration&&end>ed.duration+0.5){fieldErr(p,'end','ဆုံးချိန် သည် video ကြာချိန် ('+fmtDur(ed.duration)+') ထက် ကျော်နေပါတယ်');return}
+ const subOn=E('subTgl').classList.contains('on');
+ const lines=(E('subs').value||'').split('\n').map(s=>s.trim()).filter(Boolean);
+ if(subOn&&!lines.length){fieldErr(p,'subs','စာတန်း ဖွင့်ထားသော်လည်း စာသား မရှိပါ — စာတန်း တစ်ကြောင်းစီ ရိုက်ထည့်ပါ၊ သို့မဟုတ် စာတန်း ပိတ်ပါ');showNotice('⚠️ စာတန်း စာသား လိုပါတယ်','err');return}
+ if(E('titleTgl').classList.contains('on')&&!(E('title').value||'').trim()){fieldErr(p,'title','ခေါင်းစဉ် ဖွင့်ထားသော်လည်း စာသား မရှိပါ — ခေါင်းစဉ် ရိုက်ထည့်ပါ၊ သို့မဟုတ် ပိတ်ပါ');showNotice('⚠️ ခေါင်းစဉ် စာသား လိုပါတယ်','err');return}
+ if(ed.audioMode==='voice'){
+   if(!getApiKey()){showNotice('⚠️ အသံအသစ် အတွက် Gemini API Key လိုပါတယ် — ဆက်တင် tab မှာ သင့် key ထည့်ပါ','err');goTab('settings');$('#setApiKey').focus();$('#setApiKey').scrollIntoView({behavior:'smooth',block:'center'});return}
+   if(!lines.length){fieldErr(p,'subs','အသံအသစ် အတွက် ဇာတ်ကြောင်း စာသား လိုပါတယ် — စာတန်း အကွက်ထဲမှာ တစ်ကြောင်းစီ ရိုက်ထည့်ပါ');showNotice('⚠️ ဇာတ်ကြောင်း စာသား လိုပါတယ်','err');return}
+ }
+ const dur=end-start;
+ if(dur>600)showNotice('⚠️ ဖြတ်ထားသော အပိုင်း 10 မိနစ်ထက် ရှည်နေပါတယ် ('+fmtDur(dur)+') — browser ထဲတွင် အလွန် ကြာနိုင် / memory မလောက်နိုင် ပါတယ်။ ဆက်လုပ်ပါမည်။','info');
+ /* record source dims */
+ const v=E('video');ed.videoW=v.videoWidth||1280;ed.videoH=v.videoHeight||720;
+ /* segments */
+ const segments=[];
+ if(ed.isShort){
+   const mode=ed.splitMode;let parts=[];
+   if(mode==='count'){const n=Math.max(2,Math.min(20,parseInt(E('splitN').value)||3));const each=dur/n;for(let i=0;i<n;i++)parts.push([start+i*each,start+(i+1)*each])}
+   else{const len=Math.max(5,parseFloat(E('splitLen').value)||60);for(let t=start;t<end-0.05;t+=len)parts.push([t,Math.min(end,t+len)])}
+   parts.forEach(([s,e])=>segments.push({start:s,end:e}));
+ }else segments.push({start,end});
+ /* cues evenly spread across full trimmed range */
+ const cues=lines.map((text,i)=>({text,start:start+dur*i/Math.max(1,lines.length),end:start+dur*(i+1)/Math.max(1,lines.length)}));
+ segments.forEach(sg=>{sg.cues=cues.filter(c=>{const mid=(c.start+c.end)/2;return mid>=sg.start-0.01&&mid<sg.end+0.01}).map(c=>({text:c.text,start:Math.max(sg.start,c.start),end:Math.min(sg.end,c.end)}))});
+ /* --- run --- */
+ ed.busy=true;const btn=E('export');btn.classList.add('loading');btn.disabled=true;btn.querySelector('.btn-label').textContent='လုပ်ဆောင်နေပါတယ်…';
+ const logBox=E('log');logBox.style.display='block';logBox.textContent='';const log=m=>{logBox.textContent+=m+'\n';logBox.scrollTop=logBox.scrollHeight};
+ E('result').innerHTML='';showNotice('▶️ Export စတင်ပါပြီ — အပိုင်း '+segments.length+' ပိုင်း','info');
+ const baseName=(ed.file.name||'recap').replace(/\.[^.]+$/,'').replace(/[^\w\- ]+/g,'').trim()||'recap';
+ try{
+  const ff=await getFFmpeg(log);
+  const made=[];
+  for(let i=0;i<segments.length;i++){const blob=await exportOne(ff,ed,segments[i],i,segments.length,log);
+   const name=baseName+(segments.length>1?'_part'+(i+1):'')+'.mp4';
+   await idbAdd({name,date:Date.now(),size:blob.size,blob});made.push({name,blob});log('✅ '+name+' — '+fmtSize(blob.size)+' (စာကြည့်တိုက်တွင် သိမ်းပြီး)')}
+  const res=E('result');res.innerHTML='<b style="font-size:14px">✅ ပြီးပါပြီ — အောက်မှာ တန်းစီ ဒေါင်းနိုင်ပါတယ်</b>';
+  made.forEach(m=>{const url=URL.createObjectURL(m.blob);const a=document.createElement('a');a.href=url;a.download=m.name;a.className='btn light small';a.style.margin='8px 8px 0 0';a.textContent='⬇️ '+m.name;res.appendChild(a)});
+  renderHome();showDone('✅ အသံ ရပါပြီ — Export ပြီးပါပြီ','Video '+made.length+' ပိုင်း ကို စာကြည့်တိုက်ထဲ သိမ်းထားပြီး ဖြစ်ပါတယ်။ ဒေါင်းလည်း ရပါတယ်။');
+ }catch(err){console.error(err);log('❌ '+(err.message||err));showNotice('❌ Export မအောင်မြင်ပါ: '+(err.message||err),'err')}
+ finally{ed.busy=false;btn.classList.remove('loading');btn.disabled=false;btn.querySelector('.btn-label').textContent='🎬 Export ထုတ်မယ်'}
+}
+refreshSettingsUI();renderHome();
 </script>
 </body>
 </html>

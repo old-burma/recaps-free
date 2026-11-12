@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="my">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Recaps — Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Padauk:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { height:100%; }
+  body {
+    font-family:'Inter','Padauk',system-ui,sans-serif;
+    color:#eafcff;
+    background:
+      radial-gradient(1100px 750px at 88% -12%, rgba(72,225,205,.38), rgba(72,225,205,0) 60%),
+      radial-gradient(900px 700px at -12% 112%, rgba(0,170,205,.32), rgba(0,170,205,0) 62%),
+      radial-gradient(600px 420px at 55% 120%, rgba(20,190,200,.20), rgba(20,190,200,0) 65%),
+      linear-gradient(155deg, #03222b 0%, #065263 46%, #0a7d8c 100%);
+    background-attachment: fixed;
+    min-height:100vh;
+  }
+  .layout { display:block; padding:18px 18px 118px; max-width:1180px; margin:0 auto; min-height:100vh; }
+
+  /* ---------- Sidebar (dark glass) ---------- */
+  .sidebar {
+    width:238px; flex:0 0 238px; display:flex; flex-direction:column; gap:6px;
+    background:rgba(3,40,50,.55);
+    border:1px solid rgba(255,255,255,.14);
+    border-radius:24px; padding:20px 14px;
+    backdrop-filter: blur(18px) saturate(1.3); -webkit-backdrop-filter: blur(18px) saturate(1.3);
+    box-shadow: 0 24px 50px rgba(0,20,28,.35);
+    position:sticky; top:18px; height:calc(100vh - 36px);
+  }
+  .logo { display:flex; align-items:center; gap:11px; padding:2px 8px 16px; }
+  .logo-badge {
+    width:42px; height:42px; border-radius:13px; display:grid; place-items:center; font-size:21px;
+    background:linear-gradient(135deg,#1fd3e8,#0a8fa8);
+    box-shadow:0 8px 20px rgba(20,200,225,.45), inset 0 1px 0 rgba(255,255,255,.5);
+  }
+  .logo h1 { font-size:19px; font-weight:800; letter-spacing:.2px; color:#fff; line-height:1.1; }
+  .logo small { font-size:11px; color:rgba(220,250,255,.65); font-weight:500; }
+  .nav-label { font-size:10.5px; letter-spacing:.14em; text-transform:uppercase; color:rgba(200,240,248,.45); padding:10px 10px 6px; font-weight:700; }
+  .nav-item {
+    display:flex; align-items:center; gap:11px; padding:11px 12px; border-radius:13px;
+    color:rgba(225,250,255,.82); font-size:14.5px; font-weight:600; cursor:pointer; border:1px solid transparent;
+    transition: all .18s ease; user-select:none;
+  }
+  .nav-item .ic { font-size:17px; width:22px; text-align:center; }
+  .nav-item:hover { background:rgba(255,255,255,.08); color:#fff; }
+  .nav-item.active {
+    background:linear-gradient(90deg,#15c3da,#0b9db8); color:#fff; border-color:rgba(255,255,255,.25);
+    box-shadow:0 10px 22px rgba(10,170,200,.40), inset 0 1px 0 rgba(255,255,255,.35);
+  }
+  .side-spacer { flex:1; }
+  .user-chip {
+    display:flex; align-items:center; gap:10px; padding:10px; border-radius:15px;
+    background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.10);
+  }
+  .avatar {
+    width:36px; height:36px; border-radius:50%; display:grid; place-items:center; font-weight:800; font-size:14px; color:#04303d;
+    background:linear-gradient(135deg,#ffe259,#ffa751);
+  }
+  .user-chip b { font-size:13px; color:#fff; display:block; line-height:1.2; }
+  .user-chip span { font-size:11px; color:rgba(215,245,250,.6); }
+
+  /* ---------- Main sheet (light glass) ---------- */
+  .main {
+    flex:1; min-width:0;
+    background:rgba(226,248,250,.14);
+    border:1px solid rgba(255,255,255,.22);
+    border-radius:26px; padding:24px;
+    backdrop-filter: blur(20px) saturate(1.25); -webkit-backdrop-filter: blur(20px) saturate(1.25);
+    box-shadow: 0 24px 60px rgba(0,25,35,.30);
+  }
+  .topbar { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; flex-wrap:wrap; }
+  .topbar h2 { font-size:26px; font-weight:800; color:#fff; text-shadow:0 2px 14px rgba(0,40,50,.35); }
+  .topbar p { color:rgba(230,252,255,.75); font-size:13.5px; margin-top:3px; font-weight:500; }
+  .top-actions { display:flex; align-items:center; gap:10px; }
+  .search {
+    display:flex; align-items:center; gap:8px; padding:10px 15px; border-radius:999px; min-width:210px;
+    background:rgba(255,255,255,.85); color:#5b7d85; font-size:13.5px; font-weight:500;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.9), 0 6px 16px rgba(0,40,50,.12);
+  }
+  .btn-dark {
+    padding:11px 18px; border-radius:999px; border:none; cursor:pointer;
+    background:#06333f; color:#eafcff; font-size:13.5px; font-weight:700; font-family:inherit;
+    box-shadow:0 10px 20px rgba(0,30,40,.35); transition:transform .15s ease;
+  }
+  .btn-dark:hover { transform:translateY(-1px); }
+
+  /* ---------- Cards ---------- */
+  .card {
+    background:rgba(255,255,255,.90);
+    border:1px solid rgba(255,255,255,.65);
+    border-radius:20px; padding:20px; color:#07303c;
+    box-shadow:0 14px 30px rgba(0,45,58,.14), inset 0 1px 0 rgba(255,255,255,.95);
+  }
+  .actions { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-top:22px; }
+  .action-card { cursor:pointer; transition:transform .18s ease, box-shadow .18s ease; }
+  .action-card:hover { transform:translateY(-4px); box-shadow:0 22px 40px rgba(0,45,58,.20), inset 0 1px 0 #fff; }
+  .action-ic {
+    width:48px; height:48px; border-radius:15px; display:grid; place-items:center; font-size:23px; margin-bottom:13px;
+    background:linear-gradient(135deg,#19c2da,#0a8fa8); color:#fff;
+    box-shadow:0 10px 20px rgba(12,165,190,.40), inset 0 1px 0 rgba(255,255,255,.5);
+  }
+  .action-card:nth-child(2) .action-ic { background:linear-gradient(135deg,#ffb03a,#f07f3c); box-shadow:0 10px 20px rgba(240,140,50,.40), inset 0 1px 0 rgba(255,255,255,.5); }
+  .action-card:nth-child(3) .action-ic { background:linear-gradient(135deg,#8a7cf0,#6656d8); box-shadow:0 10px 20px rgba(110,95,220,.40), inset 0 1px 0 rgba(255,255,255,.5); }
+  .action-card h3 { font-size:16.5px; font-weight:800; margin-bottom:5px; }
+  .action-card p { font-size:13px; color:#527884; line-height:1.55; font-weight:500; }
+
+  .stats { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-top:16px; }
+  .stat-card { padding:17px 19px; }
+  .stat-top { display:flex; justify-content:space-between; align-items:center; }
+  .stat-top .ic { width:34px; height:34px; border-radius:11px; display:grid; place-items:center; font-size:16px; background:rgba(10,160,185,.12); }
+  .stat-card .num { font-size:27px; font-weight:800; margin-top:9px; letter-spacing:-.5px; }
+  .stat-card .lbl { font-size:12.5px; color:#527884; font-weight:600; margin-top:2px; }
+  .delta { font-size:11.5px; font-weight:700; color:#0a9d6c; background:rgba(10,180,120,.12); padding:3px 8px; border-radius:999px; }
+
+  .cols { display:grid; grid-template-columns:1.65fr 1fr; gap:16px; margin-top:16px; }
+  .card h4 { font-size:15.5px; font-weight:800; display:flex; align-items:center; gap:8px; }
+  .card .sub { font-size:12.5px; color:#5b828d; margin-top:3px; font-weight:500; }
+  .empty {
+    margin-top:16px; border:1.6px dashed rgba(8,90,108,.28); border-radius:16px; padding:30px 18px; text-align:center;
+    color:#40626d; background:rgba(255,255,255,.45);
+  }
+  .empty .big { font-size:30px; margin-bottom:8px; }
+  .empty b { font-size:14.5px; color:#07303c; display:block; margin-bottom:4px; }
+  .empty span { font-size:12.5px; }
+  .set-row { display:flex; justify-content:space-between; align-items:center; padding:13px 2px; border-bottom:1px solid rgba(8,80,98,.09); }
+  .set-row:last-child { border-bottom:none; }
+  .set-row b { font-size:13.5px; font-weight:700; }
+  .set-row span { display:block; font-size:11.5px; color:#5b828d; font-weight:500; margin-top:1px; }
+  .chip {
+    font-size:12px; font-weight:700; color:#086a7d; background:rgba(12,170,195,.13);
+    border:1px solid rgba(12,170,195,.25); padding:6px 12px; border-radius:999px; white-space:nowrap;
+  }
+  .foot { margin-top:18px; text-align:center; font-size:12px; color:rgba(225,250,255,.55); font-weight:500; }
+
+  /* ---------- Brand (in topbar) ---------- */
+  .brand { display:flex; align-items:center; gap:11px; width:100%; margin-bottom:14px; }
+  .brand .logo-badge { width:40px; height:40px; border-radius:12px; font-size:20px; }
+  .brand h1 { font-size:18px; font-weight:800; color:#fff; line-height:1.1; }
+  .brand small { font-size:11px; color:rgba(220,250,255,.65); font-weight:500; }
+
+  /* ---------- Glassy pill navigation (reference: bottom style) ---------- */
+  .pillnav {
+    position:fixed; left:50%; transform:translateX(-50%); bottom:18px; z-index:60;
+    width:min(560px, calc(100% - 24px));
+    display:flex; align-items:stretch; justify-content:space-between;
+    padding:9px 12px 7px;
+    background:rgba(255,255,255,.55);
+    border:1px solid rgba(255,255,255,.65);
+    border-radius:999px;
+    backdrop-filter: blur(22px) saturate(1.5); -webkit-backdrop-filter: blur(22px) saturate(1.5);
+    box-shadow: 0 18px 42px rgba(0,28,38,.30), inset 0 1px 0 rgba(255,255,255,.85), inset 0 -8px 18px rgba(255,255,255,.18);
+  }
+  .pill-item {
+    flex:1; display:flex; flex-direction:column; align-items:center; gap:2px;
+    padding:5px 2px 3px; border-radius:999px; cursor:pointer; user-select:none;
+    color:rgba(7,48,60,.55); transition:color .16s ease, background .16s ease;
+  }
+  .pill-item svg { width:22px; height:22px; }
+  .pill-item .plabel { font-size:10.5px; font-weight:600; line-height:1.15; white-space:nowrap; }
+  .pill-item .pdot { width:5px; height:5px; border-radius:50%; background:#0aa2c0; opacity:0; transform:scale(.4); transition:all .16s ease; }
+  .pill-item:hover { color:#075a6d; }
+  .pill-item.active { color:#075a6d; }
+  .pill-item.active .plabel { font-weight:800; }
+  .pill-item.active .pdot { opacity:1; transform:scale(1); }
+  .pill-item.center svg { width:25px; height:25px; }
+
+  @media (max-width: 960px) {
+    .stats { grid-template-columns:repeat(2,1fr); }
+    .actions { grid-template-columns:1fr; }
+    .cols { grid-template-columns:1fr; }
+  }
+  @media (max-width: 720px) {
+    .layout { padding:12px 12px 110px; }
+    .main { padding:17px 14px 26px; border-radius:22px; }
+    .topbar h2 { font-size:21px; }
+    .search { min-width:0; flex:1; }
+    .top-actions { width:100%; }
+    .pillnav { bottom:12px; padding:8px 9px 6px; }
+    .pill-item .plabel { font-size:10px; }
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- Main -->
+  <main class="main">
+    <div class="brand">
+      <div class="logo-badge">🎬</div>
+      <div>
+        <h1>Recaps</h1>
+        <small>recaps-free.work.gd</small>
+      </div>
+    </div>
+    <div class="topbar">
+      <div>
+        <h2 id="greeting">မင်္ဂလာပါ 👋</h2>
+        <p>Recaps Dashboard — ဒီနေ့ ဘာလုပ်မလဲ?</p>
+      </div>
+      <div class="top-actions">
+        <div class="search">🔍 <span>Recap ရှာရန်…</span></div>
+        <button class="btn-dark">＋ Recap အသစ်</button>
+        <div class="avatar" title="Old Burma">O</div>
+      </div>
+    </div>
+
+    <!-- Quick actions -->
+    <section class="actions">
+      <div class="card action-card">
+        <div class="action-ic">📱</div>
+        <h3>ဖုန်းထဲက Video</h3>
+        <p>Phone ထဲက video တင်လိုက်တာနဲ့ စာတန်းထိုး + နောက်ခံစကားပြောနဲ့ Recap လုပ်ပေးမယ်</p>
+      </div>
+      <div class="card action-card">
+        <div class="action-ic">🔗</div>
+        <h3>URL မှ Recap</h3>
+        <p>YouTube / TikTok link ထည့်လိုက်ရုံနဲ့ download လုပ်ပြီး Recap အဖြစ် ပြောင်းပေးမယ်</p>
+      </div>
+      <div class="card action-card">
+        <div class="action-ic">✂️</div>
+        <h3>Long to Short</h3>
+        <p>Video အရှည်ကို အတိုဆုံး အကောင်းဆုံး အပိုင်းတွေ ရွေးပြီး Short အဖြစ် ဖြတ်ပေးမယ်</p>
+      </div>
+    </section>
+
+    <!-- Stats -->
+    <section class="stats">
+      <div class="card stat-card">
+        <div class="stat-top"><span class="ic">🎬</span><span class="delta">အသစ်</span></div>
+        <div class="num">0</div>
+        <div class="lbl">စုစုပေါင်း Recap</div>
+      </div>
+      <div class="card stat-card">
+        <div class="stat-top"><span class="ic">✅</span><span class="delta">ဒီလ</span></div>
+        <div class="num">0</div>
+        <div class="lbl">ဒီလ လုပ်ပြီး</div>
+      </div>
+      <div class="card stat-card">
+        <div class="stat-top"><span class="ic">⏳</span><span class="delta">ဆောင်ဆဲ</span></div>
+        <div class="num">0</div>
+        <div class="lbl">လုပ်ဆောင်နေဆဲ</div>
+      </div>
+      <div class="card stat-card">
+        <div class="stat-top"><span class="ic">⏱️</span><span class="delta">ပျမ်းမျှ</span></div>
+        <div class="num">—</div>
+        <div class="lbl">ပျမ်းမျှ အရှည်</div>
+      </div>
+    </section>
+
+    <!-- Columns -->
+    <section class="cols">
+      <div class="card">
+        <h4>🗂️ နောက်ဆုံး Recap များ</h4>
+        <p class="sub">လုပ်ပြီးသား recap တွေ ဒီမှာ ပေါ်လာမယ်</p>
+        <div class="empty">
+          <div class="big">🎞️</div>
+          <b>Recap မရှိသေးပါ</b>
+          <span>အပေါ်က ကတ်တစ်ခုခုကို နှိပ်ပြီး ပထမဆုံး Recap စလုပ်ပါ</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h4>⚙️ ဆက်တင် အကျဉ်း</h4>
+        <p class="sub">Recap တိုင်းမှာ စိတ်ကြိုက် ပြင်လို့ရတယ်</p>
+        <div style="margin-top:8px">
+          <div class="set-row">
+            <div><b>Blur</b><span>နောက်ခံ blur အဆင့်</span></div>
+            <span class="chip">ပြင်ရန်</span>
+          </div>
+          <div class="set-row">
+            <div><b>ခေါင်းစဉ် (Title)</b><span>Video ပေါ်က ခေါင်းစဉ်စာ</span></div>
+            <span class="chip">ပြင်ရန်</span>
+          </div>
+          <div class="set-row">
+            <div><b>Aspect Ratio</b><span>9:16 · 16:9 · 1:1</span></div>
+            <span class="chip">9:16</span>
+          </div>
+          <div class="set-row">
+            <div><b>စာတန်း + အသံ</b><span>စာတန်းထိုး + နောက်ခံစကားပြော</span></div>
+            <span class="chip">ဖွင့်ထား</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="foot">Recaps Web App — recaps-free.work.gd · Dashboard v1</div>
+  </main>
+</div>
+
+<!-- Glassy pill navigation -->
+<nav class="pillnav">
+  <div class="pill-item active" data-nav>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9.5 21v-6h5v6"/></svg>
+    <span class="plabel">ခြုံငုံ</span>
+    <span class="pdot"></span>
+  </div>
+  <div class="pill-item" data-nav>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><path d="M8 7.5 20 19"/><path d="M8 16.5 20 5"/></svg>
+    <span class="plabel">အတိုချုပ်</span>
+    <span class="pdot"></span>
+  </div>
+  <div class="pill-item center" data-nav>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>
+    <span class="plabel">Recap</span>
+    <span class="pdot"></span>
+  </div>
+  <div class="pill-item" data-nav>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+    <span class="plabel">စာကြည့်တိုက်</span>
+    <span class="pdot"></span>
+  </div>
+  <div class="pill-item" data-nav>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg>
+    <span class="plabel">ဆက်တင်</span>
+    <span class="pdot"></span>
+  </div>
+</nav>
+
+<script>
+  // Time-aware Burmese greeting
+  (function () {
+    var h = new Date().getHours();
+    var g = h < 12 ? 'မင်္ဂလာ မနက်ခင်းပါ 🌅' : (h < 17 ? 'မင်္ဂလာ နေ့လည်ခင်းပါ ☀️' : 'မင်္ဂလာ ညနေခင်းပါ 🌇');
+    document.getElementById('greeting').textContent = g;
+  })();
+  // Sidebar active state
+  document.querySelectorAll('[data-nav]').forEach(function (el) {
+    el.addEventListener('click', function () {
+      document.querySelectorAll('[data-nav]').forEach(function (n) { n.classList.remove('active'); });
+      el.classList.add('active');
+    });
+  });
+</script>
+</body>
+</html>

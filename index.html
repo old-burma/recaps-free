@@ -392,26 +392,37 @@ refreshSettingsUI();renderHome();
 /* ================= AI Script pipeline (Gemini, visitor's own key) =================
    Flow: video audio → transcript → Myanmar script (2 modes) → script box → voiceover/SRT */
 const GEM_MODELS=['gemini-3.8-flash','gemini-3.5-flash-lite','gemini-2.5-flash','gemini-2.5-flash-lite'];
-async function geminiGen(key,parts,temp){
- let lastErr=null,lastStatus=0;
+async function geminiGen(key,parts,temp,statusFn){
+ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+ let lastErr=null,quotaErr=null,busyErr=null;
  for(const model of GEM_MODELS){
-  let res,data;
-  try{
-   res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+model+':generateContent',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify({contents:[{parts}],generationConfig:{temperature:(temp==null?0.2:temp)}})});
-   data=await res.json().catch(()=>({}));
-  }catch(netErr){lastErr=netErr;lastStatus=0;continue}
-  if(res.ok){
-   const cand=(data.candidates||[])[0]||{};const cparts=(cand.content||{}).parts||[];
-   const txt=cparts.map(pp=>pp.text||'').join('').trim();
-   if(txt)return txt;
-   lastErr=new Error('Gemini ('+model+') မှ စာသား ပြန်မရပါ'+(cand.finishReason?' — '+cand.finishReason:''));lastStatus=200;continue;
+  for(let attempt=0;attempt<2;attempt++){
+   let res,data;
+   try{
+    res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+model+':generateContent',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify({contents:[{parts}],generationConfig:{temperature:(temp==null?0.2:temp)}})});
+    data=await res.json().catch(()=>({}));
+   }catch(netErr){lastErr=netErr;break}
+   if(res.ok){
+    const cand=(data.candidates||[])[0]||{};const cparts=(cand.content||{}).parts||[];
+    const txt=cparts.map(pp=>pp.text||'').join('').trim();
+    if(txt)return txt;
+    lastErr=new Error('Gemini ('+model+') မှ စာသား ပြန်မရပါ'+(cand.finishReason?' — '+cand.finishReason:''));break;
+   }
+   const msg=((data.error||{}).message)||('HTTP '+res.status);
+   const err=new Error('Gemini အမှား '+res.status+' ('+model+'): '+msg);lastErr=err;
+   const modelErr=res.status===404||/not found|not supported/i.test(msg);
+   if(modelErr)break;
+   if(res.status===429||res.status>=500){
+    if(res.status===429&&!quotaErr)quotaErr=err;
+    if(res.status>=500&&!busyErr)busyErr=err;
+    if(attempt===0){const wait=res.status===429?20000:6000;if(statusFn)statusFn('⏳ '+(res.status===429?'Quota ပြည့်နေလို့':'Google server busy ဖြစ်နေလို့')+' '+Math.round(wait/1000)+' စက္ကန့် စောင့်ပြီး ပြန်ကြိုးစားနေပါတယ်… ('+model+')');await sleep(wait);continue}
+    break;
+   }
+   throw err;
   }
-  const msg=((data.error||{}).message)||('HTTP '+res.status);
-  lastErr=new Error('Gemini အမှား '+res.status+' ('+model+'): '+msg);lastStatus=res.status;
-  const modelErr=res.status===404||/not found|not supported/i.test(msg);
-  if(!(modelErr||res.status===429||res.status>=500))break;
  }
- if(lastStatus===429)throw new Error('⚠️ Credit/Quota ကုန်သွားပါပြီ — Gemini model အားလုံး quota ပြည့်သွားပါတယ်။ ခဏ စောင့်ပြီး ပြန်ကြိုးစားပါ၊ ဒါမှမဟုတ် ဆက်တင်မှာ တခြား key ပြောင်းသုံးပါ။ အသေးစိတ်: '+(lastErr?lastErr.message:''));
+ if(quotaErr)throw new Error('⚠️ Credit/Quota ကုန်သွားပါပြီ — Gemini quota ပြည့်သွားပါတယ်။ ၁ မိနစ်ခောက် စောင့်ပြီး ပြန်ကြိုးစားပါ၊ ဒါမှမဟုတ် ဆက်တင်မှာ တခြား key ပြောင်းသုံးပါ။ အသေးစိတ်: '+quotaErr.message);
+ if(busyErr)throw new Error('⏳ Google server busy ဖြစ်နေပါတယ် — ခဏ စောင့်ပြီး ပြန်ကြိုးစားပါ။ အသေးစိတ်: '+busyErr.message);
  throw lastErr||new Error('Gemini ကို ခေါ်မရပါ — internet စစ်ပြီး ပြန်ကြိုးစားပါ');
 }
 function cleanLines(txt){return String(txt||'').split('\n').map(s=>s.replace(/^```[a-z]*$/i,'').trim()).filter(Boolean)}
@@ -433,17 +444,17 @@ async function extractAiAudio(ff,ed,start,end){
  }finally{try{await ff.deleteFile('ai_in.mp4')}catch(e3){}}
  return chunks;
 }
-async function transcribeChunks(key,chunks){
+async function transcribeChunks(key,chunks,statusFn){
  const texts=[];
- for(const ch of chunks){
+ for(let ci=0;ci<chunks.length;ci++){const ch=chunks[ci];if(ci>0)await new Promise(r=>setTimeout(r,2500));
   const parts=[{inlineData:{mimeType:'audio/mp3',data:u8ToB64(ch)}},{text:'Transcribe the speech in this audio exactly, in its original language. One sentence per line. Output ONLY the transcript lines — no translation, no labels, no commentary.'}];
-  texts.push(await geminiGen(key,parts,0.2));
+  texts.push(await geminiGen(key,parts,0.2,statusFn));
  }
  return texts.join('\n');
 }
-async function translateFaithful(key,transcript){
+async function translateFaithful(key,transcript,statusFn){
  const prompt='Translate the following transcript into natural SPOKEN Burmese (Myanmar language), the way a real person would SAY it out loud — NOT formal written style.\nRules:\n- Keep EXACTLY the same number of lines: one output line per input line, in the same order.\n- Keep names, places and facts accurate — translate faithfully, do not add or remove content.\n- Write ALL numbers as Burmese words (for example တစ်သောင်း, နှစ်ဆယ်, သုံးရာ) — never use digits.\n- Transliterate foreign words into Burmese script where natural, because this text will be read aloud by a voice.\n- Output ONLY the Burmese lines — no labels, no notes, no blank lines.\n\nTranscript:\n'+transcript;
- return geminiGen(key,[{text:prompt}],0.2);
+ return geminiGen(key,[{text:prompt}],0.2,statusFn);
 }
 async function sampleFrames(ed,start,end){
  const v=$('#'+ed.p+'-video');if(!v||!v.videoWidth||!ed.url)return[];
@@ -457,14 +468,14 @@ async function sampleFrames(ed,start,end){
  try{v.currentTime=prevT;if(!wasPaused)v.play().catch(()=>{})}catch(e){}
  return frames;
 }
-async function writeSceneScript(key,frames,transcript,dur){
+async function writeSceneScript(key,frames,transcript,dur,statusFn){
  const target=Math.max(3,Math.round(dur/4.5));
  const parts=frames.map(b64=>({inlineData:{mimeType:'image/jpeg',data:b64}}));
  let prompt='You are writing the narration script for a short TikTok recap video (about '+Math.round(dur)+' seconds long). The images above are frames sampled in time order from the video.';
  if(transcript)prompt+='\n\nTranscript of the original audio (use it for facts and context):\n'+transcript;
  prompt+='\n\nWrite the recap narration in Burmese (Myanmar language), following ALL of these rules:\n- About '+target+' lines. One short cue per line (each line at most about 25 words — one subtitle cue, one breath).\n- The FIRST line must be a strong curiosity hook that makes viewers keep watching.\n- Then tell the story in scene order. Cover the key facts COMPLETELY.\n- Use ONLY facts visible in the frames'+(transcript?' or stated in the transcript':'')+'. Do NOT invent facts. No exaggeration.\n- Write in natural, conversational SPOKEN Burmese (သဘာဝကျကျ ပြောတဲ့ပုံစံ) — like a real person telling the story, NOT formal written Burmese.\n- Write ALL numbers as Burmese words — never use digits.\n- Output ONLY the script lines — no title, no labels, no notes.';
  parts.push({text:prompt});
- return geminiGen(key,parts,0.4);
+ return geminiGen(key,parts,0.4,statusFn);
 }
 /* --- SRT helpers --- */
 function srtTime(sec){let t=Math.max(0,Math.round(sec*1000));const p=(n,l)=>String(n).padStart(l,'0');const h=Math.floor(t/3600000);t%=3600000;const m=Math.floor(t/60000);t%=60000;const s=Math.floor(t/1000);return p(h,2)+':'+p(m,2)+':'+p(s,2)+','+p(t,3)}
@@ -524,7 +535,7 @@ function downloadText(name,text){const b=new Blob([text],{type:'text/plain;chars
    try{
     const chunks=await extractAiAudio(ff,ed,start,end);
     setStatus('📝 စာသား ထုတ်နေပါတယ်… (အသံ အပိုင်း '+chunks.length+' ပိုင်း)');showNotice('📝 စာသား ထုတ်နေပါတယ်…','info');
-    transcript=cleanLines(await transcribeChunks(key,chunks)).join('\n');
+    transcript=cleanLines(await transcribeChunks(key,chunks,setStatus)).join('\n');
    }catch(ae){if(ae&&ae.message===AI_NO_AUDIO)noAudio=true;else throw ae}
    if(noAudio){
     if(mode==='faithful'){setStatus('⚠️ ဒီ video မှာ အသံ မပါပါ');showNotice('⚠️ ဒီ video မှာ အသံထွက် မပါပါ — "မူရင်းအသံအတိုင်း" ပုံစံ သုံးမရပါ။ "Scene အသစ် Recap" ပုံစံကို ရွေးပြီး ပြန် ကြိုးစားပါ (Scene ပုံများ ကိုပဲ ကြည့်၍ ရေးပေးပါမယ်)','err');return}
@@ -537,13 +548,13 @@ function downloadText(name,text){const b=new Blob([text],{type:'text/plain;chars
    if(mode==='faithful'){
     if(!transcript)throw new Error('အသံထဲက စကားပြော မကြားရပါ — စကားပြော မရှိသော video ဖြစ်နိုင်ပါတယ်။ "Scene အသစ် Recap" ပုံစံကို စမ်းကြည့်ပါ');
     setStatus('🔄 မြန်မာ script ပြောင်းနေပါတယ်…');showNotice('🔄 မြန်မာ script ပြောင်းနေပါတယ်…','info');
-    scriptLines=cleanLines(await translateFaithful(key,transcript));
+    scriptLines=cleanLines(await translateFaithful(key,transcript,setStatus));
    }else{
     setStatus('🎞️ Scene ပုံများ ယူနေပါတယ်…');
     const frames=await sampleFrames(ed,start,end);
     if(!frames.length&&!transcript)throw new Error('Scene ပုံများ ယူမရပါ — video ကို ခဏ play လုပ်ထားပြီး ပြန် ကြိုးစားပါ');
     setStatus('✍️ Scene အသစ် script ရေးနေပါတယ်…');showNotice('✍️ Scene အသစ် script ရေးနေပါတယ်…','info');
-    scriptLines=cleanLines(await writeSceneScript(key,frames,transcript,end-start));
+    scriptLines=cleanLines(await writeSceneScript(key,frames,transcript,end-start,setStatus));
    }
    if(!scriptLines.length)throw new Error('AI မှ script ပြန်မရပါ — ပြန် ကြိုးစားကြည့်ပါ');
    E('subs').value=scriptLines.join('\n');

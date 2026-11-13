@@ -17,6 +17,7 @@ body{font-family:'Inter','Padauk','Noto Sans Myanmar',system-ui,sans-serif;color
 .main{padding:0}
 .tabpage{display:none}.tabpage.active{display:block}
 /* ===== top app bar (reference: white bar, orange title, pill buttons) ===== */
+:root{--appbarH:56px;--sheetTop:64px}
 .appbar{position:sticky;top:0;z-index:85;background:#fff;border-bottom:2px solid #F6C667;box-shadow:0 2px 10px rgba(146,110,20,.08)}
 .appbar-in{max-width:980px;margin:0 auto;display:flex;align-items:center;gap:7px;padding:9px 10px}
 .appbar-ttl{flex:1;font-size:15.5px;font-weight:800;color:#E8710A;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -33,7 +34,7 @@ body{font-family:'Inter','Padauk','Noto Sans Myanmar',system-ui,sans-serif;color
 .drawer-sub{font-size:12.5px;color:#8A7B5C;line-height:1.65;margin-bottom:16px}
 .drawer-sec{font-size:13px;font-weight:800;color:#33302A;margin:18px 0 8px}
 /* ===== cards / fields / buttons ===== */
-.card{background:#fff;border:1px solid #F1E4C4;border-radius:20px;padding:18px;color:#2E2A23;box-shadow:0 10px 24px rgba(146,110,20,.08);margin-bottom:14px;scroll-margin-top:78px}
+.card{background:#fff;border:1px solid #F1E4C4;border-radius:20px;padding:18px;color:#2E2A23;box-shadow:0 10px 24px rgba(146,110,20,.08);margin-bottom:14px;scroll-margin-top:calc(var(--sheetTop,110px) + 10px)}
 .card h3{font-size:16px;font-weight:800;margin-bottom:6px;color:#33302A}
 .card h3.studio-h{color:#E8710A;font-size:17px}
 .card p{font-size:13px;color:#6E6455;line-height:1.55}
@@ -67,7 +68,7 @@ input[type=checkbox]{width:19px;height:19px;accent-color:#22A06B;cursor:pointer}
 .tgl::after{content:'';position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:all .18s}
 .tgl.on{background:#F59E0B}.tgl.on::after{left:25px}
 video.preview{width:100%;border-radius:12px;background:#0E2233}
-video.preview.framed{max-height:52vh;object-fit:contain}
+video.preview.framed{max-height:34vh;object-fit:contain}
 .file-info{font-size:12.5px;color:#8A7B5C;margin-top:6px;word-break:break-all}
 /* waveform loading */
 .wave{display:none;align-items:flex-end;gap:2.5px;height:16px}
@@ -77,10 +78,10 @@ video.preview.framed{max-height:52vh;object-fit:contain}
 .btn.loading .wave{display:inline-flex}.btn.loading .btn-label{opacity:.85}
 body.locked{overflow:hidden}
 /* bottom sheet */
-.sheet-wrap{position:fixed;inset:0;z-index:100;display:none}
+.sheet-wrap{position:fixed;left:0;right:0;bottom:0;top:var(--sheetTop,0px);z-index:100;display:none}
 .sheet-wrap.open{display:block}
 .sheet-bg{position:absolute;inset:0;background:rgba(43,32,8,.5)}
-.sheet{position:absolute;left:0;right:0;bottom:0;max-width:640px;margin:0 auto;background:#FFFDF7;border-radius:24px 24px 0 0;padding:20px 18px 28px;color:#2E2A23;max-height:82vh;overflow:auto}
+.sheet{position:absolute;left:0;right:0;bottom:0;max-width:640px;margin:0 auto;background:#FFFDF7;border-radius:24px 24px 0 0;padding:20px 18px 28px;color:#2E2A23;max-height:56vh;overflow:auto}
 .sheet h3{font-size:16px;font-weight:800;margin-bottom:12px}
 .opt{width:100%;text-align:left;padding:14px;border-radius:14px;border:1.5px solid #EFE3C2;background:#fff;margin-bottom:9px;cursor:pointer;font-family:inherit}
 .opt b{display:block;font-size:14px;color:#33302A}.opt span{font-size:12.5px;color:#6E6455}
@@ -96,6 +97,9 @@ body.locked{overflow:hidden}
 /* ===== player card (compact, normal flow — NOT sticky, so it can never
    overlay the Mode band or the Features list) + placeholder + overlays ===== */
 .vid-pin{background:#fff;padding:14px}
+/* V207: ONLY the video frame is pinned — sticky directly under the app bar,
+   compact (frame capped at 34vh). Everything else scrolls beneath it. */
+.vid-sticky{position:sticky;top:var(--appbarH,56px);z-index:80;background:#fff;border:1px solid #F1E4C4;border-radius:18px;padding:10px;box-shadow:0 8px 20px rgba(146,110,20,.10);margin-bottom:12px}
 .vid-pin .btn.primary{padding:11px 18px}
 .pick-row{display:flex;align-items:center;gap:10px;margin-bottom:10px}
 .pick-row .file-info{margin-top:0}
@@ -211,10 +215,24 @@ function showNotice(msg,type){const n=$('#notice');n.textContent=msg;n.className
 function showDone(title,text){$('#doneTitle').textContent=title;$('#doneText').textContent=text;$('#donePop').classList.add('show')}
 $('#doneOk').addEventListener('click',()=>$('#donePop').classList.remove('show'));
 /* bottom sheet */
+/* V207 pinned-video geometry: the video frame (.vid-sticky) stays fixed
+   under the app bar while features are edited, so sheets must open BELOW
+   it — the sheet wrap starts at the pinned frame's bottom edge (the video
+   stays fully visible and undimmed) and the panel is capped at 56vh.
+   --appbarH / --sheetTop are measured from the live layout and refreshed
+   on resize, on video load and at every sheet open. */
+function syncPinGeometry(){
+ const ab=document.querySelector('.appbar');const ah=(ab&&ab.offsetHeight)||56;
+ const fp=document.querySelector('.vid-sticky');const fh=(fp&&fp.offsetHeight)||0;
+ const de=document.documentElement;
+ if(de&&de.style&&de.style.setProperty){de.style.setProperty('--appbarH',ah+'px');de.style.setProperty('--sheetTop',(ah+fh)+'px')}
+}
+window.syncPinGeometry=syncPinGeometry;
+if(window.addEventListener)window.addEventListener('resize',syncPinGeometry);
 let sheetOnClose=null;
 function flushSheet(){if(sheetOnClose){const f=sheetOnClose;sheetOnClose=null;try{f()}catch(e){}}}
-function openSheet(title,html){flushSheet();$('#sheetTitle').textContent=title;$('#sheetBody').innerHTML=html;$('#sheetWrap').classList.add('open');document.body.classList.add('locked')}
-function openSheetNodes(title,node){flushSheet();$('#sheetTitle').textContent=title;const b=$('#sheetBody');const home=node.parentElement,next=node.nextSibling;b.innerHTML='';b.appendChild(node);sheetOnClose=()=>{if(!home)return;if(next&&next.parentElement===home)home.insertBefore(node,next);else home.appendChild(node)};$('#sheetWrap').classList.add('open');document.body.classList.add('locked')}
+function openSheet(title,html){syncPinGeometry();flushSheet();$('#sheetTitle').textContent=title;$('#sheetBody').innerHTML=html;$('#sheetWrap').classList.add('open');document.body.classList.add('locked')}
+function openSheetNodes(title,node){syncPinGeometry();flushSheet();$('#sheetTitle').textContent=title;const b=$('#sheetBody');const home=node.parentElement,next=node.nextSibling;b.innerHTML='';b.appendChild(node);sheetOnClose=()=>{if(!home)return;if(next&&next.parentElement===home)home.insertBefore(node,next);else home.appendChild(node)};$('#sheetWrap').classList.add('open');document.body.classList.add('locked')}
 function closeSheet(){flushSheet();$('#sheetWrap').classList.remove('open');document.body.classList.remove('locked')}
 $('#sheetBg').addEventListener('click',closeSheet);
 /* IndexedDB library — resilient: the connection can enter a "closing" state
@@ -237,9 +255,9 @@ function pickVoice(current,cb){openSheet('အသံ ရွေးပါ',VOICES.m
 <script>
 /* ================= Recap editor ================= */
 function editorHTML(p){
-const videoInner='<input type="file" id="'+p+'-file" accept="video/*" style="display:none">'
-+'<div class="vid-wrap"><div class="ph-box" id="'+p+'-ph"><div class="ph-ic">🎬</div><div class="ph-t">Tap to Upload Video</div><div class="ph-s">နှိပ်ပြီး video ဖိုင် ရွေးပါ</div></div><video class="preview framed" id="'+p+'-video" playsinline style="display:none"></video><div class="mode-pill hide" id="'+p+'-modePill">🎬 Movie Recap Mode</div><div class="title-overlay" id="'+p+'-titleOvl"></div><div class="logo-overlay" id="'+p+'-logoOvl"></div><div class="sub-overlay" id="'+p+'-overlay"></div><div class="text-overlay" id="'+p+'-textOvl"></div><div class="frame-border" id="'+p+'-borderOvl"></div></div>'
-+'<div class="transport"><button class="tp-play" id="'+p+'-tpPlay">▶</button><button class="tp-skip" id="'+p+'-tpBack">⏪ 5s</button><span class="tp-time" id="'+p+'-tpCur">00:00</span><input type="range" id="'+p+'-tpSeek" min="0" max="1000" value="0"><span class="tp-time" id="'+p+'-tpDur">00:00</span><button class="tp-skip" id="'+p+'-tpFwd">5s ⏩</button></div>'
+const frameInner='<input type="file" id="'+p+'-file" accept="video/*" style="display:none">'
++'<div class="vid-wrap"><div class="ph-box" id="'+p+'-ph"><div class="ph-ic">🎬</div><div class="ph-t">Tap to Upload Video</div><div class="ph-s">နှိပ်ပြီး video ဖိုင် ရွေးပါ</div></div><video class="preview framed" id="'+p+'-video" playsinline style="display:none"></video><div class="mode-pill hide" id="'+p+'-modePill">🎬 Movie Recap Mode</div><div class="title-overlay" id="'+p+'-titleOvl"></div><div class="logo-overlay" id="'+p+'-logoOvl"></div><div class="sub-overlay" id="'+p+'-overlay"></div><div class="text-overlay" id="'+p+'-textOvl"></div><div class="frame-border" id="'+p+'-borderOvl"></div></div>';
+const controlsInner='<div class="transport"><button class="tp-play" id="'+p+'-tpPlay">▶</button><button class="tp-skip" id="'+p+'-tpBack">⏪ 5s</button><span class="tp-time" id="'+p+'-tpCur">00:00</span><input type="range" id="'+p+'-tpSeek" min="0" max="1000" value="0"><span class="tp-time" id="'+p+'-tpDur">00:00</span><button class="tp-skip" id="'+p+'-tpFwd">5s ⏩</button></div>'
 +'<button class="btn primary" id="'+p+'-createRecap" style="width:100%;margin-top:10px"><span class="wave"><i></i><i></i><i></i><i></i><i></i></span><span class="btn-label">✨ Script ထုတ်မည်</span></button>'
 +'<div class="studio-status" style="margin:10px 0 0"><span class="dot"></span><span id="'+p+'-createStatus">အသင့်ဖြစ်ပါပြီ</span></div>'
 +'<div class="btn-row2"><button class="btn light" id="'+p+'-previewBtn">▶ စစ်ကြည့်မယ်</button><button class="btn light" id="'+p+'-insertBtn"><span class="wave"><i></i><i></i><i></i><i></i><i></i></span><span class="btn-label">🎬 ထည့်မယ်</span></button></div><div class="file-info" id="'+p+'-insertStatus"></div><div id="'+p+'-insertResult" style="margin-top:8px"></div><audio id="'+p+'-pvAudio" style="display:none"></audio>';
@@ -302,13 +320,16 @@ const homes='<div id="'+p+'-sheetHomes" style="display:none">'
 +'<div id="'+p+'-homeBorder">'+borderHome+'</div>'
 +'</div>';
 const exportInner='<div class="logbox" id="'+p+'-log"></div><div id="'+p+'-result" style="margin-top:12px"></div>';
-/* ---- Layout (V204): the player card holds ONLY the frame + transport +
-   Script button/status + preview/insert row. Below it: the Mode band, ONE
-   Features list card (each row opens its settings as a bottom sheet whose
-   controls live in the hidden #sheetHomes), and a slim Export card that
-   stays hidden until it has content. ---- */
+/* ---- Layout (V207): ONLY the compact video frame is pinned (sticky
+   .vid-sticky directly under the app bar, capped at 34vh) so feature edits
+   are visible LIVE on the video; transport + Script button/status +
+   preview/insert scroll in the card beneath it, then the Mode band, ONE
+   Features list card (each row opens its settings as a bottom sheet BELOW
+   the pinned video; controls live in the hidden #sheetHomes), and a slim
+   Export card that stays hidden until it has content. ---- */
 return ''
-+'<div class="card vid-pin" id="'+p+'-secPlayer">'+videoInner+'</div>'
++'<div class="vid-sticky" id="'+p+'-framePin">'+frameInner+'</div>'
++'<div class="card vid-pin" id="'+p+'-secPlayer">'+controlsInner+'</div>'
 +modeBand
 +featuresCard
 +homes
@@ -316,6 +337,7 @@ return ''
 +'<div class="bottombar"><div class="bottombar-in"><button class="btn green" id="'+p+'-export"><span class="wave"><i></i><i></i><i></i><i></i><i></i></span><span class="btn-label">🎬 Export MP4</span></button><button class="btn light off" id="'+p+'-audioDl" aria-disabled="true">🎵 Audio</button><button class="btn light" id="'+p+'-srtBtn2">📝 SRT</button></div></div>';
 }
 $('#page-recap').innerHTML=editorHTML('recap');
+syncPinGeometry();
 /* Gemini key card on the Recap page — same localStorage key ('recaps_gemini_key') and saved notice as before */
 const keyInput=$('#recap-apiKey');keyInput.value=getApiKey();keyInput.addEventListener('change',()=>{localStorage.setItem('recaps_gemini_key',keyInput.value.trim());showNotice('✅ API Key သိမ်းပြီးပါပြီ (ဒီ browser ထဲမှာပဲ)','ok')});
 const editors={};
@@ -1323,6 +1345,7 @@ function unifiedCues(ed){
   tpSeek.addEventListener('input',()=>{const d=vidEl.duration;if(!d||!isFinite(d))return;tpSeeking=true;try{vidEl.currentTime=(parseFloat(tpSeek.value)||0)/1000*d}catch(e){}tpCur.textContent=fmtDur(vidEl.currentTime||0)});
   tpSeek.addEventListener('change',()=>{tpSeeking=false;tpSync()});
   ['play','pause','ended','timeupdate','durationchange','loadedmetadata'].forEach(ev=>vidEl.addEventListener(ev,tpSync));
+  vidEl.addEventListener('loadedmetadata',()=>{if(typeof syncPinGeometry==='function')syncPinGeometry()});
   vidEl.addEventListener('click',e=>{if(e.target!==vidEl)return;if(vidEl.paused)vidEl.play().catch(()=>{});else vidEl.pause()});
  }
  /* --- top bar + mode field --- */

@@ -321,7 +321,7 @@ let ffInstance=null,ffLoading=null,ffLogSink=null;
    button in live testing. Logs now go to ONE swappable sink (the current
    operation's logger), "Aborted()" lines are always dropped, and error text
    shown to users passes through humanErr(). */
-function humanErr(e){const m=(e&&e.message)||String(e||'');if(/Aborted\(\)/.test(m))return 'ffmpeg အလုပ် ရပ်သွားပါတယ် — ပြန် ကြိုးစားပါ';return m}
+function humanErr(e){const m=(e&&e.message)||String(e||'');if(/Aborted\(\)/.test(m))return 'ffmpeg အလုပ် ရပ်သွားပါတယ် — ပြန် ကြိုးစားပါ';if(/detached|postMessage/i.test(m))return 'အသံ အချက်အလက် ပျက်သွားပါတယ် — ④ အသံ အပိုင်းမှာ "🎙️ Create Voice" ကို ပြန်နှိပ်ပြီး အသံ ပြန်ထုတ်ပါ';return m}
 async function getFFmpeg(logFn){
  if(logFn)ffLogSink=logFn;
  if(ffInstance)return ffInstance;
@@ -341,13 +341,20 @@ async function ffReadU8(ff,name){const d=await ff.readFile(name);if(d instanceof
 /* atempo only accepts 0.5–2.0 per filter instance in the wasm ffmpeg build, so
    chain instances for wider factors. Product of the chain == requested speed. */
 function atempoChain(speed){const f=[];let s=speed;while(s>2.0){f.push('atempo=2.0000');s/=2}while(s<0.5){f.push('atempo=0.5000');s/=0.5}f.push('atempo='+s.toFixed(4));return f.join(',')}
+/* ffmpeg.wasm's writeFile hands the ArrayBuffer to its Worker with transfer
+   semantics: the caller's buffer is DETACHED on first use, so stored voice
+   bytes (pristine / render cache) passed directly are neutered and the SECOND
+   use throws "An ArrayBuffer is detached and could not be cloned" at
+   postMessage (live defect 2026-11-13: the 2nd consecutive speed re-render
+   failed). Every stored-byte writeFile therefore passes a fresh copy. */
+function ffCopy(u8){return (u8 instanceof Uint8Array)?u8.slice(0):u8}
 /* Re-render a speed-adjusted copy from the PRISTINE generated audio (never from an
    already-adjusted copy, so repeated adjustments never compound). Output: WAV. */
 async function renderVoiceSpeed(pristine,ext,speed,logFn){
- if(Math.abs(speed-1)<0.001)return{bytes:pristine,ext};
+ if(Math.abs(speed-1)<0.001)return{bytes:ffCopy(pristine),ext};
  const ff=await getFFmpeg(logFn||(()=>{}));
  const inName='spd_in.'+ext,outName='spd_out.wav';
- await ff.writeFile(inName,pristine);
+ await ff.writeFile(inName,ffCopy(pristine));
  try{
   const code=await ff.exec(['-i',inName,'-af',atempoChain(speed),'-vn','-c:a','pcm_s16le',outName],600000);
   if(code!==0)throw new Error('အသံ အမြန် ပြင်ရာတွင် ffmpeg exit code '+code);
@@ -383,7 +390,7 @@ async function exportOne(ff,ed,seg,idx,total,log){
  const fetchFile=window.FFmpegUtil&&window.FFmpegUtil.fetchFile;
  await ff.writeFile('in.mp4',fetchFile?await fetchFile(ed.file):new Uint8Array(await ed.file.arrayBuffer()));
  let voiceArr=null,voiceFile='voice.wav';
- if(ed.audioMode==='voice'){if(ed._cachedVoice){log('✅ အသံ အပိုင်းမှာ ထုတ်ထားသော အသံကို ပြန်သုံးပါတယ်');voiceArr=ed._cachedVoice;voiceFile='voice.'+(ed._cachedVoiceExt||'wav')}else{log('အသံ ထုတ်နေပါတယ်…');const gv=await generateVoice(ed,seg.cues.map(c=>c.text).join(' '),log);voiceArr=gv.bytes;voiceFile='voice.'+gv.ext}await ff.writeFile(voiceFile,voiceArr)}
+ if(ed.audioMode==='voice'){if(ed._cachedVoice){log('✅ အသံ အပိုင်းမှာ ထုတ်ထားသော အသံကို ပြန်သုံးပါတယ်');voiceArr=ed._cachedVoice;voiceFile='voice.'+(ed._cachedVoiceExt||'wav')}else{log('အသံ ထုတ်နေပါတယ်…');const gv=await generateVoice(ed,seg.cues.map(c=>c.text).join(' '),log);voiceArr=gv.bytes;voiceFile='voice.'+gv.ext}await ff.writeFile(voiceFile,ffCopy(voiceArr))}
  const overlays=[]; /* {file,y} */
  if(useTitle){await ff.writeFile('title.png',await textPNG($('#'+ed.p+'-title').value.trim(),W,150,{size:52,color:'#FFE92E'}));overlays.push({file:'title.png',y:36,from:0,to:dur})}
  if(useSub){for(let i=0;i<seg.cues.length;i++){const fn='sub'+i+'.png';await ff.writeFile(fn,await textPNG(seg.cues[i].text,W,170,{size:46}));overlays.push({file:fn,y:subY,from:seg.cues[i].start-seg.start,to:seg.cues[i].end-seg.start})}}
@@ -1018,7 +1025,7 @@ function unifiedCues(ed){
    const ff=await getFFmpeg(()=>{});
    const fetchFile=window.FFmpegUtil&&window.FFmpegUtil.fetchFile;
    await ff.writeFile('ins_in.mp4',fetchFile?await fetchFile(ed.file):new Uint8Array(await ed.file.arrayBuffer()));
-   const vf='ins_voice.'+rv.ext;await ff.writeFile(vf,rv.bytes);
+   const vf='ins_voice.'+rv.ext;await ff.writeFile(vf,ffCopy(rv.bytes));
    const seg=(r.end-r.start).toFixed(2);
    /* mixer (⑤ အသံ ချိန်ညှိ): BGM% keeps that much original audio under the
       voice at Voice% volume; BGM 0% = the voice replaces the original

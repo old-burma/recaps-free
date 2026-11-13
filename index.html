@@ -70,25 +70,14 @@ body.locked{overflow:hidden}
 #donePop .box{background:#fff;color:#07303c;border-radius:22px;padding:26px 22px;width:min(400px,calc(100% - 40px));text-align:center}
 .logbox{background:#04222b;color:#bfeef7;border-radius:13px;padding:11px 13px;font-size:11.5px;max-height:130px;overflow:auto;white-space:pre-wrap;word-break:break-all;margin-top:10px;display:none}
 @media(max-width:720px){.actions{grid-template-columns:1fr}.stats{grid-template-columns:1fr 1fr}.layout{padding:10px 10px 24px}.main{padding:16px 13px 24px}}
-/* recap workflow: pinned video + step pager */
+/* recap studio: pinned video + one-screen stacked sections (no step wizard) */
 .vid-pin{position:sticky;top:10px;z-index:40;background:rgba(250,254,255,.985);backdrop-filter:blur(16px) saturate(1.2);-webkit-backdrop-filter:blur(16px) saturate(1.2);box-shadow:0 18px 38px rgba(0,45,58,.30)}
 .vid-pin video.preview{max-height:34vh}
-/* sequential step flow: labeled chips + Back/Next (no dots, no swipe pager) */
-.steps-bar{display:flex;flex-wrap:wrap;gap:7px;margin:0 0 12px}
-.step-chip{flex:1 1 30%;display:flex;align-items:center;gap:7px;padding:9px 10px;border-radius:13px;border:1.5px solid rgba(255,255,255,.35);background:rgba(255,255,255,.16);color:#eafcff;font-family:inherit;font-size:12.5px;font-weight:700;cursor:pointer;text-align:left}
-.step-chip .n{width:22px;height:22px;flex:0 0 22px;border-radius:50%;background:rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800}
-.step-chip.cur{background:#fff;color:#07303c;border-color:#fff}
-.step-chip.cur .n{background:#0b9db8;color:#fff}
-.step-chip.done .n{background:#2fbf71;color:#fff}
-.step-chip.locked{opacity:.45}
-.stepfoot{display:flex;align-items:center;gap:10px;margin-top:2px}
-.stepfoot .btn{flex:1}
-.stepfoot-name{font-size:12px;color:rgba(230,252,255,.85);font-weight:700;text-align:center;min-width:70px}
-.panel{display:none}
-.panel.active{display:block}
+.card{scroll-margin-top:calc(34vh + 118px)}
 /* live subtitle overlay on the pinned video frame */
 .vid-wrap{position:relative}
-.sub-overlay{position:absolute;left:4%;right:4%;bottom:9%;text-align:center;font-family:'Padauk','Noto Sans Myanmar',sans-serif;font-weight:700;font-size:clamp(15px,4.4vw,25px);line-height:1.55;color:#fff;text-shadow:0 0 7px rgba(0,0,0,.95),0 2px 4px rgba(0,0,0,.95),-1px 0 0 rgba(0,0,0,.85),1px 0 0 rgba(0,0,0,.85),0 -1px 0 rgba(0,0,0,.85);pointer-events:none;display:none;white-space:pre-line;z-index:5}
+.sub-overlay{position:absolute;left:4%;right:4%;bottom:9%;text-align:center;font-family:'Padauk','Noto Sans Myanmar',sans-serif;font-weight:700;font-size:clamp(15px,4.4vw,25px);line-height:1.55;color:#fff;text-shadow:0 0 7px rgba(0,0,0,.95),0 2px 4px rgba(0,0,0,.95),-1px 0 0 rgba(0,0,0,.85),1px 0 0 rgba(0,0,0,.85),0 -1px 0 rgba(0,0,0,.85);pointer-events:auto;cursor:grab;touch-action:none;display:none;white-space:pre-line;z-index:5}
+.sub-overlay:active{cursor:grabbing}
 /* SRT cue editor rows */
 .cue-row{display:flex;gap:6px;align-items:flex-start;padding:8px;border:1.5px solid rgba(8,90,108,.16);border-radius:12px;margin-bottom:8px;background:#fff}
 .cue-row.cur{border-color:#0b9db8;background:rgba(12,170,195,.08)}
@@ -133,7 +122,7 @@ const FF_CORE='https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm/ffmpeg-core.js';
 const FF_WASM='https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm/ffmpeg-core.wasm';
 const ASPECTS={blurpad:{label:'9:16 — 1:1 ပုံ + Blur နောက်ခံ',desc:'ပုံ အလယ် 1:1၊ အပေါ်/အောက် blur၊ စာတန်း ပုံအောက်တွင်'},full916:{label:'9:16 — အပြည့် ဖြတ်',desc:'9:16 အပြည့် crop'},original:{label:'မူရင်း Aspect',desc:'မူရင်း အချိုးအတိုင်း'}};
 const VOICES=['Kore','Puck','Charon','Leda','Aoede'];
-const DEF={aspect:'blurpad',blur:28,voice:'Kore'};
+const DEF={aspect:'blurpad',blur:28,voice:'Kore',subPosY:0.81};
 function loadSettings(){try{return Object.assign({},DEF,JSON.parse(localStorage.getItem('recaps_settings')||'{}'))}catch(e){return Object.assign({},DEF)}}
 let SETTINGS=loadSettings();
 function saveSettings(){localStorage.setItem('recaps_settings',JSON.stringify(SETTINGS))}
@@ -169,31 +158,31 @@ function pickVoice(current,cb){openSheet('အသံ ရွေးပါ',VOICES.m
 <script>
 /* ================= Recap editor ================= */
 function editorHTML(p){
-const head='<h2 class="page-title">Recap လုပ်ရန်</h2><p class="page-sub">ဖုန်းထဲက video တင်ပြီး အဆင့်လိုက် Recap ထုတ်ပါ</p>';
+const head='<h2 class="page-title">Recap လုပ်ရန်</h2><p class="page-sub">ဖုန်းထဲက video တင်ပြီး တစ်မျက်နှာတည်းမှာ Recap ထုတ်ပါ</p>';
 const videoInner='<input type="file" id="'+p+'-file" accept="video/*" style="display:none"><button class="btn primary" id="'+p+'-pick">📱 Video ရွေးရန်</button><div class="file-info" id="'+p+'-fileinfo">ဖိုင် မရွေးရသေးပါ</div><div class="vid-wrap"><video class="preview" id="'+p+'-video" controls playsinline style="display:none;margin-top:10px"></video><div class="sub-overlay" id="'+p+'-overlay"></div></div>';
 const trimInner='<div class="row2"><div class="field" id="'+p+'-f-start"><label>စချိန် (စက္ကန့်)</label><input type="number" id="'+p+'-start" value="0" min="0" step="0.1"><div class="err-text" id="'+p+'-e-start"></div></div><div class="field" id="'+p+'-f-end"><label>ဆုံးချိန် (စက္ကန့်)</label><input type="number" id="'+p+'-end" value="0" min="0" step="0.1"><div class="err-text" id="'+p+'-e-end"></div></div></div>'
 +'<div class="field"><label>စချိန် slider</label><input type="range" id="'+p+'-rstart" value="0" min="0" max="100" step="0.1"></div><div class="field"><label>ဆုံးချိန် slider</label><input type="range" id="'+p+'-rend" value="0" min="0" max="100" step="0.1"></div><p class="hint" style="font-size:12px;color:#527884">ကြာချိန်: <b id="'+p+'-durinfo">—</b></p>';
 const aspectInner='<div class="field"><label>Aspect</label><button class="btn light" id="'+p+'-aspectBtn" style="width:100%"></button></div><div class="field"><label>Blur အား — <span id="'+p+'-blurVal"></span></label><input type="range" id="'+p+'-blur" min="5" max="60" step="1"><p class="hint">Blur pad သုံးသော ပုံစံတွင်သာ သက်ရောက်ပါတယ်</p></div>'
 +'<div class="switch-row"><div><b style="font-size:14px">ခေါင်းစဉ် (Title)</b><div style="font-size:12px;color:#527884">Video အပေါ်ပိုင်းတွင် ပြမည်</div></div><div class="tgl on" id="'+p+'-titleTgl"></div></div><div class="field" id="'+p+'-f-title"><label>ခေါင်းစဉ် စာသား</label><input type="text" id="'+p+'-title" placeholder="ဥပမာ — အံ့ဩဖွယ် ဖြစ်ရပ်"><div class="err-text" id="'+p+'-e-title"></div></div>';
-const subsFieldRecap='<div class="field" id="'+p+'-f-subs"><label>မြန်မာ Script (ပြင်နိုင်ပါတယ်)</label><textarea id="'+p+'-subs" placeholder="ပထမ ကြောင်း&#10;ဒုတိယ ကြောင်း&#10;တတိယ ကြောင်း"></textarea><div class="err-text" id="'+p+'-e-subs"></div><p class="hint">တစ်ကြောင်း = စာတန်း cue တစ်ခု — ပြင်ပြီးရင် "↻ Script မှ အချိန် ပြန်ခွဲ" နှိပ်ပြီး cue အချိန် ပြန်ခွဲနိုင်ပါတယ်။ အဆင့် ၃ မှာ အသံ ထုတ်ရာမှာလည်း ဒီစာသားကိုပဲ သုံးပါမယ်</p></div>';
+const subsFieldRecap='<div class="field" id="'+p+'-f-subs"><label>မြန်မာ Script (ပြင်နိုင်ပါတယ်)</label><textarea id="'+p+'-subs" placeholder="ပထမ ကြောင်း&#10;ဒုတိယ ကြောင်း&#10;တတိယ ကြောင်း"></textarea><div class="err-text" id="'+p+'-e-subs"></div><p class="hint">တစ်ကြောင်း = စာတန်း cue တစ်ခု — ပြင်ပြီးရင် "↻ Script မှ အချိန် ပြန်ခွဲ" နှိပ်ပြီး cue အချိန် ပြန်ခွဲနိုင်ပါတယ်။ 🎙️ အသံ အပိုင်းမှာ အသံ ထုတ်ရာမှာလည်း ဒီစာသားကိုပဲ သုံးပါမယ်</p></div>';
 const subToggleRow='<div class="switch-row"><div><b style="font-size:14px">စာတန်း ဖွင့်ရန်</b><div style="font-size:12px;color:#527884">တစ်ကြောင်း = စာတန်း တစ်ခု၊ အချိန် အလိုအလျောက် ခွဲပေးမည်</div></div><div class="tgl on" id="'+p+'-subTgl"></div></div>';
 const srtRow='<button class="btn light small" id="'+p+'-srtBtn">📄 SRT ဒေါင်း</button><span style="font-size:12px;color:#527884;margin-left:8px">စာတန်း အချိန်ဇယား (.srt) ဖိုင် သီးခြား ဒေါင်းရန်</span>';
 const audioInner='<div class="field"><label>အသံ ပုံစံ</label><button class="btn light" id="'+p+'-audioBtn" style="width:100%"></button></div><div class="field"><label>အသံ (Voice) — အသံအသစ် အတွက်</label><button class="btn light" id="'+p+'-voiceBtn" style="width:100%"></button></div>';
+const mixerInner='<div class="field"><label>မူရင်းအသံ (BGM) — <span id="'+p+'-bgmVolVal">0%</span></label><input type="range" id="'+p+'-bgmVol" min="0" max="100" step="1" value="0"><p class="hint">Voice နှင့် ရောရာတွင် မူရင်း အသံ ဘယ်လောက် ချန်မလဲ — 0% ဆိုရင် မူရင်း အသံ လုံးဝ ပိတ်ပြီး Voice ပဲ ပါမည် (Video ထဲ ထည့်ခြင်း နှင့် Export တွင် သက်ရောက်သည်)</p></div><div class="field"><label>🔊 Voice — <span id="'+p+'-voiceVolVal">100%</span></label><input type="range" id="'+p+'-voiceVol" min="0" max="300" step="5" value="100"><p class="hint">Voiceover အသံ အတိုးအကျယ် — 100% = မူရင်း အဆင့်၊ 300% အထိ တိုးနိုင်သည်</p></div><div class="field" style="margin-bottom:0"><label>⏱️ စာတန်း Sync Delay — <span id="'+p+'-syncDelayVal">0.0s</span></label><div style="display:flex;gap:8px;align-items:center"><input type="range" id="'+p+'-syncDelay" min="-5" max="5" step="0.1" value="0" style="flex:1"><button class="btn light small" id="'+p+'-syncReset">↺ 0</button></div><p class="hint">စာတန်း စော/နောက်ကျ ဖြစ်နေရင် ညှိရန် — (+) ဆိုရင် စာတန်း ပိုနောက်မှ ပေါ်မည်။ Live preview, SRT နှင့် Export အားလုံးတွင် သက်ရောက်သည် (မူရင်း cue အချိန်များကို မပြောင်းပါ)</p></div>';
 const exportInner='<button class="btn primary" id="'+p+'-export"><span class="wave"><i></i><i></i><i></i><i></i><i></i></span><span class="btn-label">🎬 Export ထုတ်မယ်</span></button><div class="logbox" id="'+p+'-log"></div><div id="'+p+'-result" style="margin-top:12px"></div>';
-/* ---- Recap: pinned video + 4-step flow (၁ Video + Create Recaps → ၂ စာတန်း → ၃ အသံ Create Voice → ၄ Export) ---- */
+/* ---- Recap ONE-SCREEN STUDIO: pinned video + stacked sections on one screen
+   (① Video · ② Create Recaps · ③ စာတန်း · ④ အသံ Create Voice · ⑤ Mixer/Sync · ⑥ Export) ---- */
 return head
 +'<div class="card vid-pin"><h3>🎬 Video</h3>'+videoInner+'</div>'
 +'<div class="card"><h3>🔑 Gemini Key</h3><div class="field" style="margin-bottom:0"><label>API Key (သင့်ကိုယ်ပိုင် key)</label><input type="password" id="'+p+'-apiKey" placeholder="AIza…"><p class="hint">⚠️ Key ကို ဒီ browser ၏ localStorage ထဲမှာပဲ သိမ်းပါတယ် — server သို့ မပို့ပါ။ Google AI Studio မှ အခမဲ့ ရယူနိုင်ပါတယ်။ AI Script နှင့် Gemini TTS အတွက် လိုအပ်ပါတယ် (Edge TTS ဆိုရင် key မလိုပါ)။</p></div></div>'
-+'<div class="steps-bar" id="'+p+'-stepsBar"></div>'
-+'<div id="'+p+'-panels">'
-+'<div class="card panel active"><h3>အဆင့် ၁ — 🎬 Video (ဖြတ် + Aspect)</h3>'+trimInner+'<div style="margin-top:14px">'+aspectInner+'</div><button class="btn primary" id="'+p+'-createRecap" style="margin-top:16px"><span class="wave"><i></i><i></i><i></i><i></i><i></i></span><span class="btn-label">🎬 Recaps လုပ်မယ်</span></button><div class="file-info" id="'+p+'-createStatus"></div><p class="hint" style="margin-top:6px">Video တင်ပြီး ဒီ ခလုတ် နှိပ်လိုက်ရင် ပုံစံ ရွေးခိုင်းပါမယ် — ပြီးရင် စာသား ထုတ် → မြန်မာ Script → စာတန်း အလိုအလျောက် ဆက်လုပ်ပေးပါမယ်</p></div>'
++'<div class="card" id="'+p+'-secVideo"><h3>① 🎬 Video — ဖြတ် + Aspect</h3>'+trimInner+'<div style="margin-top:14px">'+aspectInner+'</div></div>'
++'<div class="card" id="'+p+'-secCreate"><h3>② 🎬 Recaps လုပ်မယ်</h3><button class="btn primary" id="'+p+'-createRecap"><span class="wave"><i></i><i></i><i></i><i></i><i></i></span><span class="btn-label">🎬 Recaps လုပ်မယ်</span></button><div class="file-info" id="'+p+'-createStatus"></div><p class="hint" style="margin-top:6px">Video တင်ပြီး ဒီ ခလုတ် နှိပ်လိုက်ရင် ပုံစံ ရွေးခိုင်းပါမယ် — ပြီးရင် စာသား ထုတ် → မြန်မာ Script → စာတန်း အလိုအလျောက် ဆက်လုပ်ပေးပါမယ်</p></div>'
 
-+'<div class="card panel"><h3>အဆင့် ၂ — 💬 စာတန်း (ပြင် + Live Preview)</h3>'+subToggleRow+'<p style="margin:8px 0 10px">Cue တစ်ခု၏ ▶ ကို နှိပ်ရင် video က အဲဒီ နေရာသို့ ရောက်သွားပါမယ်။ Video play ထားရင် လက်ရှိ စာတန်းကို video ပေါ်မှာ တန်း ပြပေးပါမယ် — ဒီမှာ ပြင်လိုက်တာနဲ့ video ပေါ်က စာတန်းလည်း တန်း ပြောင်းပါမယ်။</p>'+'<div class="picker-row" style="margin-bottom:10px"><button class="btn light small" id="'+p+'-cueRebuild">↻ Script မှ အချိန် ပြန်ခွဲ</button><button class="btn light small" id="'+p+'-cueAdd">➕ Cue ထည့်</button></div>'+'<div class="file-info" id="'+p+'-cueCount" style="margin-bottom:10px">စာတန်း ၀ ကြောင်း</div>'+'<div id="'+p+'-cueList"></div>'+'<div class="warnbox" id="'+p+'-cueWarn" style="display:none"></div>'+'<button class="btn light" id="'+p+'-previewBtn2" style="width:100%;margin:10px 0">▶ စစ်ကြည့်မယ် (စာတန်း + အသံ)</button>'+srtRow+'<div style="margin-top:16px;border-top:1.5px solid rgba(8,90,108,.14);padding-top:12px"><div class="switch-row"><div><b style="font-size:14px">📝 Script စာသား</b><div style="font-size:12px;color:#527884">မြန်မာ Script နှင့် မူရင်း စာသား — လိုရင် ဖွင့်ကြည့်/ပြင်နိုင်ပါတယ်</div></div><button class="btn light small" id="'+p+'-scriptTgl">ပြ</button></div><div id="'+p+'-scriptBody" style="display:none">'+subsFieldRecap+'<div id="'+p+'-aiTxWrap" style="display:none;margin-top:4px"><div class="switch-row"><div><b style="font-size:14px">မူရင်း စာသား (AI ကြားရသလောက်)</b><div style="font-size:12px;color:#527884">ဖတ်ရန်သာ — ပြင်၍ မရပါ</div></div><button class="btn light small" id="'+p+'-aiTxTgl">ဖျောက်</button></div><div class="field" id="'+p+'-f-transcript" style="margin-bottom:0"><textarea id="'+p+'-transcript" readonly placeholder="AI ထုတ်ထားသော မူရင်း စာသား ဒီမှာ ပေါ်ပါမယ်"></textarea></div></div><button class="btn light" id="'+p+'-recreate" style="width:100%;margin-top:12px">🎬 Recaps ပြန်လုပ်</button><p class="hint" style="margin-top:6px">ပုံစံ ပြန်ရွေးပြီး Script အသစ် ပြန်ထုတ်ရန် (လက်ရှိ Script နှင့် cue များကို အစားထိုးပါမယ်)</p></div></div>'+'</div>'
-+'<div class="card panel"><h3>အဆင့် ၃ — 🎙️ အသံ (Text to Voice)</h3><button class="btn primary" id="'+p+'-voiceGen" disabled><span class="wave"><i></i><i></i><i></i><i></i><i></i></span><span class="btn-label">🎙️ Create Voice</span></button><div class="file-info" id="'+p+'-voiceStatus"></div><p class="hint" style="margin:6px 0 12px">စာတန်း ပြင်ပြီးမှ အသံ ထုတ်ပါ — Engine / အသံ / အမြန် ကို အောက်မှာ ရွေးနိုင်ပါတယ်</p><div class="field"><label>TTS Engine</label><button class="btn light" id="'+p+'-engineBtn" style="width:100%"></button></div>'+audioInner+'<div class="field"><label>ထုတ်ချိန် အသံ အမြန် — <span id="'+p+'-genSpeedVal">1.00×</span></label><input type="range" id="'+p+'-genSpeed" min="0.5" max="2" step="0.05" value="1"><p class="hint">အသံ မထုတ်ခင် ရွေးပါ — pitch မပြောင်းဘဲ အမြန် ညှိပေးမည် (0.5× = နှေး၊ 2.0× = မြန်)</p></div><div id="'+p+'-voiceStale" style="display:none" class="warnbox">⚠️ စာသား ပြင်ထားပါတယ် — အသံ ပြန်ထုတ်ရန် လိုပါတယ်</div><div id="'+p+'-voicePlayer" style="display:none;margin-top:12px"><div class="vp-row"><button class="vp-play" id="'+p+'-vpPlay">▶️</button><div class="vp-track"><div class="vp-bar" id="'+p+'-vpBar"></div></div><span class="vp-time" id="'+p+'-vpTime">0:00 / —</span></div><audio id="'+p+'-vpAudio" style="display:none"></audio></div>'
-+'<div id="'+p+'-adjWrap" style="display:none;margin-top:14px"><div class="field"><label>အသံ အမြန် ပြန်ချိန် — <span id="'+p+'-adjSpeedVal">1.00×</span></label><input type="range" id="'+p+'-adjSpeed" min="0.5" max="2" step="0.05" value="1"><p class="hint">ထုတ်ထားသော မူရင်း အသံကနေပဲ အမြဲ ပြန်ချိန်တာပါ — ထပ်ခါထပ်ခါ ချိန်လည်း အရည်�အသွေး မကျဆင်းပါ။ slider ရွှေ့ပြီး player မှာ တန်း နားထောင်ကြည့်နိုင်ပါတယ်</p></div><div class="file-info" id="'+p+'-effInfo"></div><div class="warnbox" id="'+p+'-voiceWarn" style="display:none"></div><button class="btn light" id="'+p+'-renderSpeed" style="width:100%;margin-top:10px"><span class="wave"><i></i><i></i><i></i><i></i><i></i></span><span class="btn-label">🔄 အမြန် ပြင်ပြီး အသံ ပြန်ထုတ်</span></button><button class="btn light" id="'+p+'-previewBtn" style="width:100%;margin-top:10px">▶ စစ်ကြည့်မယ် (စာတန်း + အသံ)</button><button class="btn primary" id="'+p+'-insertBtn" style="margin-top:10px"><span class="wave"><i></i><i></i><i></i><i></i><i></i></span><span class="btn-label">🎬 Video ထဲ ထည့်မယ်</span></button><div class="file-info" id="'+p+'-insertStatus"></div><div id="'+p+'-insertResult" style="margin-top:8px"></div><audio id="'+p+'-pvAudio" style="display:none"></audio></div></div>'
-+'<div class="card panel"><h3>အဆင့် ၄ — 🎬 Export</h3><p style="margin-bottom:10px">ခေါင်းစဉ် / Aspect / Blur ကို အဆင့် ၁ မှာ ပြင်နိုင်ပါတယ်။ Export မှာ စာတန်း burn-in နှင့် SRT ဖိုင်သည် အဆင့် ၂ က cue အချိန် အတိအကျ အတူတူ သုံးပါတယ်။</p>'+exportInner+'</div>'
-+'</div>'
-+'<div class="stepfoot"><button class="btn light" id="'+p+'-stepPrev">⬅ အရင်</button><div class="stepfoot-name" id="'+p+'-stepName"></div><button class="btn primary" id="'+p+'-stepNext" style="width:auto;flex:1">နောက် ➡</button></div>';
++'<div class="card" id="'+p+'-secSrt"><h3>③ 💬 စာတန်း — ပြင် + Live Preview</h3>'+subToggleRow+'<p style="margin:8px 0 10px">Cue တစ်ခု၏ ▶ ကို နှိပ်ရင် video က အဲဒီ နေရာသို့ ရောက်သွားပါမယ်။ Video play ထားရင် လက်ရှိ စာတန်းကို video ပေါ်မှာ တန်း ပြပေးပါမယ် — ဒီမှာ ပြင်လိုက်တာနဲ့ video ပေါ်က စာတန်းလည်း တန်း ပြောင်းပါမယ်။</p>'+'<div class="picker-row" style="margin-bottom:10px;align-items:center"><button class="btn light small" id="'+p+'-subPosReset">↺ အလယ် ပြန်ထား</button><span style="font-size:12.5px;color:#527884">စာတန်း နေရာ: <b id="'+p+'-subPosVal">81%</b> — video ပေါ်က စာတန်းကို ဖိဆွဲပြီး အပေါ်/အောက် ရွှေ့နိုင်ပါတယ် (Export မှာပါ ဒီ နေရာ သုံးပါမယ်)</span></div>'+'<div class="picker-row" style="margin-bottom:10px"><button class="btn light small" id="'+p+'-cueRebuild">↻ Script မှ အချိန် ပြန်ခွဲ</button><button class="btn light small" id="'+p+'-cueAdd">➕ Cue ထည့်</button></div>'+'<div class="file-info" id="'+p+'-cueCount" style="margin-bottom:10px">စာတန်း ၀ ကြောင်း</div>'+'<div id="'+p+'-cueList"></div>'+'<div class="warnbox" id="'+p+'-cueWarn" style="display:none"></div>'+'<button class="btn light" id="'+p+'-previewBtn2" style="width:100%;margin:10px 0">▶ စစ်ကြည့်မယ် (စာတန်း + အသံ)</button>'+srtRow+'<div style="margin-top:16px;border-top:1.5px solid rgba(8,90,108,.14);padding-top:12px"><div class="switch-row"><div><b style="font-size:14px">📝 Script စာသား</b><div style="font-size:12px;color:#527884">မြန်မာ Script နှင့် မူရင်း စာသား — လိုရင် ဖွင့်ကြည့်/ပြင်နိုင်ပါတယ်</div></div><button class="btn light small" id="'+p+'-scriptTgl">ပြ</button></div><div id="'+p+'-scriptBody" style="display:none">'+subsFieldRecap+'<div id="'+p+'-aiTxWrap" style="display:none;margin-top:4px"><div class="switch-row"><div><b style="font-size:14px">မူရင်း စာသား (AI ကြားရသလောက်)</b><div style="font-size:12px;color:#527884">ဖတ်ရန်သာ — ပြင်၍ မရပါ</div></div><button class="btn light small" id="'+p+'-aiTxTgl">ဖျောက်</button></div><div class="field" id="'+p+'-f-transcript" style="margin-bottom:0"><textarea id="'+p+'-transcript" readonly placeholder="AI ထုတ်ထားသော မူရင်း စာသား ဒီမှာ ပေါ်ပါမယ်"></textarea></div></div><button class="btn light" id="'+p+'-recreate" style="width:100%;margin-top:12px">🎬 Recaps ပြန်လုပ်</button><p class="hint" style="margin-top:6px">ပုံစံ ပြန်ရွေးပြီး Script အသစ် ပြန်ထုတ်ရန် (လက်ရှိ Script နှင့် cue များကို အစားထိုးပါမယ်)</p></div></div>'+'</div>'
++'<div class="card" id="'+p+'-secVoice"><h3>④ 🎙️ အသံ — Text to Voice</h3><button class="btn primary" id="'+p+'-voiceGen" disabled><span class="wave"><i></i><i></i><i></i><i></i><i></i></span><span class="btn-label">🎙️ Create Voice</span></button><div class="file-info" id="'+p+'-voiceStatus"></div><p class="hint" style="margin:6px 0 12px">စာတန်း ပြင်ပြီးမှ အသံ ထုတ်ပါ — Engine / အသံ / အမြန် ကို အောက်မှာ ရွေးနိုင်ပါတယ်</p><div class="field"><label>TTS Engine</label><button class="btn light" id="'+p+'-engineBtn" style="width:100%"></button></div>'+audioInner+'<div class="field"><label>အသံအမြန်နှုန်း (Speed) — ထုတ်ချိန် <span id="'+p+'-genSpeedVal">1.00×</span></label><input type="range" id="'+p+'-genSpeed" min="0.5" max="2" step="0.05" value="1"><p class="hint">အသံ မထုတ်ခင် ရွေးပါ — pitch မပြောင်းဘဲ အမြန် ညှိပေးမည် (0.5× = နှေး၊ 2.0× = မြန်)</p></div><div id="'+p+'-voiceStale" style="display:none" class="warnbox">⚠️ စာသား ပြင်ထားပါတယ် — အသံ ပြန်ထုတ်ရန် လိုပါတယ်</div><div id="'+p+'-voicePlayer" style="display:none;margin-top:12px"><div class="vp-row"><button class="vp-play" id="'+p+'-vpPlay">▶️</button><div class="vp-track"><div class="vp-bar" id="'+p+'-vpBar"></div></div><span class="vp-time" id="'+p+'-vpTime">0:00 / —</span></div><audio id="'+p+'-vpAudio" style="display:none"></audio></div>'
++'<div id="'+p+'-adjWrap" style="display:none;margin-top:14px"><div class="field"><label>အသံအမြန်နှုန်း (Speed) — ပြန်ချိန် <span id="'+p+'-adjSpeedVal">1.00×</span></label><input type="range" id="'+p+'-adjSpeed" min="0.5" max="2" step="0.05" value="1"><p class="hint">ထုတ်ထားသော မူရင်း အသံကနေပဲ အမြဲ ပြန်ချိန်တာပါ — ထပ်ခါထပ်ခါ ချိန်လည်း အရည်�အသွေး မကျဆင်းပါ။ slider ရွှေ့ပြီး player မှာ တန်း နားထောင်ကြည့်နိုင်ပါတယ်</p></div><div class="file-info" id="'+p+'-effInfo"></div><div class="warnbox" id="'+p+'-voiceWarn" style="display:none"></div><button class="btn light" id="'+p+'-renderSpeed" style="width:100%;margin-top:10px"><span class="wave"><i></i><i></i><i></i><i></i><i></i></span><span class="btn-label">🔄 အမြန် ပြင်ပြီး အသံ ပြန်ထုတ်</span></button><button class="btn light" id="'+p+'-previewBtn" style="width:100%;margin-top:10px">▶ စစ်ကြည့်မယ် (စာတန်း + အသံ)</button><button class="btn primary" id="'+p+'-insertBtn" style="margin-top:10px"><span class="wave"><i></i><i></i><i></i><i></i><i></i></span><span class="btn-label">🎬 Video ထဲ ထည့်မယ်</span></button><div class="file-info" id="'+p+'-insertStatus"></div><div id="'+p+'-insertResult" style="margin-top:8px"></div><audio id="'+p+'-pvAudio" style="display:none"></audio></div></div>'
++'<div class="card" id="'+p+'-secMix"><h3>⑤ 🔊 အသံ ချိန်ညှိ</h3>'+mixerInner+'</div>'
++'<div class="card" id="'+p+'-secExport"><h3>⑥ 🎬 Export</h3><p style="margin-bottom:10px">ခေါင်းစဉ် / Aspect / Blur ကို ① Video အပိုင်းမှာ ပြင်နိုင်ပါတယ်။ Export မှာ စာတန်း burn-in နှင့် SRT ဖိုင်သည် ③ စာတန်း အပိုင်းက cue အချိန် အတိအကျ အတူတူ သုံးပါတယ် (⏱️ Sync Delay နှင့် 🔊 အသံ ချိန်ညှိ တန်ဖိုးများပါ သက်ရောက်ပါတယ်)။</p>'+exportInner+'</div>';
 }
 $('#page-recap').innerHTML=editorHTML('recap');
 /* Gemini key card on the Recap page — same localStorage key ('recaps_gemini_key') and saved notice as before */
@@ -202,7 +191,7 @@ const editors={};
 function fieldErr(p,key,msg){const f=$('#'+p+'-f-'+key),e=$('#'+p+'-e-'+key);if(f)f.classList.add('bad');if(e){e.textContent=msg;e.classList.add('show')}if(f)f.scrollIntoView({behavior:'smooth',block:'center'})}
 function clearErrs(p){['start','end','title','subs'].forEach(k=>{const f=$('#'+p+'-f-'+k),e=$('#'+p+'-e-'+k);if(f)f.classList.remove('bad');if(e)e.classList.remove('show')});const fi=$('#'+p+'-fileinfo');if(fi)fi.style.color=''}
 function makeEditor(p){
- const ed={p,file:null,url:null,duration:0,aspect:SETTINGS.aspect,blur:SETTINGS.blur,audioMode:'original',voice:SETTINGS.voice,busy:false,ttsEngine:'gemini',edgeVoice:'my-MM-ThihaNeural',voiceCache:null,voiceUrl:null};
+ const ed={p,file:null,url:null,duration:0,aspect:SETTINGS.aspect,blur:SETTINGS.blur,audioMode:'original',voice:SETTINGS.voice,busy:false,ttsEngine:'gemini',edgeVoice:'my-MM-ThihaNeural',voiceCache:null,voiceUrl:null,bgmVol:0,voiceVol:100,syncDelay:0,subPosY:(typeof SETTINGS.subPosY==='number'?SETTINGS.subPosY:0.81),subPosCustom:!!SETTINGS.subPosCustom};
  editors[p]=ed;
  const E=id=>$('#'+p+'-'+id);
  function refreshLabels(){E('aspectBtn').textContent=ASPECTS[ed.aspect].label;E('blurVal').textContent=ed.blur;E('blur').value=ed.blur;E('audioBtn').textContent=ed.audioMode==='voice'?'🎙️ အသံအသစ် (Gemini voiceover)':'🔊 မူရင်းအသံ';E('voiceBtn').textContent=ed.ttsEngine==='edge'?edgeVoiceLabel(ed.edgeVoice):ed.voice;const s=parseFloat(E('start').value)||0,en=parseFloat(E('end').value)||0;E('durinfo').textContent=ed.duration?fmtDur(Math.max(0,en-s))+' (မူရင်း '+fmtDur(ed.duration)+')':'—'}
@@ -325,12 +314,20 @@ async function geminiTTSLong(key,text,voice){ /* chunk long narration, concat PC
 </script>
 <script>
 /* ================= Export engine — ffmpeg.wasm single-thread ================= */
-let ffInstance=null,ffLoading=null;
+let ffInstance=null,ffLoading=null,ffLogSink=null;
+/* Raw ffmpeg.wasm log lines must never reach status elements: the wasm runtime
+   prints a bare "Aborted()" line when an exec finishes/aborts, and streaming the
+   log into the voice-step status made that text appear under the Create Voice
+   button in live testing. Logs now go to ONE swappable sink (the current
+   operation's logger), "Aborted()" lines are always dropped, and error text
+   shown to users passes through humanErr(). */
+function humanErr(e){const m=(e&&e.message)||String(e||'');if(/Aborted\(\)/.test(m))return 'ffmpeg အလုပ် ရပ်သွားပါတယ် — ပြန် ကြိုးစားပါ';return m}
 async function getFFmpeg(logFn){
+ if(logFn)ffLogSink=logFn;
  if(ffInstance)return ffInstance;
  if(ffLoading)return ffLoading;
  ffLoading=(async()=>{const FFmpegWASM=window.FFmpegWASM;if(!FFmpegWASM)throw new Error('ffmpeg library မတင်ရသေးပါ — internet စစ်ပြီး ပြန်ကြိုးစားပါ');
-  const ff=new FFmpegWASM.FFmpeg();ff.on('log',({message})=>{if(logFn)logFn(message)});
+  const ff=new FFmpegWASM.FFmpeg();ff.on('log',({message})=>{if(!message||/Aborted\(\)/.test(message))return;if(ffLogSink)ffLogSink(message)});
   /* Browsers block cross-origin classic Workers, so fetch the ffmpeg worker,
      core and wasm as blobs and pass same-origin blob URLs (fixes the live-site
      "Failed to construct 'Worker'" error from the unpkg URLs). */
@@ -379,12 +376,14 @@ async function exportOne(ff,ed,seg,idx,total,log){
  if(ed.aspect==='blurpad'){W=720;H=1280;picW=720;picH=720;picY=280;subY=1035}
  else if(ed.aspect==='full916'){W=720;H=1280;picW=720;picH=1280;picY=0;subY=1060}
  else{const vw=ed.videoW||1280,vh=ed.videoH||720;const sc=Math.min(1,720/vw);W=Math.max(2,Math.round(vw*sc/2)*2);H=Math.max(2,Math.round(vh*sc/2)*2);picW=W;picH=H;picY=0;subY=H-170}
+ /* dragged subtitle position: % of frame height -> top of the export subtitle band */
+ if(ed.subPosCustom)subY=Math.max(0,Math.min(H-170,Math.round((ed.subPosY||0.81)*H)));
  const useSub=$('#'+ed.p+'-subTgl').classList.contains('on')&&seg.cues.length;
  const useTitle=$('#'+ed.p+'-titleTgl').classList.contains('on')&&($('#'+ed.p+'-title').value||'').trim();
  const fetchFile=window.FFmpegUtil&&window.FFmpegUtil.fetchFile;
  await ff.writeFile('in.mp4',fetchFile?await fetchFile(ed.file):new Uint8Array(await ed.file.arrayBuffer()));
  let voiceArr=null,voiceFile='voice.wav';
- if(ed.audioMode==='voice'){if(ed._cachedVoice){log('✅ အသံ အဆင့်မှာ ထုတ်ထားသော အသံကို ပြန်သုံးပါတယ်');voiceArr=ed._cachedVoice;voiceFile='voice.'+(ed._cachedVoiceExt||'wav')}else{log('အသံ ထုတ်နေပါတယ်…');const gv=await generateVoice(ed,seg.cues.map(c=>c.text).join(' '),log);voiceArr=gv.bytes;voiceFile='voice.'+gv.ext}await ff.writeFile(voiceFile,voiceArr)}
+ if(ed.audioMode==='voice'){if(ed._cachedVoice){log('✅ အသံ အပိုင်းမှာ ထုတ်ထားသော အသံကို ပြန်သုံးပါတယ်');voiceArr=ed._cachedVoice;voiceFile='voice.'+(ed._cachedVoiceExt||'wav')}else{log('အသံ ထုတ်နေပါတယ်…');const gv=await generateVoice(ed,seg.cues.map(c=>c.text).join(' '),log);voiceArr=gv.bytes;voiceFile='voice.'+gv.ext}await ff.writeFile(voiceFile,voiceArr)}
  const overlays=[]; /* {file,y} */
  if(useTitle){await ff.writeFile('title.png',await textPNG($('#'+ed.p+'-title').value.trim(),W,150,{size:52,color:'#FFE92E'}));overlays.push({file:'title.png',y:36,from:0,to:dur})}
  if(useSub){for(let i=0;i<seg.cues.length;i++){const fn='sub'+i+'.png';await ff.writeFile(fn,await textPNG(seg.cues[i].text,W,170,{size:46}));overlays.push({file:fn,y:subY,from:seg.cues[i].start-seg.start,to:seg.cues[i].end-seg.start})}}
@@ -401,17 +400,26 @@ async function exportOne(ff,ed,seg,idx,total,log){
  }else{
   fc+='[0:v]trim=start='+seg.start+':end='+seg.end+',setpts=PTS-STARTPTS,scale='+W+':'+H+'[base0];';base='base0';
  }
- let inIdx=1;const voiceIdx=ed.audioMode==='voice'?1:-1;if(ed.audioMode==='voice')inIdx=2;
+ let inIdx=1;if(ed.audioMode==='voice')inIdx=2;
  overlays.forEach((ov,i)=>{const out=i===overlays.length-1?'vout':'vo'+i;fc+='['+base+']['+(inIdx+i)+':v]overlay=0:'+ov.y+":enable='between(t,"+ov.from.toFixed(2)+','+ov.to.toFixed(2)+")'["+out+'];';base=out});
  if(!overlays.length){fc+='['+base+']null[vout];'}
  fc=fc.replace(/;\s*$/,'');
- const args=['-i','in.mp4'];if(ed.audioMode==='voice')args.push('-i',voiceFile);overlays.forEach(ov=>args.push('-loop','1','-t',dur.toFixed(2),'-i',ov.file));
- args.push('-filter_complex',fc);
- if(ed.audioMode==='voice'){args.push('-map','[vout]','-map','1:a','-af','apad,atrim=0:'+dur.toFixed(2))}
- else{args.push('-map','[vout]','-map','0:a?','-af','atrim=0:'+dur.toFixed(2)+',asetpts=PTS-STARTPTS')}
- args.push('-t',dur.toFixed(2),'-c:v','libx264','-preset','veryfast','-crf','23','-pix_fmt','yuv420p','-c:a','aac','-b:a','128k','-movflags','+faststart','out'+idx+'.mp4');
+ /* mixer (⑤ အသံ ချိန်ညှိ): BGM% = original audio kept under the voice, Voice% =
+    voiceover volume — applied here at Export (and in the voice section's insert). */
+ const bgmF=Math.max(0,Math.min(100,ed.bgmVol||0))/100,voiceF=Math.max(0,Math.min(300,ed.voiceVol==null?100:ed.voiceVol))/100;
+ const fcMix=fc+';[0:a]atrim=start='+seg.start+':end='+seg.end+',asetpts=PTS-STARTPTS,volume='+bgmF.toFixed(3)+'[abg];[1:a]volume='+voiceF.toFixed(3)+',apad,atrim=0:'+dur.toFixed(2)+'[avc];[abg][avc]amix=inputs=2:duration=first:dropout_transition=0[aout]';
+ function buildArgs(mix){
+  const a=['-i','in.mp4'];if(ed.audioMode==='voice')a.push('-i',voiceFile);overlays.forEach(ov=>a.push('-loop','1','-t',dur.toFixed(2),'-i',ov.file));
+  a.push('-filter_complex',mix?fcMix:fc);
+  if(ed.audioMode==='voice'){if(mix)a.push('-map','[vout]','-map','[aout]');else a.push('-map','[vout]','-map','1:a','-af','volume='+voiceF.toFixed(3)+',apad,atrim=0:'+dur.toFixed(2))}
+  else{a.push('-map','[vout]','-map','0:a?','-af','atrim=0:'+dur.toFixed(2)+',asetpts=PTS-STARTPTS')}
+  a.push('-t',dur.toFixed(2),'-c:v','libx264','-preset','veryfast','-crf','23','-pix_fmt','yuv420p','-c:a','aac','-b:a','128k','-movflags','+faststart','out'+idx+'.mp4');
+  return a;
+ }
  log('Video ထုတ်နေပါတယ် ('+(idx+1)+'/'+total+') — '+dur.toFixed(1)+' စက္ကန့်…');
- const code=await ff.exec(args,3600000);
+ const wantMix=ed.audioMode==='voice'&&bgmF>0;
+ let code=await ff.exec(buildArgs(wantMix),3600000);
+ if(code!==0&&wantMix){log('ℹ️ မူရင်းအသံ ရောမရပါ (အသံ မပါသော video ဖြစ်နိုင်ပါတယ်) — voice သီးသန့်ဖြင့် ပြန်ထုတ်နေပါတယ်…');code=await ff.exec(buildArgs(false),3600000)}
  if(code!==0)throw new Error('ffmpeg exit code '+code+' — အသေးစိတ်ကို log တွင် ကြည့်ပါ');
  const data=await ff.readFile('out'+idx+'.mp4');
  const blob=new Blob([data.buffer||data],{type:'video/mp4'});
@@ -440,10 +448,11 @@ async function exportEditor(ed){
  /* segments */
  const segments=[{start,end}];
  /* cues: the SAME cue list the SRT editor/SRT download use — char-weighted timing
-    (spreadCuesWeighted) + over-long cue splitting. If step 4's cue list matches the
+    (spreadCuesWeighted) + over-long cue splitting. If the SRT section's cue list matches the
     current script + trim range, use it verbatim (including manual edits). */
  const cues=(ed.cues&&ed.cues.length&&ed.cuesSig===lines.join('\n')+'|'+start+'|'+end)?ed.cues:unifiedCues(ed);
- segments.forEach(sg=>{sg.cues=cues.filter(c=>{const mid=(c.start+c.end)/2;return mid>=sg.start-0.01&&mid<sg.end+0.01}).map(c=>({text:c.text,start:Math.max(sg.start,c.start),end:Math.min(sg.end,c.end)}))});
+ const syncDl=ed.syncDelay||0; /* ⏱️ Sync Delay: shifted at use time only — stored cue times untouched */
+ segments.forEach(sg=>{sg.cues=cues.filter(c=>{const mid=(c.start+c.end)/2;return mid>=sg.start-0.01&&mid<sg.end+0.01}).map(c=>({text:c.text,start:Math.max(sg.start,c.start+syncDl),end:Math.min(sg.end,c.end+syncDl)})).filter(c=>c.end-c.start>=0.05)});
  /* --- run --- */
  ed.busy=true;const btn=E('export');btn.classList.add('loading');btn.disabled=true;btn.querySelector('.btn-label').textContent='လုပ်ဆောင်နေပါတယ်…';
  const logBox=E('log');logBox.style.display='block';logBox.textContent='';const log=m=>{logBox.textContent+=m+'\n';logBox.scrollTop=logBox.scrollHeight};
@@ -454,18 +463,18 @@ async function exportEditor(ed){
   const made=[];
   ed._cachedVoice=null;ed._cachedVoiceExt=null;
   if(ed.audioMode==='voice'){
-   /* voice prep: reuse step-5 voice when it matches, else generate; apply the
+   /* voice prep: reuse the voice section's voice when it matches, else generate; apply the
       speed controls; and NEVER silently trim a too-long voice mid-sentence —
       block with both durations + the speed needed (instructive error). */
    const vid=(ed.ttsEngine==='edge'?ed.edgeVoice:ed.voice);
    let vc=(ed.voiceCache&&ed.voiceCache.text===lines.join(' ')&&ed.voiceCache.engine===ed.ttsEngine&&ed.voiceCache.voice===vid)?ed.voiceCache:null;
    let pristine,pext;
-   if(vc){pristine=vc.bytes;pext=vc.ext;log('✅ အသံ အဆင့်မှာ ထုတ်ထားသော အသံကို ပြန်သုံးပါတယ်')}
+   if(vc){pristine=vc.bytes;pext=vc.ext;log('✅ အသံ အပိုင်းမှာ ထုတ်ထားသော အသံကို ပြန်သုံးပါတယ်')}
    else{log('အသံ ထုတ်နေပါတယ်…');const gv=await generateVoice(ed,lines.join(' '),log);pristine=gv.bytes;pext=gv.ext;vc={text:lines.join(' '),engine:ed.ttsEngine,voice:vid,bytes:pristine,ext:pext,genSpeed:parseFloat(E('genSpeed').value)||1,dur:0};ed.voiceCache=vc}
    if(!vc.dur)vc.dur=await probeAudioDur(pristine,pext);
    const eff=effSpeedOf(ed),effDur=vc.dur?vc.dur/eff:0;
    if(vc.dur&&effDur>dur+0.05){
-    const msg='အသံ ကြာချိန် ('+effDur.toFixed(1)+' စက္ကန့်) က video အပိုင်း ('+dur.toFixed(1)+' စက္ကန့်) ထက် ရှည်နေပါတယ် — အသံကို ဖြတ်မပစ်ပါ။ အဆင့် ၃ မှာ အသံ အမြန်ကို စုစုပေါင်း '+(vc.dur/dur).toFixed(2)+'× အထိ တင်ပါ၊ သို့မဟုတ် အဆင့် ၁ မှာ Trim အပိုင်းကို ပိုရှည်အောင် ပြန်ဖြတ်ပါ။';
+    const msg='အသံ ကြာချိန် ('+effDur.toFixed(1)+' စက္ကန့်) က video အပိုင်း ('+dur.toFixed(1)+' စက္ကန့်) ထက် ရှည်နေပါတယ် — အသံကို ဖြတ်မပစ်ပါ။ 🎙️ အသံ အပိုင်းမှာ အသံ အမြန်ကို စုစုပေါင်း '+(vc.dur/dur).toFixed(2)+'× အထိ တင်ပါ၊ သို့မဟုတ် ① Video အပိုင်းမှာ Trim အပိုင်းကို ပိုရှည်အောင် ပြန်ဖြတ်ပါ။';
     log('⚠️ '+msg);showNotice('⚠️ '+msg,'err');return;
    }
    const rv=await effectiveVoiceBytes(ed,pristine,pext,log);
@@ -479,7 +488,7 @@ async function exportEditor(ed){
   made.forEach(m=>{const url=URL.createObjectURL(m.blob);const a=document.createElement('a');a.href=url;a.download=m.name;a.className='btn light small';a.style.margin='8px 8px 0 0';a.textContent='⬇️ '+m.name;res.appendChild(a)});
   if(window.__recapDone)window.__recapDone(3);
   showDone('✅ အသံ ရပါပြီ — Export ပြီးပါပြီ','Video '+made.length+' ပိုင်း ထုတ်ပြီးပါပြီ — အောက်က ဒေါင်း link များမှ ယူပါ။');
- }catch(err){console.error(err);log('❌ '+(err.message||err));showNotice('❌ Export မအောင်မြင်ပါ: '+(err.message||err),'err')}
+ }catch(err){console.error(err);log('❌ '+humanErr(err));showNotice('❌ Export မအောင်မြင်ပါ: '+humanErr(err),'err')}
  finally{ed.busy=false;ed._cachedVoice=null;ed._cachedVoiceExt=null;btn.classList.remove('loading');btn.disabled=false;btn.querySelector('.btn-label').textContent='🎬 Export ထုတ်မယ်'}
 }
 </script>
@@ -622,58 +631,40 @@ function unifiedCues(ed){
   const start=parseFloat($('#'+p+'-start').value),end=parseFloat($('#'+p+'-end').value);
   if(isNaN(start)||isNaN(end)||end<=start){fieldErr(p,'end','SRT အတွက် ဖြတ်ထားသော အပိုင်း (စချိန်/ဆုံးချိန်) အရင် မှန်အောင် ထားပါ');showNotice('⚠️ Trim အချိန် ပြင်ပါ','err');return}
   clearErrs(p);
-  const cues=(ed&&ed.cues&&ed.cues.length&&ed.cuesSig===lines.join('\n')+'|'+start+'|'+end)?ed.cues:unifiedCues(ed);
+  const rawCues=(ed&&ed.cues&&ed.cues.length&&ed.cuesSig===lines.join('\n')+'|'+start+'|'+end)?ed.cues:unifiedCues(ed);
+  const syncDl=(ed&&ed.syncDelay)||0; /* ⏱️ Sync Delay applied at download time only */
+  const cues=syncDl?rawCues.map(c=>({text:c.text,start:c.start+syncDl,end:c.end+syncDl})):rawCues;
   const srt=buildSRT(cues,start,end);
   const base=((ed&&ed.file?ed.file.name:'recap')||'recap').replace(/\.[^.]+$/,'').replace(/[^\w\- ]+/g,'').trim()||'recap';
   downloadText(base+'.srt',srt);showNotice('✅ SRT ဖိုင် ဒေါင်းပြီးပါပြီ — '+lines.length+' ကြောင်း','ok');
  };
 });
-/* --- Recap workflow wiring: step pager + AI steps + voice step (Recap editor only) --- */
+/* --- Recap workflow wiring: one-screen studio sections + AI pipeline + voice (Recap editor only) --- */
 (function(){
  const ed=editors.recap;if(!ed)return;const p='recap';const E=id=>$('#'+p+'-'+id);
  ed.aiMode='faithful';ed.aiBusy=false;ed.voiceBusy=false;
- /* ================= step navigation — labeled chips + Back/Next =================
-    Steps: ၁ Video (Create Recaps) · ၂ စာတန်း (SRT) · ၃ အသံ (Create Voice) · ၄ Export.
-    Tap any UNLOCKED chip to jump; locked chips explain what is missing. */
- const STEP_NAMES=['🎬 ဗီဒီယို','💬 စာတန်း','🎙️ အသံ','🎬 Export'];
- const STEP_SHORT=['ဗီဒီယို','စာတန်း','အသံ','Export'];
- const STEP_DIGITS=['၁','၂','၃','၄'];
- const chipsBox=E('stepsBar'),panels=$$('#'+p+'-panels .panel'),stepNameEl=E('stepName');
- let curStep=0;const chips=[];
- for(let i=0;i<STEP_NAMES.length;i++){const b=document.createElement('button');b.className='step-chip';b.innerHTML='<span class="n">'+STEP_DIGITS[i]+'</span><span>'+STEP_SHORT[i]+'</span>';b.onclick=()=>goStep(i);chipsBox.appendChild(b);chips.push(b)}
- function stepUnlocked(i){
-  if(i<=0)return true;
-  if(i===1)return !!ed.file||scriptLines().length>0; /* SRT step: a video (manual script entry) or a script opens it */
-  if(i===3)return !!ed.file; /* Export needs the video file */
-  return scriptLines().length>0; /* Voice step needs a script */
- }
- function lockReason(i){
-  if(i===1||i===3)return 'အရင် အဆင့် ၁ မှာ Video ဖိုင် ရွေးပါ';
-  return 'အရင် အဆင့် ၁ မှာ "🎬 Recaps လုပ်မယ်" နှိပ်ပြီး Script ထုတ်ပါ (သို့မဟုတ် အဆင့် ၂ > 📝 Script စာသား မှာ ကိုယ်တိုင် ရိုက်ထည့်ပါ)';
- }
- function renderSteps(){
-  chips.forEach((c,i)=>{c.classList.toggle('cur',i===curStep);c.classList.toggle('locked',i!==curStep&&!stepUnlocked(i))});
-  panels.forEach((pn,i)=>pn.classList.toggle('active',i===curStep));
-  if(stepNameEl)stepNameEl.textContent='အဆင့် '+STEP_DIGITS[curStep]+' / ၄';
-  E('stepPrev').disabled=curStep===0;
-  E('stepNext').disabled=curStep===STEP_NAMES.length-1;
- }
+ /* ================= one-screen studio navigation =================
+    No step wizard: every section is stacked on ONE screen under the pinned
+    video, nothing is locked behind steps — blocks validate with instructive
+    errors when tapped without prerequisites. goStep(i) survives as a SCROLL
+    helper for the existing validation flows (0 -> ① Video, 1 -> ③ စာတန်း,
+    2 -> ④ အသံ, 3 -> ⑥ Export) and keeps the old hook behaviour (SRT entry
+    builds cues; Voice entry refreshes its gates). doneStep / undoneStep /
+    renderSteps are intentional no-ops so older call sites stay valid. */
+ function secEl(i){return [E('secVideo'),E('secSrt'),E('secVoice'),E('secExport')][i]||null}
  function goStep(i){
-  i=Math.max(0,Math.min(STEP_NAMES.length-1,i));
-  if(i!==curStep&&!stepUnlocked(i)){showNotice('🔒 ဒီ အဆင့် မပွင့်သေးပါ — '+lockReason(i),'err');renderSteps();return}
+  i=Math.max(0,Math.min(3,i));
   if(previewMode&&i!==1&&i!==2)exitPreview(true);
-  curStep=i;renderSteps();
-  if(curStep===1){ensureCues();updateVoiceWarn()}
-  if(curStep===2){checkVoiceStale();refreshVoiceGate();updateVoiceWarn()}
+  if(i===1){ensureCues();updateVoiceWarn()}
+  if(i===2){checkVoiceStale();refreshVoiceGate();updateVoiceWarn()}
+  const t=secEl(i);if(t)t.scrollIntoView({behavior:'smooth',block:'start'});
   updateOverlay(true);
  }
- function doneStep(i){if(chips[i])chips[i].classList.add('done')}
- function undoneStep(i){if(chips[i])chips[i].classList.remove('done')}
- E('stepPrev').onclick=()=>goStep(curStep-1);
- E('stepNext').onclick=()=>goStep(curStep+1);
- window.__recapDone=i=>doneStep(i);
- renderSteps();
- /* ================= step 4: SRT cue editor + live overlay + combined preview ================= */
+ function doneStep(){}
+ function undoneStep(){}
+ function renderSteps(){}
+ window.__recapDone=function(){};
+ /* ================= SRT cue editor + live overlay + combined preview ================= */
  const vidEl=E('video'),overlayEl=E('overlay'),pvAudio=E('pvAudio');
  ed.cues=[];ed.cuesSig='';ed.cuesManual=false;ed.adjSpeed=1;
  let previewMode=false,previewTimer=null;
@@ -704,27 +695,43 @@ function unifiedCues(ed){
    box.appendChild(row);
   });
  }
- E('cueRebuild').onclick=()=>{if(!scriptLines().length){showNotice('⚠️ Cue ခွဲရန် မြန်မာ Script အရင် လိုပါတယ် — အဆင့် ၁ မှာ "🎬 Recaps လုပ်မယ်" နှိပ်ပြီး Script အရင် ထုတ်ပါ','err');goStep(0);return}rebuildCues();showNotice('✅ Script မှ cue '+ed.cues.length+' ခု ပြန်ခွဲပြီးပါပြီ','ok')};
+ E('cueRebuild').onclick=()=>{if(!scriptLines().length){showNotice('⚠️ Cue ခွဲရန် မြန်မာ Script အရင် လိုပါတယ် — အပေါ်က ② "🎬 Recaps လုပ်မယ်" နှိပ်ပြီး Script အရင် ထုတ်ပါ','err');goStep(0);return}rebuildCues();showNotice('✅ Script မှ cue '+ed.cues.length+' ခု ပြန်ခွဲပြီးပါပြီ','ok')};
  E('cueAdd').onclick=()=>{
   const r=trimRange();const last=ed.cues[ed.cues.length-1];
   const s=last?last.end:r.start;const e=r.end?Math.min(r.end,s+2):s+2;
-  if(r.end&&s>=r.end-0.05){showNotice('⚠️ Cue အသစ် ထည့်ရန် နေရာ မကျန်တော့ပါ — အဆင့် ၁ မှာ Trim ဆုံးချိန်ကို အရင် ရှည်ပေးပါ','err');return}
+  if(r.end&&s>=r.end-0.05){showNotice('⚠️ Cue အသစ် ထည့်ရန် နေရာ မကျန်တော့ပါ — ① Video အပိုင်းမှာ Trim ဆုံးချိန်ကို အရင် ရှည်ပေးပါ','err');return}
   ed.cues.push({text:'',start:s,end:e});ed.cuesManual=true;renderCueList();updateCueCount();
   const rows=E('cueList').children;const nr=rows[rows.length-1];if(nr){nr.scrollIntoView({behavior:'smooth',block:'center'});const t=nr.querySelector('.ct');if(t)t.focus()}
  };
- /* --- live subtitle overlay on the video frame (steps 4 + combined preview) --- */
- function overlayActive(){return previewMode||curStep===1}
+ /* --- live subtitle overlay on the video frame (SRT section + combined preview) --- */
+ function overlayActive(){return true} /* one-screen studio: the live cue always shows on the pinned frame */
  function cueAt(t){for(let i=0;i<ed.cues.length;i++){if(t>=ed.cues[i].start&&t<ed.cues[i].end)return i}return -1}
  function updateOverlay(){
   if(!overlayEl)return;
   if(!overlayActive()){overlayEl.style.display='none';return}
-  const t=previewMode?previewTime():vidEl.currentTime;
+  const t=(previewMode?previewTime():vidEl.currentTime)-(ed.syncDelay||0); /* ⏱️ Sync Delay: display-time shift only */
   const i=cueAt(t);
   if(i<0||!ed.cues[i].text){overlayEl.style.display='none'}else{overlayEl.textContent=ed.cues[i].text;overlayEl.style.display='block'}
   const rows=E('cueList')?E('cueList').children:[];for(let k=0;k<rows.length;k++)rows[k].classList.toggle('cur',k===i);
  }
  vidEl.addEventListener('timeupdate',()=>{if(!previewMode)updateOverlay()});
  vidEl.addEventListener('seeked',()=>{if(!previewMode)updateOverlay()});
+ /* --- draggable subtitle position (the reference studio's draggable texts):
+    drag the live subtitle band up/down on the frame. The position is a
+    fraction of the frame height, remembered on the editor + settings, used
+    by the combined preview (same overlay) and mapped to the burned-export
+    subtitle band in exportOne (subPosCustom). --- */
+ function applySubPos(){if(!overlayEl)return;overlayEl.style.top=((ed.subPosY||0.81)*100).toFixed(1)+'%';overlayEl.style.bottom='auto'}
+ function updateSubPosLabel(){const s=E('subPosVal');if(s)s.textContent=Math.round((ed.subPosY||0.81)*100)+'%'}
+ (function(){
+  let drag=null;const wrap=overlayEl.parentElement;
+  overlayEl.addEventListener('pointerdown',e=>{drag={y:e.clientY,frac:(ed.subPosY||0.81)};try{overlayEl.setPointerCapture(e.pointerId)}catch(err){}e.preventDefault()});
+  overlayEl.addEventListener('pointermove',e=>{if(!drag||!wrap)return;const r=wrap.getBoundingClientRect();if(!r.height)return;let f=drag.frac+(e.clientY-drag.y)/r.height;f=Math.max(0.02,Math.min(0.95,f));ed.subPosY=f;applySubPos();updateSubPosLabel()});
+  const endDrag=()=>{if(!drag)return;drag=null;ed.subPosCustom=true;SETTINGS.subPosY=ed.subPosY;SETTINGS.subPosCustom=true;saveSettings()};
+  overlayEl.addEventListener('pointerup',endDrag);
+  overlayEl.addEventListener('pointercancel',endDrag);
+  const rb=E('subPosReset');if(rb)rb.onclick=()=>{ed.subPosY=0.81;ed.subPosCustom=false;SETTINGS.subPosY=0.81;SETTINGS.subPosCustom=false;saveSettings();applySubPos();updateSubPosLabel();showNotice('↺ စာတန်း နေရာ မူလ နေရာ ပြန်ထားပါပြီ','info')};
+ })();
  /* --- combined preview: video (muted) + speed-adjusted voiceover + live cues ---
     A separate <audio> drives the voice; a 120ms tick re-aligns it to the video
     (drift > 0.15s is corrected). If the voice overruns the video, the video ends
@@ -734,13 +741,17 @@ function unifiedCues(ed){
  function previewTime(){const r=trimRange();if(vidEl.ended&&pvAudio)return r.start+(pvAudio.currentTime||0)/pvFactor();return vidEl.currentTime}
  function setPreviewBtns(){const t=previewMode?'⏹ Preview ပိတ်':'▶ စစ်ကြည့်မယ် (စာတန်း + အသံ)';const b1=E('previewBtn');if(b1)b1.textContent=t;const b2=E('previewBtn2');if(b2)b2.textContent=t}
  function enterPreview(){
-  if(!ed.voiceCache||!ed.voiceUrl){showNotice('⚠️ စစ်ကြည့်ရန် အသံ အရင် လိုပါတယ် — အဆင့် ၃ မှာ အသံ အရင် ထုတ်ပါ','err');goStep(2);return}
-  if(!ed.file){showNotice('⚠️ Video ဖိုင် အရင် လိုပါတယ် — အဆင့် ၁ မှာ ရွေးပါ','err');goStep(0);return}
+  if(!ed.voiceCache||!ed.voiceUrl){showNotice('⚠️ စစ်ကြည့်ရန် အသံ အရင် လိုပါတယ် — ④ အသံ အပိုင်းမှာ အသံ အရင် ထုတ်ပါ','err');goStep(2);return}
+  if(!ed.file){showNotice('⚠️ Video ဖိုင် အရင် လိုပါတယ် — အပေါ်မှာ ရွေးပါ','err');goStep(0);return}
   ensureCues();
   if(ed.url&&vidEl.src!==ed.url)vidEl.src=ed.url; /* preview always uses the original video */
   pvAudio.src=pvUseRendered()?ed.renderUrl:ed.voiceUrl;
   pvAudio.playbackRate=pvFactor();
-  previewMode=true;vidEl.muted=true;
+  /* mixer approximation for preview only: voice element at Voice% (element
+     volume caps at 100%), original audio unmuted at BGM% when BGM > 0 */
+  pvAudio.volume=Math.min(100,(ed.voiceVol==null?100:ed.voiceVol))/100;
+  previewMode=true;
+  if((ed.bgmVol||0)>0){vidEl.muted=false;vidEl.volume=(ed.bgmVol||0)/100}else{vidEl.muted=true;vidEl.volume=1}
   const r=trimRange();
   if(vidEl.currentTime<r.start||vidEl.currentTime>=r.end)vidEl.currentTime=r.start;
   pvAudio.currentTime=Math.max(0,(vidEl.currentTime-r.start)*pvFactor());
@@ -754,7 +765,7 @@ function unifiedCues(ed){
  function exitPreview(silent){
   previewMode=false;if(previewTimer){clearInterval(previewTimer);previewTimer=null}
   if(pvAudio)try{pvAudio.pause()}catch(e){}
-  vidEl.muted=false;setPreviewBtns();updateOverlay();
+  vidEl.muted=false;vidEl.volume=1;if(pvAudio)pvAudio.volume=1;setPreviewBtns();updateOverlay();
   if(!silent)showNotice('⏹ Preview ပိတ်ပါပြီ — မူရင်း အသံ ပြန်ရပါပြီ','info');
  }
  function previewTick(){
@@ -790,7 +801,7 @@ function unifiedCues(ed){
   clearErrs(p);
   if(!ed.file){E('fileinfo').style.color='#b3261e';E('fileinfo').textContent='⚠️ Video ဖိုင် မရွေးရသေးပါ — အရင် "Video ရွေးရန်" ကို နှိပ်ပြီး ဖိုင် ရွေးပါ';E('pick').scrollIntoView({behavior:'smooth',block:'center'});showNotice('⚠️ Video ဖိုင် လိုပါတယ် — အရင် ဖိုင် ရွေးပါ','err');return null}
   const key=getApiKey();
-  if(!key){showNotice('⚠️ ဒီ အဆင့်အတွက် Gemini API Key လိုပါတယ် — အပေါ်က "🔑 Gemini Key" ကတ်မှာ သင့် key ထည့်ပါ','err');const ki=$('#recap-apiKey');ki.focus();ki.scrollIntoView({behavior:'smooth',block:'center'});return null}
+  if(!key){showNotice('⚠️ ဒီ အလုပ်အတွက် Gemini API Key လိုပါတယ် — အပေါ်က "🔑 Gemini Key" ကတ်မှာ သင့် key ထည့်ပါ','err');const ki=$('#recap-apiKey');ki.focus();ki.scrollIntoView({behavior:'smooth',block:'center'});return null}
   const start=parseFloat(E('start').value),end=parseFloat(E('end').value);
   if(isNaN(start)||start<0){fieldErr(p,'start','စချိန် မှားနေပါတယ် — 0 သို့မဟုတ် အထက် ထည့်ပါ');showNotice('⚠️ စချိန် ပြင်ပါ','err');return null}
   if(isNaN(end)||end<=start){fieldErr(p,'end','ဆုံးချိန် သည် စချိန်ထက် ကြီးရပါမည်');showNotice('⚠️ ဆုံးချိန် ပြင်ပါ','err');return null}
@@ -873,7 +884,7 @@ function unifiedCues(ed){
    setCreateStatus('✅ Recaps ရပါပြီ — စာတန်း '+lines.length+' ကြောင်း');
    showNotice('✅ Recaps ရပါပြီ — စာတန်းကို video ပေါ်မှာ စစ်ပြီး စိတ်ကြိုက် ပြင်နိုင်ပါတယ်','ok');
    goStep(1);
-  }catch(err){console.error(err);setCreateStatus('❌ '+(err.message||err));showNotice('❌ Recaps လုပ်မရပါ: '+(err.message||err),'err')}
+  }catch(err){console.error(err);setCreateStatus('❌ '+humanErr(err));showNotice('❌ Recaps လုပ်မရပါ: '+humanErr(err),'err')}
   finally{ed.aiBusy=false;busyBtn(btn,false,'🎬 Recaps လုပ်မယ်')}
  }
  function openModeSheet(){
@@ -891,7 +902,7 @@ function unifiedCues(ed){
  const recreateBtn=E('recreate');if(recreateBtn)recreateBtn.onclick=openModeSheet;
  const scriptTgl=E('scriptTgl');if(scriptTgl)scriptTgl.onclick=()=>{const b=E('scriptBody');const hidden=b.style.display==='none';b.style.display=hidden?'':'none';scriptTgl.textContent=hidden?'ဖျောက်':'ပြ'};
  const txTgl=E('aiTxTgl');if(txTgl)txTgl.onclick=()=>{const f=E('f-transcript');const hidden=f.style.display==='none';f.style.display=hidden?'':'none';txTgl.textContent=hidden?'ဖျောက်':'ပြ'};
- /* ================= step 4: voiceover (gated on script, engine choice, cache + mini player) ================= */
+ /* ================= voiceover (gated on script, engine choice, cache + mini player) ================= */
  function effVoice(){return ed.ttsEngine==='edge'?ed.edgeVoice:ed.voice}
  function voiceFresh(){const c=ed.voiceCache;return !!(c&&c.text===scriptText()&&c.engine===ed.ttsEngine&&c.voice===effVoice())}
  function checkVoiceStale(){
@@ -910,7 +921,7 @@ function unifiedCues(ed){
  async function runVoiceGen(){
   if(ed.voiceBusy)return;
   const txt=scriptText();
-  if(!txt){showNotice('⚠️ အသံ ထုတ်ရန် မြန်မာ Script အရင် လိုပါတယ် — အဆင့် ၁ မှာ "🎬 Recaps လုပ်မယ်" နှိပ်ပြီး Script အရင် ထုတ်ပါ','err');goStep(0);return}
+  if(!txt){showNotice('⚠️ အသံ ထုတ်ရန် မြန်မာ Script အရင် လိုပါတယ် — အပေါ်က ② "🎬 Recaps လုပ်မယ်" နှိပ်ပြီး Script အရင် ထုတ်ပါ','err');goStep(0);return}
   if(ed.ttsEngine==='gemini'&&!getApiKey()){showNotice('⚠️ Gemini TTS အတွက် Gemini API Key လိုပါတယ် — အပေါ်က "🔑 Gemini Key" ကတ်မှာ သင့် key ထည့်ပါ (Edge TTS ဆိုရင် key မလိုပါ)','err');const ki=$('#recap-apiKey');ki.focus();ki.scrollIntoView({behavior:'smooth',block:'center'});return}
   ed.voiceBusy=true;const btn=E('voiceGen');busyBtn(btn,true,'အသံ ထုတ်နေပါတယ်…');
   setVoiceStatus('🎙️ အသံ ထုတ်နေပါတယ်…');showNotice('▶️ အသံ ထုတ်ခြင်း စတင်ပါပြီ','info');
@@ -945,7 +956,7 @@ function unifiedCues(ed){
   au.addEventListener('loadedmetadata',()=>{vpTime.textContent='0:00 / '+fmtDur((au.duration||0)/vpDiv())});
   au.addEventListener('timeupdate',()=>{const d=au.duration||0,c=au.currentTime||0,div=vpDiv();vpBar.style.width=(d?Math.round(c/d*100):0)+'%';vpTime.textContent=fmtDur(c/div)+' / '+(d?fmtDur(d/div):'—')});
  }
- /* ================= step 5: speed controls, duration warning, render, insert ================= */
+ /* ================= speed controls, duration warning, render, insert ================= */
  function fmtSpeed(x){return (Math.round(x*100)/100).toFixed(2)+'×'}
  function voiceDurInfo(){
   const c=ed.voiceCache;if(!c||!c.dur)return null;
@@ -954,7 +965,7 @@ function unifiedCues(ed){
  }
  function updateVoiceWarn(){
   const info=voiceDurInfo();
-  const txt=(info&&info.over)?('⚠️ အသံ ('+info.effDur.toFixed(1)+' စက္ကန့်) က video အပိုင်း ('+info.seg.toFixed(1)+' စက္ကန့်) ထက် ရှည်နေပါတယ် — အသံ အမြန် စုစုပေါင်း '+info.need.toFixed(2)+'× အထိ တင်ပါ၊ သို့မဟုတ် အဆင့် ၁ မှာ Trim အပိုင်းကို ရှည်ပေးပါ။'):'';
+  const txt=(info&&info.over)?('⚠️ အသံ ('+info.effDur.toFixed(1)+' စက္ကန့်) က video အပိုင်း ('+info.seg.toFixed(1)+' စက္ကန့်) ထက် ရှည်နေပါတယ် — အသံ အမြန် စုစုပေါင်း '+info.need.toFixed(2)+'× အထိ တင်ပါ၊ သို့မဟုတ် ① Video အပိုင်းမှာ Trim အပိုင်းကို ရှည်ပေးပါ။'):'';
   ['voiceWarn','cueWarn'].forEach(id=>{const w=E(id);if(w){w.style.display=txt?'block':'none';w.textContent=txt}});
   const ei=E('effInfo');
   if(ei)ei.textContent=info?('အသံ ကြာချိန် ~'+info.effDur.toFixed(1)+' စက္ကန့် (စုစုပေါင်း အမြန် '+fmtSpeed(info.eff)+') · video အပိုင်း '+info.seg.toFixed(1)+' စက္ကန့်'):'';
@@ -980,13 +991,13 @@ function unifiedCues(ed){
   ed.renderBusy=true;const btn=E('renderSpeed');btn.classList.add('loading');btn.disabled=true;
   setVoiceStatus('🔄 အမြန် '+fmtSpeed(eff)+' ဖြင့် အသံ ပြန်ထုတ်နေပါတယ်…');showNotice('▶️ အသံ ပြန်ထုတ်ခြင်း စတင်ပါပြီ','info');
   try{
-   const rv=await effectiveVoiceBytes(ed,ed.voiceCache.bytes,ed.voiceCache.ext,m=>setVoiceStatus(m));
+   const rv=await effectiveVoiceBytes(ed,ed.voiceCache.bytes,ed.voiceCache.ext,()=>{});
    if(ed.renderUrl)URL.revokeObjectURL(ed.renderUrl);
    ed.renderUrl=URL.createObjectURL(new Blob([rv.bytes],{type:'audio/wav'}));
    syncVoicePlayer();updateVoiceWarn();
    setVoiceStatus('✅ အမြန် '+fmtSpeed(eff)+' ဖြင့် အသံ ပြန်ထုတ်ပြီးပါပြီ — player မှာ နားထောင်ကြည့်ပါ');
    showNotice('✅ အသံ ပြန်ထုတ်ပြီးပါပြီ','ok');
-  }catch(err){console.error(err);setVoiceStatus('❌ '+(err.message||err));showNotice('❌ အသံ ပြန်ထုတ်မရပါ: '+(err.message||err),'err')}
+  }catch(err){console.error(err);setVoiceStatus('❌ '+humanErr(err));showNotice('❌ အသံ ပြန်ထုတ်မရပါ: '+humanErr(err),'err')}
   finally{ed.renderBusy=false;btn.classList.remove('loading');btn.disabled=false}
  };
  E('insertBtn').onclick=async()=>{
@@ -994,22 +1005,31 @@ function unifiedCues(ed){
   if(previewMode)exitPreview(true);
   const c=ed.voiceCache;
   if(!c){showNotice('⚠️ Video ထဲ ထည့်ရန် အသံ အရင် လိုပါတယ် — အရင် "🎙️ Create Voice" နှိပ်ပါ','err');return}
-  if(!ed.file){showNotice('⚠️ Video ဖိုင် အရင် လိုပါတယ် — အဆင့် ၁ မှာ ရွေးပါ','err');goStep(0);return}
+  if(!ed.file){showNotice('⚠️ Video ဖိုင် အရင် လိုပါတယ် — အပေါ်မှာ ရွေးပါ','err');goStep(0);return}
   const r=trimRange();
-  if(!(r.end>r.start)){showNotice('⚠️ Trim အချိန် (စချိန်/ဆုံးချိန်) အရင် မှန်အောင် ထားပါ — အဆင့် ၁ မှာ ပြင်ပါ','err');goStep(0);return}
+  if(!(r.end>r.start)){showNotice('⚠️ Trim အချိန် (စချိန်/ဆုံးချိန်) အရင် မှန်အောင် ထားပါ — ① Video အပိုင်းမှာ ပြင်ပါ','err');goStep(0);return}
   if(!c.dur)c.dur=await probeAudioDur(c.bytes,c.ext);
   const info=voiceDurInfo();
   if(info&&info.over){updateVoiceWarn();const w=E('voiceWarn');if(w)w.scrollIntoView({behavior:'smooth',block:'center'});showNotice('⚠️ အသံ ('+info.effDur.toFixed(1)+' စက္ကန့်) က video အပိုင်း ('+info.seg.toFixed(1)+' စက္ကန့်) ထက် ရှည်နေပါတယ် — အသံကို ဖြတ်မပစ်ပါ။ အမြန် စုစုပေါင်း '+info.need.toFixed(2)+'× အထိ တင်ပြီးမှ ပြန်ထည့်ပါ','err');return}
   ed.insertBusy=true;const btn=E('insertBtn');busyBtn(btn,true,'ထည့်နေပါတယ်…');
   const st=E('insertStatus');st.textContent='🎬 အသံပါသော video ထုတ်နေပါတယ်…';showNotice('▶️ Video ထဲ အသံ ထည့်ခြင်း စတင်ပါပြီ','info');
   try{
-   const rv=await effectiveVoiceBytes(ed,c.bytes,c.ext,m=>{st.textContent=m});
-   const ff=await getFFmpeg(m=>{st.textContent=m});
+   const rv=await effectiveVoiceBytes(ed,c.bytes,c.ext,()=>{});
+   const ff=await getFFmpeg(()=>{});
    const fetchFile=window.FFmpegUtil&&window.FFmpegUtil.fetchFile;
    await ff.writeFile('ins_in.mp4',fetchFile?await fetchFile(ed.file):new Uint8Array(await ed.file.arrayBuffer()));
    const vf='ins_voice.'+rv.ext;await ff.writeFile(vf,rv.bytes);
    const seg=(r.end-r.start).toFixed(2);
-   const code=await ff.exec(['-ss',r.start.toFixed(2),'-i','ins_in.mp4','-i',vf,'-t',seg,'-map','0:v:0','-map','1:a:0','-af','apad,atrim=0:'+seg,'-c:v','libx264','-preset','veryfast','-crf','23','-pix_fmt','yuv420p','-c:a','aac','-b:a','128k','-movflags','+faststart','ins_out.mp4'],3600000);
+   /* mixer (⑤ အသံ ချိန်ညှိ): BGM% keeps that much original audio under the
+      voice at Voice% volume; BGM 0% = the voice replaces the original
+      entirely (previous behaviour). If the source has no audio stream the
+      mix graph fails — fall back to voice-only with a note. */
+   const bgmF=Math.max(0,Math.min(100,ed.bgmVol||0))/100,voiceF=Math.max(0,Math.min(300,ed.voiceVol==null?100:ed.voiceVol))/100;
+   const insArgs=mix=>mix
+    ?['-ss',r.start.toFixed(2),'-i','ins_in.mp4','-i',vf,'-filter_complex','[0:a]atrim=0:'+seg+',asetpts=PTS-STARTPTS,volume='+bgmF.toFixed(3)+'[abg];[1:a]volume='+voiceF.toFixed(3)+',apad,atrim=0:'+seg+'[avc];[abg][avc]amix=inputs=2:duration=first:dropout_transition=0[aout]','-t',seg,'-map','0:v:0','-map','[aout]','-c:v','libx264','-preset','veryfast','-crf','23','-pix_fmt','yuv420p','-c:a','aac','-b:a','128k','-movflags','+faststart','ins_out.mp4']
+    :['-ss',r.start.toFixed(2),'-i','ins_in.mp4','-i',vf,'-t',seg,'-map','0:v:0','-map','1:a:0','-af','volume='+voiceF.toFixed(3)+',apad,atrim=0:'+seg,'-c:v','libx264','-preset','veryfast','-crf','23','-pix_fmt','yuv420p','-c:a','aac','-b:a','128k','-movflags','+faststart','ins_out.mp4'];
+   let code=await ff.exec(insArgs(bgmF>0),3600000);
+   if(code!==0&&bgmF>0){st.textContent='ℹ️ မူရင်းအသံ ရောမရပါ (အသံ မပါသော video ဖြစ်နိုင်ပါတယ်) — voice သီးသန့် ပြန်ထည့်နေပါတယ်…';code=await ff.exec(insArgs(false),3600000)}
    if(code!==0)throw new Error('ffmpeg exit code '+code);
    const data=await ff.readFile('ins_out.mp4');
    const blob=new Blob([data.buffer||data],{type:'video/mp4'});
@@ -1022,13 +1042,27 @@ function unifiedCues(ed){
    const rb=E('restoreVid');if(rb)rb.onclick=()=>{vidEl.src=ed.url;showNotice('↩ မူရင်း video ပြန်ပြထားပါတယ်','info')};
    st.textContent='✅ အသံ ထည့်ပြီးပါပြီ — အပေါ်က player မှာ စစ်ကြည့်ပါ၊ သို့မဟုတ် ဒေါင်းပါ';
    showDone('✅ ရပါပြီ','အသံပါသော video ထုတ်ပြီးပါပြီ — player မှာ စစ်ကြည့်နိုင်ပြီး ဒေါင်း link လည်း ရပါပြီ။');
-  }catch(err){console.error(err);st.textContent='❌ '+(err.message||err);showNotice('❌ Video ထဲ ထည့်မရပါ: '+(err.message||err),'err')}
+  }catch(err){console.error(err);st.textContent='❌ '+humanErr(err);showNotice('❌ Video ထဲ ထည့်မရပါ: '+humanErr(err),'err')}
   finally{ed.insertBusy=false;busyBtn(btn,false,'🎬 Video ထဲ ထည့်မယ်')}
  };
+ /* ================= ⑤ mixer + ⏱️ sync delay wiring =================
+    Mixer values live on the editor (ed.bgmVol / ed.voiceVol) and are applied
+    at insert + Export; the sync delay (ed.syncDelay) is applied at USE time
+    (overlay, preview, SRT download, burned export) — stored cue times are
+    never rewritten. */
+ function setSyncDelay(v){ed.syncDelay=Math.max(-5,Math.min(5,Math.round((v||0)*10)/10));const s=E('syncDelay');if(s&&document.activeElement!==s)s.value=ed.syncDelay;const lb=E('syncDelayVal');if(lb)lb.textContent=(ed.syncDelay>0?'+':'')+ed.syncDelay.toFixed(1)+'s';updateOverlay(true)}
+ E('bgmVol').addEventListener('input',()=>{ed.bgmVol=+E('bgmVol').value;E('bgmVolVal').textContent=ed.bgmVol+'%';if(previewMode){if(ed.bgmVol>0){vidEl.muted=false;vidEl.volume=ed.bgmVol/100}else{vidEl.muted=true;vidEl.volume=1}}});
+ E('voiceVol').addEventListener('input',()=>{ed.voiceVol=+E('voiceVol').value;E('voiceVolVal').textContent=ed.voiceVol+'%';if(previewMode)pvAudio.volume=Math.min(100,ed.voiceVol)/100});
+ E('syncDelay').addEventListener('input',()=>setSyncDelay(parseFloat(E('syncDelay').value)||0));
+ E('syncReset').onclick=()=>setSyncDelay(0);
+ /* one-screen equivalent of "entering the SRT step": build cues the first
+    time the စာတန်း section scrolls into view */
+ const secSrtEl=E('secSrt');
+ if(secSrtEl&&'IntersectionObserver' in window){const io=new IntersectionObserver(es=>{if(es.some(e=>e.isIntersecting)){ensureCues();updateVoiceWarn();io.disconnect()}},{rootMargin:'240px'});io.observe(secSrtEl)}
  /* script edits drive the cue count, the stale warning and the voice gate */
  E('subs').addEventListener('input',()=>{updateCueCount();checkVoiceStale();refreshVoiceGate();renderSteps()});
  ['start','end'].forEach(id=>{E(id).addEventListener('input',()=>{updateVoiceWarn()})});
- refreshEngineBtn();updateCueCount();refreshVoiceGate();renderSteps();updateVoiceWarn();
+ refreshEngineBtn();updateCueCount();refreshVoiceGate();updateVoiceWarn();applySubPos();updateSubPosLabel();setSyncDelay(0);
 })();
 </script>
 </body>

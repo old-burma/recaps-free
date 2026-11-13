@@ -328,7 +328,7 @@ function makeEditor(p){
  function refreshLabels(){$$('#'+p+'-aspectOpts .opt').forEach(o=>o.classList.toggle('sel',o.dataset.v===ed.aspect));E('blurVal').textContent=ed.blur;E('blur').value=ed.blur;E('audioBtn').textContent=ed.audioMode==='voice'?'🎙️ အသံအသစ် (Gemini voiceover)':'🔊 မူရင်းအသံ';E('voiceBtn').textContent=ed.ttsEngine==='edge'?edgeVoiceLabel(ed.edgeVoice):ed.voice;const s=parseFloat(E('start').value)||0,en=parseFloat(E('end').value)||0;E('durinfo').textContent=ed.duration?fmtDur(Math.max(0,en-s))+' (မူရင်း '+fmtDur(ed.duration)+')':'—';if(window.__refreshFeatureSummaries)window.__refreshFeatureSummaries()}
  ed.refresh=refreshLabels;
  E('pick').onclick=()=>E('file').click();const phB=E('ph');if(phB)phB.onclick=()=>E('file').click();
- E('file').addEventListener('change',()=>{const f=E('file').files[0];if(!f)return;ed.file=f;if(ed.url)URL.revokeObjectURL(ed.url);ed.url=URL.createObjectURL(f);const v=E('video');v.src=ed.url;v.style.display='block';const ph0=E('ph');if(ph0)ph0.style.display='none';E('fileinfo').textContent=f.name+' · '+fmtSize(f.size);if(f.size>200*1048576)showNotice('⚠️ ဖိုင် 200 MB ထက် ကြီးနေပါတယ် ('+fmtSize(f.size)+') — browser ထဲတွင် Export ကြာနိုင် / မအောင်မြင်နိုင်ပါတယ်။ ဖိုင် သေးတာ သုံးရန် အကြံပြုပါတယ်။','info');v.onloadedmetadata=()=>{if(ed.url&&v.src!==ed.url)return; /* an inserted-voice preview is loaded, not a new source file */ ed.duration=v.duration;ed.videoW=v.videoWidth||0;ed.videoH=v.videoHeight||0;E('start').value=0;E('end').value=Math.floor(v.duration*10)/10;E('rstart').max=v.duration;E('rend').max=v.duration;E('rstart').value=0;E('rend').value=v.duration;refreshLabels();if(window.__recapNavRefresh)window.__recapNavRefresh();showNotice('✅ Video တင်ပြီးပါပြီ — ကြာချိန် '+fmtDur(v.duration),'ok')}});
+ E('file').addEventListener('change',()=>{const f=E('file').files[0];if(!f)return;ed.file=f;if(ed.url)URL.revokeObjectURL(ed.url);ed.url=URL.createObjectURL(f);const v=E('video');v.src=ed.url;v.style.display='block';const ph0=E('ph');if(ph0)ph0.style.display='none';E('fileinfo').textContent=f.name+' · '+fmtSize(f.size);if(f.size>200*1048576)showNotice('⚠️ ဖိုင် 200 MB ထက် ကြီးနေပါတယ် ('+fmtSize(f.size)+') — browser ထဲတွင် Export ကြာနိုင် / မအောင်မြင်နိုင်ပါတယ်။ ဖိုင် သေးတာ သုံးရန် အကြံပြုပါတယ်။','info');v.onloadedmetadata=()=>{if(ed.url&&v.src!==ed.url)return; /* an inserted-voice preview is loaded, not a new source file */ ed.duration=v.duration;ed.videoW=v.videoWidth||0;ed.videoH=v.videoHeight||0;E('start').value=0;E('end').value=Math.floor(v.duration*10)/10;E('rstart').max=v.duration;E('rend').max=v.duration;E('rstart').value=0;E('rend').value=v.duration;refreshLabels();if(window.__recapNavRefresh)window.__recapNavRefresh();showNotice('✅ Video တင်ပြီးပါပြီ — ကြာချိန် '+fmtDur(v.duration),'ok');if(ed.pendingCreate&&ed.modeChosen){ed.pendingCreate=false;if(window.__recapPendingCreate)window.__recapPendingCreate()}}});
  [['start','rstart'],['end','rend']].forEach(([a,b])=>{E(a).addEventListener('input',()=>{E(b).value=E(a).value;refreshLabels()});E(b).addEventListener('input',()=>{E(a).value=E(b).value;refreshLabels()})});
  $$('#'+p+'-aspectOpts .opt').forEach(o=>{o.onclick=()=>{ed.aspect=o.dataset.v;refreshLabels()}});
  E('blur').addEventListener('input',()=>{ed.blur=+E('blur').value;refreshLabels()});
@@ -790,7 +790,7 @@ function unifiedCues(ed){
 /* --- Recap workflow wiring: one-screen studio sections + AI pipeline + voice (Recap editor only) --- */
 (function(){
  const ed=editors.recap;if(!ed)return;const p='recap';const E=id=>$('#'+p+'-'+id);
- ed.aiMode='faithful';ed.aiBusy=false;ed.voiceBusy=false;ed.recapStyle='standard';
+ ed.aiMode='faithful';ed.aiBusy=false;ed.voiceBusy=false;ed.recapStyle='standard';ed.pendingCreate=false;
  /* ================= one-screen studio navigation =================
     No step wizard: every section is stacked on ONE screen under the pinned
     video, nothing is locked behind steps — blocks validate with instructive
@@ -1002,6 +1002,7 @@ function unifiedCues(ed){
  }
  async function runCreate(){
   if(ed.aiBusy)return;
+  ed.pendingCreate=false; /* any Create start consumes a mode-first pending pick */
   const v=validCommon();if(!v)return;
   const mode=ed.aiMode;
   ed.aiBusy=true;const btn=E('createRecap');busyBtn(btn,true,'လုပ်ဆောင်နေပါတယ်…');
@@ -1039,7 +1040,12 @@ function unifiedCues(ed){
  const STYLE_DEFS=[['standard','🎙️ စံပြ'],['exciting','🔥 စိတ်လှုပ်ရှား'],['funny','😂 ဟာသ'],['natural','🌿 သဘာဝ'],['horror','👻 သရဲ']];
  function openModeSheet(){
   if(ed.aiBusy)return;
-  if(!ed.file){E('fileinfo').style.color='#b3261e';E('fileinfo').textContent='⚠️ Video ဖိုင် မရွေးရသေးပါ — အရင် "Video ရွေးရန်" ကို နှိပ်ပြီး ဖိုင် ရွေးပါ';showNotice('⚠️ Video ဖိုင် လိုပါတယ် — အရင် ဖိုင် ရွေးပါ','err');const scp=E('secPlayer');if(scp)scp.scrollIntoView({behavior:'smooth',block:'start'});E('file').click();return}
+  /* The sheet ALWAYS opens — a mode can be picked before any video is
+     loaded (mode-first flow, see chooseModeAndRun). V205 gated this on
+     ed.file and returned before openSheet(), so the mode list could never
+     open pre-upload; the picker click it fired from the field tap instead
+     had no mode chosen and no pending state behind it, so even a picked
+     file led nowhere. */
   openSheet('🎬 Recaps ပုံစံ ရွေးပါ',
    '<button class="opt'+(ed.aiMode==='faithful'?' sel':'')+'" data-v="faithful"><b>🎧 Original Recaps</b><span>မူရင်း အသံအတိုင်း — မူရင်း အသံကို မြန်မာ စကားပြော ပုံစံဖြင့် တစ်ကြောင်းချင်း ဘာသာပြန်မယ်</span></button>'
   +'<button class="opt'+(ed.aiMode==='scene'?' sel':'')+'" data-v="scene"><b>✨ New Recaps</b><span>ဇာတ်ကြောင်းပြော အသစ် — Scene ပုံများနှင့် စာသားကို ကြည့်ပြီး hook ပါသော ဇာတ်ကြောင်း အသစ် ရေးပေးမယ်</span></button>'
@@ -1051,14 +1057,36 @@ function unifiedCues(ed){
     tap). Validation runs BEFORE the run: on failure the sheet stays open so
     the user keeps the context — EXCEPT a missing Gemini key, where the sheet
     closes into the drawer instead, because the key field lives there. The
-    sheet closes only when the run actually starts. */
+    sheet closes only when the run actually starts.
+    Mode-first exception: with NO video loaded yet, the pick cannot run —
+    it is kept as ed.pendingCreate, the sheet closes, the file picker opens,
+    and the run starts automatically once the file finishes loading (see
+    window.__recapPendingCreate, called from the file-load handler). */
  function chooseModeAndRun(mode){
   if(ed.aiBusy)return;
   ed.aiMode=mode;ed.modeChosen=true;updateModeUI();
+  if(!ed.file){
+   /* Mode-first pick: close the sheet and open the picker on the LIVE
+      #recap-file input — the same node and .click() call the frame tap /
+      pick button / Swap button use — issued synchronously inside this
+      option-tap handler so the browser honours it as part of the tap.
+      (V205's attempt fired the click from the mode-FIELD tap, before any
+      mode existed, and gated the sheet shut entirely.) */
+   ed.pendingCreate=true;
+   closeSheet();
+   showNotice('✅ Mode ရွေးပြီးပါပြီ — Video တင်လိုက်တာနဲ့ Script တန်း ထုတ်ပေးပါမယ်','ok');
+   E('file').click();
+   return;
+  }
   const v=validCommon();
   if(!v){if(ed.file&&!getApiKey()){closeSheet();openDrawer()}return}
   closeSheet();runCreate();
  }
+ /* Called by makeEditor's file-load handler when a file that was picked
+    AFTER a mode (pendingCreate) finishes loading: run Create with the
+    normal validation — a missing Gemini key lands on the key notice +
+    drawer, exactly as a with-file pick does. */
+ window.__recapPendingCreate=()=>{const v=validCommon();if(!v){if(!getApiKey())openDrawer();return}runCreate()};
  E('createRecap').onclick=()=>{if(ed.modeChosen)runCreate();else openModeSheet()};
 
  const recreateBtn=E('recreate');if(recreateBtn)recreateBtn.onclick=openModeSheet;

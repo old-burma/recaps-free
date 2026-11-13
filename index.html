@@ -83,16 +83,17 @@ video.preview.framed{max-height:40vh;object-fit:contain}
 .btn.loading .wave{display:inline-flex}.btn.loading .btn-label{opacity:.85}
 .pill-btn.loading .wave{display:inline-flex}.pill-btn.loading .btn-label{opacity:.85}
 body.locked{overflow:hidden}
-/* bottom sheet — ONLY for the small pickers (voice detail / audio source) */
+/* bottom sheet — V213: the home of EVERY toolbar feature pop-up
+   (Burmese Voice app style), plus the small pickers + the cue editor */
 .sheet-wrap{position:fixed;left:0;right:0;bottom:0;top:var(--sheetTop,0px);z-index:100;display:none}
 .sheet-wrap.open{display:block}
 .sheet-bg{position:absolute;inset:0;background:rgba(5,5,8,.5)}
-.sheet{position:absolute;left:0;right:0;bottom:0;max-width:640px;margin:0 auto;background:#17171C;border-radius:24px 24px 0 0;padding:20px 18px 28px;color:#F2F2F5;max-height:56vh;overflow:auto}
+.sheet{position:absolute;left:0;right:0;bottom:0;max-width:640px;margin:0 auto;background:#17171C;border-radius:24px 24px 0 0;padding:20px 18px 28px;color:#F2F2F5;max-height:min(68vh,100%);overflow:auto}
 .sheet h3{font-size:16px;font-weight:800;margin-bottom:12px}
-/* V212 voice pop-up: a taller sheet (62vh cap) that still never covers
-   the preview frame — the wrap starts below the frame, so 100% of the
-   wrap height is the hard limit */
-.sheet-wrap.voicePop .sheet{max-height:min(62vh,100%)}
+/* V213: EVERY feature pop-up (the Burmese Voice app pattern) shares the
+   same cap — the wrap starts below the preview frame, so 100% of the
+   wrap height is the hard limit and the video stays visible above */
+.sheet-wrap.voicePop .sheet{max-height:min(68vh,100%)}
 .opt{width:100%;text-align:left;padding:14px;border-radius:14px;border:1.5px solid #2C2C35;background:#1B1B21;margin-bottom:9px;cursor:pointer;font-family:inherit;color:#F2F2F5}
 .opt b{display:block;font-size:14px;color:#F2F2F5}.opt span{font-size:12.5px;color:#9A9AA5}
 .opt.sel{border-color:#F59E0B;background:rgba(245,158,11,.14)}
@@ -137,16 +138,13 @@ body.locked{overflow:hidden}
 .tp-seek::-webkit-slider-thumb{width:13px;height:13px;border-width:2px}
 .tp-seek::-moz-range-thumb{width:12px;height:12px;border-width:2px}
 .tp-seek::-moz-range-track{height:3px;background:rgba(255,255,255,.35)}
-/* ===== V210 timeline (CapCut-style: ruler + video / subtitle / voice tracks) ===== */
+/* ===== timeline — V213: TWO tracks only (subtitle cues + voice) ===== */
 .tl-wrap{flex:0 0 auto;background:#101014;border-top:1px solid #26262E;border-bottom:1px solid #26262E;padding:6px 0 8px}
 .tl-scroll{overflow-x:auto;overflow-y:hidden}
 .tl-inner{position:relative;min-width:100%}
-.tl-ruler{position:relative;height:15px;cursor:pointer}
-.tl-tick{position:absolute;top:0;height:15px;line-height:15px;font-size:9px;color:#9A9AA5;border-left:1px solid #3A3A45;padding-left:3px;white-space:nowrap}
 .tl-track{position:relative;height:24px}
 .tl-track-subs{height:28px}
 .tl-block{position:absolute;top:3px;border-radius:4px;font-size:10px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:pointer;font-family:inherit;text-align:left}
-.tl-vblock{height:18px;line-height:18px;padding:0 6px;background:#2A2A33;border:1px solid #3A3A45;color:#F2F2F5}
 .tl-sblock{height:22px;line-height:22px;padding:0 5px;background:rgba(245,158,11,.22);border:1px solid #B97A0E;color:#FFD9A0}
 .tl-sblock.cur{background:#F59E0B;border-color:#F59E0B;color:#1A1206;font-weight:700}
 .tl-voblock{height:18px;line-height:18px;padding:0 6px;background:#1F3D2B;border:1px solid #25B373;color:#A7E8C6}
@@ -164,15 +162,15 @@ body.locked{overflow:hidden}
 .field .duck-chk{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;color:#34D399;cursor:pointer;margin-bottom:0}
 .btn-row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
 .btn-row2 .btn{width:100%;padding:9px 10px;font-size:13px;white-space:nowrap}
-/* SRT cue editor rows */
-.cue-row{display:flex;gap:6px;align-items:flex-start;padding:8px;border:1.5px solid #2C2C35;border-radius:12px;margin-bottom:8px;background:#1B1B21}
+/* SRT cue list rows — V213: summary rows; tap one to edit it in the
+   per-cue pop-up (text / start / end / save / delete live there) */
+.cue-row{display:flex;gap:8px;align-items:center;padding:8px;border:1.5px solid #2C2C35;border-radius:12px;margin-bottom:8px;background:#1B1B21}
 .cue-row.cur{border-color:#F59E0B;background:rgba(245,158,11,.12)}
-.cue-row input[type=number]{width:66px;padding:7px 6px;border-radius:9px;border:1.5px solid #2C2C35;font-family:inherit;font-size:12.5px;color:#F2F2F5;background:#101014}
-.cue-row textarea{flex:1;padding:7px 9px;border-radius:9px;border:1.5px solid #2C2C35;font-family:inherit;font-size:13px;line-height:1.55;resize:vertical;min-height:36px;color:#F2F2F5;background:#101014}
-.cue-times{display:flex;flex-direction:column;gap:4px}
-.cue-times label{font-size:9.5px;color:#8A8A95;font-weight:700}
+.cue-main{flex:1;min-width:0;cursor:pointer}
+.cue-txt{display:block;font-size:13px;line-height:1.5;color:#F2F2F5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cue-when{display:block;font-size:11px;color:#9A9AA5;margin-top:1px}
 .cue-ic{width:32px;height:32px;flex:0 0 32px;border-radius:9px;border:none;background:rgba(245,158,11,.16);color:#FBBF24;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center}
-.cue-ic.del{background:rgba(179,38,30,.20);color:#F0A49E}
+.cue-pop textarea{min-height:64px}
 .warnbox{margin-top:10px;padding:10px 12px;border-radius:12px;background:rgba(245,158,11,.12);color:#FBBF24;font-size:13px;font-weight:600;line-height:1.55}
 /* voice mini player */
 .vp-row{display:flex;align-items:center;gap:10px}
@@ -195,13 +193,6 @@ body.locked{overflow:hidden}
 .deck-sec{margin-top:14px}
 .deck-sec:first-child{margin-top:2px}
 .deck-ttl{font-size:13.5px;font-weight:800;color:#F2F2F5;margin-bottom:8px}
-/* V212: compact ② အသံ summary row in the deck (full controls = pop-up) */
-.voice-summary{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.voice-sum-label{font-size:13.5px;font-weight:700;color:#F2F2F5}
-.voice-sum-status{font-size:12px;font-weight:700;color:#9A9AA5}
-.voice-sum-status.ok{color:#34D399}
-.voice-sum-status.warn{color:#FBBF24}
-.voice-open{margin-left:auto}
 .mode-btns{display:grid;grid-template-columns:1fr 1fr;gap:9px}
 .mode-btn{padding:12px 10px;border-radius:15px;border:1.5px solid #2C2C35;background:#1B1B21;font-family:inherit;cursor:pointer;text-align:center;width:100%}
 .mode-btn b{display:block;font-size:15px;color:#F2F2F5}
@@ -273,13 +264,14 @@ function showNotice(msg,type){const n=$('#notice');n.textContent=msg;n.className
 function showDone(title,text){$('#doneTitle').textContent=title;$('#doneText').textContent=text;$('#donePop').classList.add('show')}
 $('#doneOk').addEventListener('click',()=>$('#donePop').classList.remove('show'));
 /* bottom sheet */
-/* V207 pinned-video geometry: the video frame (.vid-sticky) stays fixed
-   at the top while features are edited, so sheets must open BELOW it —
+/* Pinned-video geometry: the video frame (.vid-sticky) stays fixed at
+   the top while features are edited, so sheets must open BELOW it —
    the sheet wrap starts at the pinned frame's bottom edge (the video
-   stays fully visible and undimmed) and the panel is capped at 56vh
-   (62vh for the V212 voice pop-up). --sheetTop is measured from the live
-   layout and refreshed on resize, on video load and at every sheet open.
-   V212: the app bar is gone, so the offset is the frame height alone. */
+   stays fully visible and undimmed) and every pop-up is capped at
+   min(68vh,100%) (V213, consistent across tools). --sheetTop is
+   measured from the live layout and refreshed on resize, on video load
+   and at every sheet open (the app bar is gone, so the offset is the
+   frame height alone). */
 function syncPinGeometry(){
  const fp=document.querySelector('.vid-sticky');const fh=(fp&&fp.offsetHeight)||0;
  const de=document.documentElement;
@@ -345,7 +337,7 @@ const scriptHome=subsFieldRecap
 +'<button class="btn light" id="'+p+'-recreate" style="width:100%;margin-top:12px">🎬 Recaps ပြန်လုပ်</button><p class="hint" style="margin-top:6px">ပုံစံ ပြန်ရွေးပြီး Script အသစ် ပြန်ထုတ်ရန် (လက်ရှိ Script နှင့် cue များကို အစားထိုးပါမယ်)</p>'
 +'<button class="btn danger" id="'+p+'-clearAll" style="width:100%;margin-top:14px">🗑️ Script + စာတန်း အကုန် ဖျက်</button><p class="hint" style="margin-top:6px">Script, cue အားလုံး, မူရင်း စာသားနှင့် ထုတ်ထားသော အသံကို ဖျက်ပါမယ် — Video, Trim, Mode ရွေးထားတာတွေကို မထိပါ</p>';
 const subsHome=subToggleRow
-+'<p style="margin:8px 0 10px">Cue တစ်ခု၏ ▶ ကို နှိပ်ရင် video က အဲဒီ နေရာသို့ ရောက်သွားပါမယ်။ ဒီမှာ ပြင်လိုက်တာနဲ့ video ပေါ်က စာတန်းလည်း တန်း ပြောင်းပါမယ်။</p>'
++'<p style="margin:8px 0 10px">Cue တစ်ကြောင်းကို နှိပ်ရင် ပြင်/Save လုပ်နိုင်သော pop-up ပွင့်ပါမယ် (Timeline ပေါ်က cue block ကို နှိပ်ရင်လည်း အတူတူပါပဲ)။ ▶ ကို နှိပ်ရင် video က အဲဒီ နေရာသို့ ရောက်သွားပါမယ်။</p>'
 +'<div class="field"><label>စာတန်း နေရာ (အပေါ်/အောက်) — <span id="'+p+'-subPosVal">81%</span></label><input type="range" id="'+p+'-subPos" min="4" max="88" step="1" value="81"><p class="hint">စာတန်း band တစ်ခုလုံး frame အထဲမှာ ဝင်အောင် 4%–88% အတွင်းသာ ရွှေ့လို့ရပါတယ်။ Video ပေါ်က စာတန်းကို ဖိဆွဲပြီးလည်း ရွှေ့နိုင်ပါတယ် (Export မှာပါ ဒီ နေရာ သုံးပါမယ်)</p></div>'
 +'<div class="picker-row" style="margin-bottom:10px;align-items:center"><button class="btn light small" id="'+p+'-subPosReset">↺ အလယ် ပြန်ထား</button><button class="btn light small" id="'+p+'-cueRebuild">↻ Script မှ အချိန် ပြန်ခွဲ</button><button class="btn light small" id="'+p+'-cueAdd">➕ Cue ထည့်</button></div>'
 +'<div class="file-info" id="'+p+'-cueCount" style="margin-bottom:10px">စာတန်း ၀ ကြောင်း</div><div id="'+p+'-cueList"></div><div class="warnbox" id="'+p+'-cueWarn" style="display:none"></div>'
@@ -361,14 +353,20 @@ const voiceHome=voiceChipsField+audioInner
 +'<div id="'+p+'-voiceStale" style="display:none" class="warnbox">⚠️ စာသား ပြင်ထားပါတယ် — အသံ ပြန်ထုတ်ရန် လိုပါတယ်</div>'
 +'<button class="btn light off" id="'+p+'-audioDl" style="width:100%;margin-top:10px" aria-disabled="true">🎵 Audio ဒေါင်း</button>';
 
-const deckInner='<div class="deck-sec"><div class="deck-ttl">① Script</div><div class="mode-btns"><button class="mode-btn" id="'+p+'-modeOrig"><b>🎧 Original</b><span>မူရင်း အသံအတိုင်း</span></button><button class="mode-btn" id="'+p+'-modeNew"><b>✨ New</b><span>ဇာတ်ကြောင်းပြော အသစ်</span></button></div>'
+/* V213: MAIN is the Script page ONLY — the mode buttons + style chips +
+   Create status (the deck's old ① section) followed by the Script
+   controls themselves (scriptHome: စာသား box, transcript, recreate,
+   🗑️ clear-all). Voice has left the deck entirely: it is the toolbar's
+   🎙️ Voice Create pop-up now. */
+const deckInner='<div class="deck-sec"><div class="deck-ttl">📝 Script</div><div class="mode-btns"><button class="mode-btn" id="'+p+'-modeOrig"><b>🎧 Original</b><span>မူရင်း အသံအတိုင်း</span></button><button class="mode-btn" id="'+p+'-modeNew"><b>✨ New</b><span>ဇာတ်ကြောင်းပြော အသစ်</span></button></div>'
 +'<div class="style-row" id="'+p+'-styleChips"><button class="style-chip sel" data-v="standard">🎙️ စံပြ</button><button class="style-chip" data-v="exciting">🔥 စိတ်လှုပ်ရှား</button><button class="style-chip" data-v="funny">😂 ဟာသ</button><button class="style-chip" data-v="natural">🌿 သဘာဝ</button><button class="style-chip" data-v="horror">👻 သရဲ</button></div><p class="hint" style="margin:6px 0 0">🎭 ဇာတ်ကြောင်းပြော ပုံစံသည် ✨ New အတွက်သာ သက်ရောက်ပါတယ်</p>'
 +'<div class="studio-status" style="margin:8px 0 0"><span class="dot"></span><span id="'+p+'-createStatus">အသင့်ဖြစ်ပါပြီ</span></div></div>'
-+'<div class="deck-sec" id="'+p+'-deckVoice"><div class="deck-ttl">② အသံ</div><div class="voice-summary"><span class="voice-sum-label" id="'+p+'-voiceSumLabel">🔊 မူရင်းအသံ</span><span class="voice-sum-status" id="'+p+'-voiceSumStatus"></span><button class="btn primary small voice-open" id="'+p+'-voiceOpen">🎙️ အသံ</button></div></div>';
-/* V212: the FULL voice controls in ONE pop-up box — the deck's 🎙️ အသံ
-   button opens it as a bottom sheet (openSheetNodes, single-instance);
-   it parks in the hidden #homeVoice between opens. The ▶ စစ်ကြည့်မယ် /
-   🎬 ထည့်မယ် row lives in here too, plus a ✓ ပြီး close button. */
++scriptHome;
+/* V212/V213: the FULL voice controls in ONE pop-up box — the toolbar's
+   🎙️ Voice Create item opens it as a bottom sheet (openSheetNodes,
+   single-instance); it parks in the hidden #homeVoice between opens.
+   The ▶ စစ်ကြည့်မယ် / 🎬 ထည့်မယ် row lives in here too, plus a ✓ ပြီး
+   close button. */
 const voiceBoxInner='<div id="'+p+'-voiceBox">'
 +voiceHome
 +'<div class="btn-row2"><button class="btn light" id="'+p+'-previewBtn">▶ စစ်ကြည့်မယ်</button><button class="btn light" id="'+p+'-insertBtn"><span class="wave"><i></i><i></i><i></i><i></i><i></i></span><span class="btn-label">🎬 ထည့်မယ်</span></button></div><div class="file-info" id="'+p+'-insertStatus"></div><div id="'+p+'-insertResult" style="margin-top:8px"></div><audio id="'+p+'-pvAudio" style="display:none"></audio>'
@@ -378,28 +376,25 @@ const mixerHome=duckField+bgmField+voiceVolField+syncField;
 const textHome='<div class="switch-row"><div><b style="font-size:14px">Text ပြရန်</b><div style="font-size:12px;color:#527884">Video ပေါ်တွင် ပြပြီး လက်ဖြင့် ရွှေ့နိုင်သည် — Export တွင်လည်း ပါမည်</div></div><div class="tgl" id="'+p+'-textTgl"></div></div><div class="field"><label>စာသား</label><input type="text" id="'+p+'-textStr" placeholder="ဥပမာ — ဆက်ကြည့်ပါ"></div><div class="field" style="margin-bottom:0"><label>စာလုံး အရွယ် — <span id="'+p+'-textSizeVal">44</span></label><input type="range" id="'+p+'-textSize" min="24" max="72" step="2" value="44"></div>';
 const logoHome='<div class="switch-row"><div><b style="font-size:14px">Logo ပြရန်</b><div style="font-size:12px;color:#527884">Video ဘယ်ဘက် အပေါ်တွင် သေးသေး ပြပြီး Export တွင်လည်း ပါမည်</div></div><div class="tgl" id="'+p+'-logoTgl"></div></div><div class="field" style="margin-bottom:0"><label>Logo စာသား</label><input type="text" id="'+p+'-logoStr"></div>';
 const borderHome='<div class="switch-row"><div><b style="font-size:14px">Border ပြရန်</b><div style="font-size:12px;color:#527884">Video ပတ်လည်တွင် ရွှေရောင် ဘောင် ပြမည်</div></div><div class="tgl" id="'+p+'-borderTgl"></div></div><p class="hint">ဖွင့်ထားရင် Export လုပ်သော video တွင်လည်း ရွှေရောင် ဘောင် ပါပါမည်</p>';
-/* ---- V210 timeline + panel + toolbar (CapCut-style) ----
-   Timeline: ruler (tap seeks) + a video block (tap -> Trim panel), one
-   block per subtitle cue (tap seeks to the cue), and a voice block; the
-   playhead follows playback. Blocks are (re)built by renderTimeline(). */
+/* ---- timeline + panel + toolbar (CapCut-style, V213) ----
+   Timeline: TWO tracks only — one block per subtitle cue (tap opens
+   the per-cue edit pop-up) and a voice block; the playhead follows
+   playback. Blocks are (re)built by renderTimeline(). */
 const timelineInner='<div class="tl-wrap" id="'+p+'-timeline"><div class="tl-scroll" id="'+p+'-tlScroll"><div class="tl-inner" id="'+p+'-tlInner">'
-+'<div class="tl-ruler" id="'+p+'-tlRuler"></div>'
-+'<div class="tl-track"><button class="tl-block tl-vblock" id="'+p+'-tlVBlock" style="display:none"></button></div>'
 +'<div class="tl-track tl-track-subs" id="'+p+'-tlSubs"></div>'
 +'<div class="tl-track"><div class="tl-block tl-voblock" id="'+p+'-tlVoBlock" style="display:none"></div></div>'
 +'<div class="tl-playhead" id="'+p+'-tlPlay" style="left:0"></div>'
 +'</div></div></div>';
 const panelInner='<div class="panel" id="'+p+'-panel"><div class="panel-head" id="'+p+'-panelHead" style="display:none"><span class="panel-title" id="'+p+'-panelTitle"></span><button class="panel-done" id="'+p+'-panelDone">✓ ပြီး</button></div><div class="panel-body" id="'+p+'-panelBody"></div></div>';
-function tb(id,ic,t){return '<button class="tool-btn" id="'+p+'-tool'+id+'" data-v="home'+id+'"><span class="tic">'+ic+'</span>'+t+'</button>'}
+function tb(id,ic,t){return '<button class="tool-btn" id="'+p+'-tool'+id+'"><span class="tic">'+ic+'</span>'+t+'</button>'}
 const toolbarInner='<nav class="toolbar" id="'+p+'-toolbar">'
-+tb('Script','🤖','Script')+tb('Subs','🎨','စာတန်း')+tb('Mixer','🔊','Mixer')+tb('Trim','✂️','Trim')+tb('Aspect','🌫️','Aspect')+tb('Title','📝','Title')+tb('Text','➕','Text')+tb('Logo','🛡️','Logo')+tb('Border','📐','Border')
++tb('Subs','🎨','စာတန်း')+tb('Voice','🎙️','Voice Create')+tb('Mixer','🔊','Mixer')+tb('Trim','✂️','Trim')+tb('Aspect','🌫️','Aspect')+tb('Title','📝','Title')+tb('Text','➕','Text')+tb('Logo','🛡️','Logo')+tb('Border','📐','Border')
 +'<button class="tool-btn" id="'+p+'-toolKey"><span class="tic">🔑</span>Key</button>'
 +'</nav>';
 const exportInner='<div class="logbox" id="'+p+'-log"></div><div id="'+p+'-result" style="margin-top:12px"></div>';
 const homes='<div id="'+p+'-sheetHomes" style="display:none">'
 +'<div id="'+p+'-homeHome">'+deckInner+'</div>'
 +'<div id="'+p+'-homeVoice">'+voiceBoxInner+'</div>'
-+'<div id="'+p+'-homeScript">'+scriptHome+'</div>'
 +'<div id="'+p+'-homeSubs">'+subsHome+'</div>'
 +'<div id="'+p+'-homeMixer">'+mixerHome+'</div>'
 +'<div id="'+p+'-homeTrim">'+pickRow+trimInner+'</div>'
@@ -410,21 +405,19 @@ const homes='<div id="'+p+'-sheetHomes" style="display:none">'
 +'<div id="'+p+'-homeBorder">'+borderHome+'</div>'
 +'<div id="'+p+'-homeExport">'+exportInner+'</div>'
 +'</div>';
-/* ---- Layout (V210, CapCut-style): dark editor that fills the viewport —
-   the page itself never scrolls. V212: NO top bar — first comes the
-   large preview frame (transparent icon transport + slim seek line
-   overlaid on its bottom edge) + the status strip (whose Export
-   segment IS the Export button), then the
-   TIMELINE (ruler / video / subtitle / voice tracks + playhead), the
-   bottom PANEL (HOME = the action deck; a toolbar tool swaps the
-   panel to that tool's controls, ✓ ပြန် returns home — the preview is
-   never covered), and the TOOLBAR fixed at the very bottom (🔑 Key at
-   its end opens the Gemini-key drawer). Control
-   blocks live in the hidden #sheetHomes and are mounted into the panel
-   one at a time (single-instance, like the old sheets); the voice
-   controls park in #homeVoice and open as a bottom-sheet pop-up. The
-   daily flow stays short: video -> ① mode button -> ② 🎙️ အသံ pop-up
-   -> အသံ ထုတ်မည် -> Export (status strip). ---- */
+/* ---- Layout (V213, CapCut-style): dark editor that fills the viewport —
+   the page itself never scrolls. NO top bar — first comes the large
+   preview frame (transparent icon transport + slim seek line overlaid
+   on its bottom edge) + the status strip (whose Export segment IS the
+   Export button), then the TIMELINE (TWO tracks: subtitle cues + voice,
+   + playhead), the bottom PANEL — whose only views are MAIN (the Script
+   page) and the Export view — and the TOOLBAR fixed at the very bottom.
+   EVERY toolbar tool opens its controls as a BOTTOM-SHEET POP-UP
+   (Burmese Voice app style): the control blocks park in the hidden
+   #sheetHomes and are mounted into the sheet one at a time
+   (single-instance); 🔑 Key at the toolbar's end opens the Gemini-key
+   drawer. The daily flow stays short: video -> mode button (MAIN) ->
+   🎙️ Voice Create pop-up -> အသံ ထုတ်မည် -> Export (status strip). ---- */
 return ''
 +'<div class="vid-sticky" id="'+p+'-framePin">'+frameInner+'</div>'
 +timelineInner
@@ -570,7 +563,7 @@ let ffInstance=null,ffLoading=null,ffLogSink=null;
    button in live testing. Logs now go to ONE swappable sink (the current
    operation's logger), "Aborted()" lines are always dropped, and error text
    shown to users passes through humanErr(). */
-function humanErr(e){const m=(e&&e.message)||String(e||'');if(/Aborted\(\)/.test(m))return 'ffmpeg အလုပ် ရပ်သွားပါတယ် — ပြန် ကြိုးစားပါ';if(/detached|postMessage/i.test(m))return 'အသံ အချက်အလက် ပျက်သွားပါတယ် — ② အသံ မှာ "🎙️ အသံ ထုတ်မည်" ကို ပြန်နှိပ်ပြီး အသံ ပြန်ထုတ်ပါ';return m}
+function humanErr(e){const m=(e&&e.message)||String(e||'');if(/Aborted\(\)/.test(m))return 'ffmpeg အလုပ် ရပ်သွားပါတယ် — ပြန် ကြိုးစားပါ';if(/detached|postMessage/i.test(m))return 'အသံ အချက်အလက် ပျက်သွားပါတယ် — 🎙️ Voice Create မှာ "🎙️ အသံ ထုတ်မည်" ကို ပြန်နှိပ်ပြီး အသံ ပြန်ထုတ်ပါ';return m}
 async function getFFmpeg(logFn){
  if(logFn)ffLogSink=logFn;
  if(ffInstance)return ffInstance;
@@ -739,7 +732,7 @@ async function exportEditor(ed){
    if(!vc.dur)vc.dur=await probeAudioDur(pristine,pext);
    const eff=effSpeedOf(ed),effDur=vc.dur?vc.dur/eff:0;
    if(vc.dur&&effDur>dur+0.05){
-    const msg='အသံ ကြာချိန် ('+effDur.toFixed(1)+' စက္ကန့်) က video အပိုင်း ('+dur.toFixed(1)+' စက္ကန့်) ထက် ရှည်နေပါတယ် — အသံကို ဖြတ်မပစ်ပါ။ ② အသံ မှာ အသံ အမြန်ကို စုစုပေါင်း '+(vc.dur/dur).toFixed(2)+'× အထိ တင်ပါ၊ သို့မဟုတ် ✂️ Trim Feature မှာ Trim အပိုင်းကို ပိုရှည်အောင် ပြန်ဖြတ်ပါ။';
+    const msg='အသံ ကြာချိန် ('+effDur.toFixed(1)+' စက္ကန့်) က video အပိုင်း ('+dur.toFixed(1)+' စက္ကန့်) ထက် ရှည်နေပါတယ် — အသံကို ဖြတ်မပစ်ပါ။ 🎙️ Voice Create မှာ အသံ အမြန်ကို စုစုပေါင်း '+(vc.dur/dur).toFixed(2)+'× အထိ တင်ပါ၊ သို့မဟုတ် ✂️ Trim pop-up မှာ Trim အပိုင်းကို ပိုရှည်အောင် ပြန်ဖြတ်ပါ။';
     log('⚠️ '+msg);showNotice('⚠️ '+msg,'err');return;
    }
    const rv=await effectiveVoiceBytes(ed,pristine,pext,log);
@@ -1019,13 +1012,14 @@ function unifiedCues(ed){
     builds cues; Voice entry refreshes its gates). doneStep / undoneStep /
     renderSteps are intentional no-ops so older call sites stay valid. */
  function goStep(i){
-  /* V210 panels: 0 -> HOME panel (the deck), 1 -> စာတန်း panel,
-     2 -> HOME panel scrolled to the ② အသံ deck section, 3 -> Export panel */
+  /* V213: 0 -> MAIN (the Script page; any pop-up closes), 1 -> the
+     🎨 စာတန်း pop-up, 2 -> the 🎙️ Voice Create pop-up, 3 -> the
+     Export view (the panel's only other view) */
   i=Math.max(0,Math.min(3,i));
   if(previewMode&&i!==1&&i!==2)exitPreview(true);
-  if(i===1){showPanel('homeSubs','🎨 စာတန်း')}
-  else if(i===2){checkVoiceStale();refreshVoiceGate();updateVoiceWarn();showPanel('homeHome');const t=E('deckVoice');if(t)t.scrollIntoView({behavior:'smooth',block:'start'})}
-  else if(i===0){showPanel('homeHome')}
+  if(i===1){openFeatureSheet('homeSubs','🎨 စာတန်း')}
+  else if(i===2){openVoiceSheet()}
+  else if(i===0){closeSheet();showPanel('homeHome')}
   else if(i===3){showPanel('homeExport','🎬 Export')}
   updateOverlay(true);
  }
@@ -1052,25 +1046,74 @@ function unifiedCues(ed){
   ed.cues.forEach((cue,i)=>{
    const row=document.createElement('div');row.className='cue-row';
    row.innerHTML='<button class="cue-ic seek" title="ဒီ cue နေရာသို့ သွားမယ်">▶</button>'
-    +'<div class="cue-times"><label>စ</label><input type="number" class="cs" step="0.1" min="0" value="'+cue.start.toFixed(1)+'"><label>ဆုံး</label><input type="number" class="ce" step="0.1" min="0" value="'+cue.end.toFixed(1)+'"></div>'
-    +'<textarea class="ct" rows="2">'+escapeHtml(cue.text)+'</textarea>'
-    +'<button class="cue-ic del" title="ဒီ cue ဖျက်">🗑</button>';
-   const cs=row.querySelector('.cs'),ce=row.querySelector('.ce'),ct=row.querySelector('.ct');
-   row.querySelector('.seek').onclick=()=>{try{vidEl.currentTime=cue.start;vidEl.play().catch(()=>{})}catch(e){}updateOverlay(true)};
-   row.querySelector('.del').onclick=()=>{ed.cues.splice(i,1);ed.cuesManual=true;renderCueList();updateCueCount();updateOverlay(true);renderTimeline()};
-   cs.onchange=()=>{let v=parseFloat(cs.value);if(isNaN(v)||v<0)v=cue.start;cue.start=Math.min(v,Math.max(0,cue.end-0.1));cs.value=cue.start.toFixed(1);ed.cuesManual=true;updateOverlay(true);renderTimeline()};
-   ce.onchange=()=>{let v=parseFloat(ce.value);if(isNaN(v))v=cue.end;cue.end=Math.max(v,cue.start+0.1);ce.value=cue.end.toFixed(1);ed.cuesManual=true;updateOverlay(true);renderTimeline()};
-   ct.addEventListener('input',()=>{cue.text=ct.value;ed.cuesManual=true;updateOverlay(true);renderTimeline()});
+    +'<div class="cue-main"><span class="cue-txt">'+escapeHtml(cue.text||'')+'</span><span class="cue-when">'+cue.start.toFixed(1)+'s – '+cue.end.toFixed(1)+'s · ပြင်ရန် နှိပ်ပါ</span></div>';
+   row.querySelector('.seek').onclick=ev=>{ev.stopPropagation();try{vidEl.currentTime=cue.start;vidEl.play().catch(()=>{})}catch(e){}updateOverlay(true)};
+   row.querySelector('.cue-main').onclick=()=>openCuePop(i,true);
    box.appendChild(row);
   });
  }
- E('cueRebuild').onclick=()=>{if(!scriptLines().length){showNotice('⚠️ Cue ခွဲရန် မြန်မာ Script အရင် လိုပါတယ် — အပေါ် deck ① Script က "🎧 Original / ✨ New" နှိပ်ပြီး Script အရင် ထုတ်ပါ','err');goStep(0);return}rebuildCues();showNotice('✅ Script မှ cue '+ed.cues.length+' ခု ပြန်ခွဲပြီးပါပြီ','ok')};
+ /* ================= V213 per-cue edit pop-up =================
+    One bottom pop-up per cue — opened from a timeline cue block or a
+    cue-list row — with the cue's text + start/end (seconds), 💾 Save,
+    🗑️ delete and ✓ close. Save writes through the same state the old
+    inline row editors used (cue fields + ed.cuesManual + overlay /
+    timeline / list refreshes, same clamps: start < end-0.1, end >
+    start+0.1). The Script box stays the source of truth for TEXT:
+    when the cue list maps 1:1 onto the script lines (no split/merge),
+    a text save also rewrites that script line and re-syncs cuesSig, so
+    SRT/export (which read script + cues) stay consistent. When the
+    pop-up was opened from the 🎨 စာတန်း sheet, closing it (Save,
+    delete, ✓ or backdrop) re-opens that sheet. */
+ let cuePopIdx=-1,cuePopFromSubs=false;
+ function syncCueTextToScript(i,text){
+  const lines=scriptLines();
+  if(ed.cues.length!==lines.length)return; /* split/merged cues: no 1:1 line */
+  const raw=(E('subs').value||'').split('\n');let seen=-1,done=false;
+  for(let k=0;k<raw.length;k++){if(raw[k].trim()){seen++;if(seen===i){raw[k]=text;done=true;break}}}
+  if(!done)return;
+  E('subs').value=raw.join('\n');
+  ed.cuesSig=cueSigNow();
+  updateCueCount();checkVoiceStale();refreshVoiceGate();
+ }
+ function openCuePop(i,fromSubs){
+  const cue=ed.cues[i];if(!cue)return;
+  cuePopIdx=i;cuePopFromSubs=!!fromSubs;
+  openSheet('✏️ Cue ပြင်ရန်','<div class="cue-pop">'
+   +'<div class="field"><label>စာတန်း စာသား</label><textarea id="'+p+'-cpText" rows="3">'+escapeHtml(cue.text||'')+'</textarea></div>'
+   +'<div class="row2"><div class="field"><label>စချိန် (စက္ကန့်)</label><input type="number" id="'+p+'-cpStart" step="0.1" min="0" value="'+cue.start.toFixed(1)+'"></div><div class="field"><label>ဆုံးချိန် (စက္ကန့်)</label><input type="number" id="'+p+'-cpEnd" step="0.1" min="0" value="'+cue.end.toFixed(1)+'"></div></div>'
+   +'<button class="btn light" id="'+p+'-cpSeek" style="width:100%">▶ ဒီ cue နေရာသို့ သွား</button>'
+   +'<button class="btn primary" id="'+p+'-cpSave" style="width:100%;margin-top:10px">💾 Save</button>'
+   +'<button class="btn danger" id="'+p+'-cpDel" style="width:100%;margin-top:10px">🗑️ ဒီ cue ဖျက်</button>'
+   +'<button class="btn light" id="'+p+'-cpClose" style="width:100%;margin-top:10px">✓ ပြီး</button></div>');
+  /* any close path funnels through closeSheet -> flushSheet, so this
+     onClose covers Save / delete / ✓ / backdrop uniformly */
+  sheetOnClose=()=>{const back=cuePopFromSubs;cuePopFromSubs=false;cuePopIdx=-1;if(back)setTimeout(()=>openFeatureSheet('homeSubs','🎨 စာတန်း'),0)};
+  E('cpSeek').onclick=()=>{const c=ed.cues[cuePopIdx];if(!c)return;try{vidEl.currentTime=c.start;vidEl.play().catch(()=>{})}catch(e){}updateOverlay(true)};
+  E('cpSave').onclick=()=>{
+   const c=ed.cues[cuePopIdx];if(!c){closeSheet();return}
+   let sv=parseFloat(E('cpStart').value);if(isNaN(sv)||sv<0)sv=c.start;
+   let ev=parseFloat(E('cpEnd').value);if(isNaN(ev))ev=c.end;
+   const ns=Math.min(sv,Math.max(0,ev-0.1)),ne=Math.max(ev,ns+0.1);
+   const nt=E('cpText').value,textChanged=nt!==c.text;
+   c.start=ns;c.end=ne;c.text=nt;ed.cuesManual=true;
+   if(textChanged)syncCueTextToScript(cuePopIdx,nt);
+   renderCueList();updateCueCount();updateOverlay(true);renderTimeline();refreshSummaries();
+   showNotice('✅ Cue ပြင်ပြီးပါပြီ','ok');
+   closeSheet();
+  };
+  E('cpDel').onclick=()=>{
+   if(cuePopIdx>=0&&ed.cues[cuePopIdx]){ed.cues.splice(cuePopIdx,1);ed.cuesManual=true;renderCueList();updateCueCount();updateOverlay(true);renderTimeline();showNotice('🗑️ Cue ဖျက်ပြီးပါပြီ','ok')}
+   closeSheet();
+  };
+  E('cpClose').onclick=()=>closeSheet();
+ }
+ E('cueRebuild').onclick=()=>{if(!scriptLines().length){showNotice('⚠️ Cue ခွဲရန် မြန်မာ Script အရင် လိုပါတယ် — Main Script စာမျက်နှာက "🎧 Original / ✨ New" နှိပ်ပြီး Script အရင် ထုတ်ပါ','err');goStep(0);return}rebuildCues();showNotice('✅ Script မှ cue '+ed.cues.length+' ခု ပြန်ခွဲပြီးပါပြီ','ok')};
  E('cueAdd').onclick=()=>{
   const r=trimRange();const last=ed.cues[ed.cues.length-1];
   const s=last?last.end:r.start;const e=r.end?Math.min(r.end,s+2):s+2;
-  if(r.end&&s>=r.end-0.05){showNotice('⚠️ Cue အသစ် ထည့်ရန် နေရာ မကျန်တော့ပါ — ✂️ Trim Feature မှာ Trim ဆုံးချိန်ကို အရင် ရှည်ပေးပါ','err');return}
+  if(r.end&&s>=r.end-0.05){showNotice('⚠️ Cue အသစ် ထည့်ရန် နေရာ မကျန်တော့ပါ — ✂️ Trim pop-up မှာ Trim ဆုံးချိန်ကို အရင် ရှည်ပေးပါ','err');return}
   ed.cues.push({text:'',start:s,end:e});ed.cuesManual=true;renderCueList();updateCueCount();renderTimeline();
-  const rows=E('cueList').children;const nr=rows[rows.length-1];if(nr){nr.scrollIntoView({behavior:'smooth',block:'center'});const t=nr.querySelector('.ct');if(t)t.focus()}
+  openCuePop(ed.cues.length-1,true);
  };
  /* --- live subtitle overlay on the video frame (SRT section + combined preview) --- */
  function overlayActive(){const t=E('subTgl');return !t||t.classList.contains('on')} /* live cue shows on the pinned frame while the စာတန်း switch (③ / 🎨 chip — one shared state) is on */
@@ -1086,25 +1129,22 @@ function unifiedCues(ed){
  }
  vidEl.addEventListener('timeupdate',()=>{if(!previewMode)updateOverlay()});
  vidEl.addEventListener('seeked',()=>{if(!previewMode)updateOverlay()});
- /* ================= V210 timeline (CapCut-style tracks) =================
-    Ruler (tap = seek) + a video block spanning the trimmed range (tap ->
-    Trim panel), one block per subtitle cue (width/position ∝ cue timing,
-    tap = seek to the cue), and a voice block (hatched + labelled when the
-    voice is stale). Rebuilt whenever cues / trim / voice change; the
-    playhead follows playback and the strip auto-scrolls to keep it in
-    view. Scale: 12 px per second. */
+ /* ================= timeline (V213: TWO tracks only) =================
+    The time ruler and the video-file block row are GONE (user order) —
+    what remains is one block per subtitle cue (width/position ∝ cue
+    timing; tap opens the per-cue edit pop-up, which carries its own ▶
+    seek) and a voice block (hatched + labelled when the voice is
+    stale). The playhead overlays both tracks and follows playback; the
+    strip auto-scrolls to keep it in view. Rebuilt whenever cues / trim
+    / voice change. Scale: 12 px per second. */
  const TL_PPS=12;
  function renderTimeline(){
   const inner=E('tlInner');if(!inner)return;
   const dur=ed.duration||0,r=trimRange();
   const scroller=E('tlScroll');const cw=(scroller&&scroller.clientWidth)||0;
   inner.style.width=Math.max(cw,Math.ceil(dur*TL_PPS))+'px';
-  const ruler=E('tlRuler');
-  if(ruler){ruler.innerHTML='';const step=dur>180?30:(dur>90?15:(dur>45?10:5));for(let t=0;t<=dur+0.001;t+=step){const tick=document.createElement('span');tick.className='tl-tick';tick.style.left=(t*TL_PPS)+'px';tick.textContent=fmtDur(t);ruler.appendChild(tick)}}
-  const vb=E('tlVBlock');
-  if(vb){if(ed.file&&dur>0){vb.style.display='block';vb.style.left=(r.start*TL_PPS)+'px';vb.style.width=Math.max(24,(r.end-r.start)*TL_PPS)+'px';vb.textContent='🎬 '+(ed.file.name||'video')+' · '+fmtDur(Math.max(0,r.end-r.start))}else vb.style.display='none'}
   const subs=E('tlSubs');ed._tlBlocks=[];
-  if(subs){subs.innerHTML='';(ed.cues||[]).forEach(cue=>{const b=document.createElement('button');b.className='tl-block tl-sblock';b.style.left=(cue.start*TL_PPS)+'px';b.style.width=Math.max(16,(cue.end-cue.start)*TL_PPS)+'px';b.textContent=graphemeList(cue.text||'').slice(0,8).join('');b.onclick=()=>{try{vidEl.currentTime=cue.start;vidEl.play().catch(()=>{})}catch(e){}updateOverlay(true)};subs.appendChild(b);ed._tlBlocks.push(b)})}
+  if(subs){subs.innerHTML='';(ed.cues||[]).forEach((cue,ci)=>{const b=document.createElement('button');b.className='tl-block tl-sblock';b.style.left=(cue.start*TL_PPS)+'px';b.style.width=Math.max(16,(cue.end-cue.start)*TL_PPS)+'px';b.textContent=graphemeList(cue.text||'').slice(0,8).join('');b.onclick=()=>openCuePop(ci,false);subs.appendChild(b);ed._tlBlocks.push(b)})}
   const vo=E('tlVoBlock');
   if(vo){const c=ed.voiceCache;if(c&&c.dur){const vd=c.dur/effSpeedOf(ed);const stale=!voiceFresh();vo.style.display='block';vo.style.left=(r.start*TL_PPS)+'px';vo.style.width=Math.max(24,vd*TL_PPS)+'px';vo.classList.toggle('stale',stale);vo.textContent='🎙️ အသံ '+fmtDur(vd)+(stale?' · အသံ မကိုက်တော့':'')}else vo.style.display='none'}
   updatePlayhead();
@@ -1118,9 +1158,6 @@ function unifiedCues(ed){
   const sc=E('tlScroll');
   if(sc&&!vidEl.paused&&sc.clientWidth){const x=t*TL_PPS;if(x<sc.scrollLeft+30||x>sc.scrollLeft+sc.clientWidth-60)sc.scrollLeft=Math.max(0,x-sc.clientWidth/3)}
  }
- const tlRulerEl=E('tlRuler');
- if(tlRulerEl)tlRulerEl.onclick=e=>{const inner=E('tlInner');if(!inner||!ed.duration)return;const rect=inner.getBoundingClientRect();const t=Math.max(0,Math.min(ed.duration,((e.clientX||0)-rect.left)/TL_PPS));try{vidEl.currentTime=t}catch(err){}updateOverlay(true);updatePlayhead()};
- const tlVB=E('tlVBlock');if(tlVB)tlVB.onclick=()=>showPanel('homeTrim','✂️ Trim');
  window.__recapTimeline=renderTimeline;
  /* --- draggable subtitle position (the reference studio's draggable texts):
     drag the live subtitle band up/down on the frame. The position is a
@@ -1147,7 +1184,7 @@ function unifiedCues(ed){
  function previewTime(){const r=trimRange();if(vidEl.ended&&pvAudio)return r.start+(pvAudio.currentTime||0)/pvFactor();return vidEl.currentTime}
  function setPreviewBtns(){const t=previewMode?'⏹ Preview ပိတ်':'▶ စစ်ကြည့်မယ်';const b1=E('previewBtn');if(b1)b1.textContent=t;}
  function enterPreview(){
-  if(!ed.voiceCache||!ed.voiceUrl){showNotice('⚠️ စစ်ကြည့်ရန် အသံ အရင် လိုပါတယ် — ② အသံ မှာ အသံ အရင် ထုတ်ပါ','err');goStep(2);return}
+  if(!ed.voiceCache||!ed.voiceUrl){showNotice('⚠️ စစ်ကြည့်ရန် အသံ အရင် လိုပါတယ် — 🎙️ Voice Create မှာ အသံ အရင် ထုတ်ပါ','err');goStep(2);return}
   if(!ed.file){showNotice('⚠️ Video ဖိုင် အရင် လိုပါတယ် — အပေါ်မှာ ရွေးပါ','err');goStep(0);return}
   ensureCues();
   if(ed.url&&vidEl.src!==ed.url)vidEl.src=ed.url; /* preview always uses the original video */
@@ -1352,7 +1389,7 @@ function unifiedCues(ed){
  E('modeNew').onclick=()=>chooseModeAndRun('scene');
  /* deck style chips: select-only — the chosen style feeds ✨ New runs */
  $$('#'+p+'-styleChips .style-chip').forEach(c=>{c.onclick=()=>{ed.recapStyle=c.dataset.v;$$('#'+p+'-styleChips .style-chip').forEach(x=>x.classList.toggle('sel',x===c))}});
- const recreateBtn=E('recreate');if(recreateBtn)recreateBtn.onclick=()=>{showPanel('homeHome');showNotice('🎬 ① Script မှာ 🎧 Original / ✨ New ပြန်ရွေးပြီး Script အသစ် ထုတ်ပါ — လက်ရှိ Script နှင့် cue များကို အစားထိုးပါမယ်','info')};
+ const recreateBtn=E('recreate');if(recreateBtn)recreateBtn.onclick=()=>{showPanel('homeHome');const pb=E('panelBody');if(pb)pb.scrollTop=0;showNotice('🎬 အပေါ်က 🎧 Original / ✨ New ပြန်ရွေးပြီး Script အသစ် ထုတ်ပါ — လက်ရှိ Script နှင့် cue များကို အစားထိုးပါမယ်','info')};
  const txTgl=E('aiTxTgl');if(txTgl)txTgl.onclick=()=>{const f=E('f-transcript');const hidden=f.style.display==='none';f.style.display=hidden?'':'none';txTgl.textContent=hidden?'ဖျောက်':'ပြ'};
  /* ================= 🗑️ clear-all (Script panel) =================
     Two-tap confirm: the first tap arms the button for 4 seconds, the
@@ -1445,14 +1482,14 @@ function unifiedCues(ed){
  const adl=E('audioDl');
  if(adl)adl.onclick=()=>{
   const u=ed.renderUrl||ed.voiceUrl;
-  if(!u){showNotice('⚠️ Audio ဒေါင်းရန် အသံ အရင် လိုပါတယ် — ② အသံ မှာ "🎙️ အသံ ထုတ်မည်" အရင် နှိပ်ပါ','err');return}
+  if(!u){showNotice('⚠️ Audio ဒေါင်းရန် အသံ အရင် လိုပါတယ် — 🎙️ Voice Create မှာ "🎙️ အသံ ထုတ်မည်" အရင် နှိပ်ပါ','err');return}
   const a=document.createElement('a');a.href=u;a.download=(((ed.file&&ed.file.name)||'recap').replace(/\.[^.]+$/,'').replace(/[^\w\- ]+/g,'').trim()||'recap')+'_voice.'+(ed.renderUrl?'wav':(ed.voiceCache?ed.voiceCache.ext:'wav'));document.body.appendChild(a);a.click();a.remove();showNotice('✅ အသံ ဖိုင် ဒေါင်းနေပါပြီ','ok');
  };
  if(duckEl&&duckEl.checked)applyAutoDuck();
  async function runVoiceGen(){
   if(ed.voiceBusy)return;
   const txt=scriptText();
-  if(!txt){showNotice('⚠️ အသံ ထုတ်ရန် မြန်မာ Script အရင် လိုပါတယ် — အပေါ် deck ① Script က "🎧 Original / ✨ New" နှိပ်ပြီး Script အရင် ထုတ်ပါ','err');goStep(0);return}
+  if(!txt){showNotice('⚠️ အသံ ထုတ်ရန် မြန်မာ Script အရင် လိုပါတယ် — Main Script စာမျက်နှာက "🎧 Original / ✨ New" နှိပ်ပြီး Script အရင် ထုတ်ပါ','err');goStep(0);return}
   if(ed.ttsEngine==='gemini'&&!getApiKey()){showNotice('⚠️ Gemini TTS အတွက် Gemini API Key လိုပါတယ် — အောက်ခြေ toolbar က 🔑 Key မှာ သင့် key ထည့်ပါ (Edge TTS ဆိုရင် key မလိုပါ)','err');const ki=$('#recap-apiKey');ki.focus();ki.scrollIntoView({behavior:'smooth',block:'center'});return}
   ed.voiceBusy=true;const btn=E('voiceGen');busyBtn(btn,true,'အသံ ထုတ်နေပါတယ်…');
   setVoiceStatus('🎙️ အသံ ထုတ်နေပါတယ်…');showNotice('▶️ အသံ ထုတ်ခြင်း စတင်ပါပြီ','info');
@@ -1471,7 +1508,9 @@ function unifiedCues(ed){
    updateVoiceWarn();
    const vi=voiceDurInfo();
    setVoiceStatus('✅ အသံ ရပါပြီ — နားထောင်ကြည့်ပါ။'+(vi?' အသံ ~'+vi.effDur.toFixed(1)+' စက္ကန့် / video အပိုင်း '+vi.seg.toFixed(1)+' စက္ကန့် (အမြန် '+fmtSpeed(vi.eff)+')။':'')+' Export မှာ ဒီ အသံကို ပြန်သုံးပါမယ်');
-   showNotice('✅ အသံ ရပါပြီ','ok');const adl2=E('audioDl');if(adl2){adl2.classList.remove('off');if(adl2.removeAttribute)adl2.removeAttribute('aria-disabled')}
+   /* V213 (Burmese Voice app pattern): generation success fires the
+      '✅ အသံ ရပါပြီ' DONE POP-UP, not just a toast */
+   showDone('✅ အသံ ရပါပြီ','အသံ ထုတ်ပြီးပါပြီ — ဒီ pop-up ထဲက player မှာ နားထောင်ကြည့်ပါ။ Export မှာ ဒီ အသံကို ပြန်သုံးပါမယ်။');const adl2=E('audioDl');if(adl2){adl2.classList.remove('off');if(adl2.removeAttribute)adl2.removeAttribute('aria-disabled')}
   }catch(err){console.error(err);let m=err.message||String(err);if(ed.ttsEngine==='edge')m+=' — Edge TTS မရရင် Engine ကို Gemini သို့ ပြောင်းသုံးကြည့်ပါ';setVoiceStatus('❌ '+m);showNotice('❌ အသံ ထုတ်မရပါ: '+m,'err')}
   finally{ed.voiceBusy=false;busyBtn(btn,false,'🎙️ အသံ ထုတ်မည်');refreshVoiceGate();checkVoiceStale()}
  }
@@ -1586,8 +1625,8 @@ function unifiedCues(ed){
  E('voiceVol').addEventListener('input',()=>{ed.voiceVol=+E('voiceVol').value;E('voiceVolVal').textContent=ed.voiceVol+'%';refreshSummaries();if(previewMode)pvAudio.volume=Math.min(100,ed.voiceVol)/100});
  E('syncDelay').addEventListener('input',()=>setSyncDelay(parseFloat(E('syncDelay').value)||0));
  E('syncReset').onclick=()=>setSyncDelay(0);
- /* V210: cues are built when the စာတန်း panel opens (showPanel) — the old
-    scroll-into-view trigger went away with the scrolling page. */
+ /* V213: cues are built when the 🎨 စာတန်း pop-up opens
+    (openFeatureSheet -> ensureCues). */
  /* ================= studio player block (reference form) =================
     Top bar (🎬 Recap · ▶ စစ်ကြည့် shortcut · 🔀 Swap Video) + mode pill on the
     frame + CUSTOM transport (native controls removed) + Mode field (opens the
@@ -1661,15 +1700,16 @@ function unifiedCues(ed){
  /* script edits drive the cue count, the stale warning and the voice gate */
  E('subs').addEventListener('input',()=>{updateCueCount();checkVoiceStale();refreshVoiceGate();renderSteps()});
  ['start','end'].forEach(id=>{E(id).addEventListener('input',()=>{updateVoiceWarn();refreshSummaries();renderTimeline()})});
- /* ================= V210 bottom panel + toolbar (CapCut-style) =================
-    The bottom panel shows ONE home at a time: HOME (the 3-tap action
-    deck) by default; a toolbar tool swaps in that tool's REAL controls —
-    the control blocks live in the hidden #recap-sheetHomes and are
-    mounted into the panel body (single-instance), then parked back on
-    switch. The panel is in flow under the timeline, so the preview is
-    never covered and no scroll-lock is needed. ✓ ပြီး — or tapping the
-    active tool again — returns to HOME. Only one panel at a time. */
- let curPanel=''; /* starts empty so the first showPanel('homeHome') actually mounts the deck */
+ /* ================= V213 bottom panel + toolbar pop-ups =================
+    The in-flow panel now hosts ONLY two views: MAIN (the Script page)
+    and the Export view — showPanel swaps just those two. EVERY toolbar
+    tool instead opens its controls as a BOTTOM-SHEET POP-UP (the
+    Burmese Voice app pattern): the control blocks park in the hidden
+    #recap-sheetHomes and are mounted into the sheet one at a time
+    (single-instance, openSheetNodes), returning on close via ✓ /
+    backdrop. */
+ let curPanel=''; /* starts empty so the first showPanel('homeHome') actually mounts MAIN */
+ function markToolSel(tid){$$('#'+p+'-toolbar .tool-btn').forEach(b=>b.classList.toggle('sel',!!tid&&b.id===p+'-'+tid))}
  function showPanel(homeId,title){
   disarmClear();
   const home=E(homeId);if(!home)return;
@@ -1681,11 +1721,32 @@ function unifiedCues(ed){
   const head=E('panelHead');
   if(homeId==='homeHome'){if(head)head.style.display='none'}
   else{if(head)head.style.display='flex';const t=E('panelTitle');if(t)t.textContent=title||''}
-  $$('#'+p+'-toolbar .tool-btn').forEach(b=>b.classList.toggle('sel',b.dataset.v===homeId));
-  if(homeId==='homeSubs'){ensureCues();updateVoiceWarn()}
+  markToolSel(null);
   refreshSummaries();
  }
- function openFeatureSheet(homeId,title){showPanel(homeId,title)}
+ /* one feature pop-up: mount the parked home into the sheet; the
+    toolbar button stays .sel while its sheet is open (the wrapped
+    sheetOnClose clears it on ANY close path — backdrop, ✓, or being
+    replaced by another sheet — because closeSheet always flushes) */
+ function openFeatureSheet(homeId,title){
+  disarmClear();
+  if(homeId==='homeSubs'){ensureCues();updateVoiceWarn()}
+  const home=E(homeId);if(!home)return;
+  openSheetNodes(title,home);
+  const ret=sheetOnClose;sheetOnClose=()=>{if(ret)ret();markToolSel(null)};
+  const tid={homeSubs:'toolSubs',homeMixer:'toolMixer',homeTrim:'toolTrim',homeAspect:'toolAspect',homeTitle:'toolTitle',homeText:'toolText',homeLogo:'toolLogo',homeBorder:'toolBorder'}[homeId];
+  markToolSel(tid||null);
+ }
+ /* 🎙️ Voice Create pop-up (Burmese Voice app style): the full voice
+    box (#voiceBox, parked in #homeVoice) in the taller voicePop sheet */
+ function openVoiceSheet(){
+  checkVoiceStale();refreshVoiceGate();updateVoiceWarn();
+  const box=E('voiceBox');if(!box)return;
+  openSheetNodes('🎙️ Voice Create',box);
+  const sw=$('#sheetWrap');if(sw)sw.classList.add('voicePop');
+  const ret=sheetOnClose;sheetOnClose=()=>{if(ret)ret();markToolSel(null)};
+  markToolSel('toolVoice');
+ }
  window.__recapShowExport=()=>showPanel('homeExport','🎬 Export');
  const panelDoneBtn=E('panelDone');if(panelDoneBtn)panelDoneBtn.onclick=()=>showPanel('homeHome');
  function sumSet(id,txt){const s=E(id);if(s)s.textContent=txt}
@@ -1711,21 +1772,17 @@ function unifiedCues(ed){
   const stS=E('stScript');if(stS)stS.innerHTML='📝 Script '+(sl>0?'<b>✓</b>':'—');
   const stV=E('stVoice');if(stV)stV.innerHTML='🎙️ အသံ '+(voiceFresh()?'<b>✓</b>':'—');
   const stX=E('stExport');if(stX){const xReady=!!(ed.file&&sl>0&&(ed.audioMode!=='voice'||voiceFresh()));const xlb=stX.querySelector('.btn-label');if(xlb)xlb.innerHTML='🎬 Export '+(xReady?'<b>အသင့်</b>':'—');stX.classList.toggle('ready',xReady)}
-  /* V212 deck ② အသံ summary row — current voice + freshness, driven by
-     the SAME real state as the strip (audioMode / engine / voiceFresh) */
-  const vsL=E('voiceSumLabel');if(vsL)vsL.textContent=(ed.audioMode==='original')?'🔊 မူရင်းအသံ':('🎙️ '+(ed.ttsEngine==='edge'?edgeVoiceLabel(ed.edgeVoice):'Gemini · '+ed.voice));
-  const vsS=E('voiceSumStatus');if(vsS){let vt='',vc='';if(ed.audioMode==='original'){vt='အသံ ထုတ်စရာ မလို'}else if(voiceFresh()){vt='✅ အသံ အသင့်';vc='ok'}else if(ed.voiceCache){vt='⚠️ အသံ ပြန်ထုတ်ရန်';vc='warn'}else{vt='အသံ မထုတ်ရသေး'}vsS.textContent=vt;vsS.className='voice-sum-status'+(vc?' '+vc:'')}
  }
  window.__refreshFeatureSummaries=refreshSummaries;
- [['toolScript','homeScript','📝 Script စာသား'],['toolSubs','homeSubs','🎨 စာတန်း'],['toolMixer','homeMixer','🔊 အသံ ချိန်ညှိ'],['toolTrim','homeTrim','✂️ Trim'],['toolAspect','homeAspect','🌫️ Blur / Aspect'],['toolTitle','homeTitle','📝 Title'],['toolText','homeText','➕ Text'],['toolLogo','homeLogo','🛡️ Logo'],['toolBorder','homeBorder','📐 Border']].forEach(([tid,home,title])=>{const b=E(tid);if(b)b.onclick=()=>{if(curPanel===home)showPanel('homeHome');else showPanel(home,title)}});
- /* V212: 🔑 Key (last toolbar item) opens the SAME Gemini-key drawer
-    the old ☰ button opened; it is not a panel tool */
- const tkBtn=E('toolKey');if(tkBtn)tkBtn.onclick=openDrawer;
- /* V212: the deck's 🎙️ အသံ button opens the voice pop-up — the full
-    voice controls (#voiceBox, parked in #homeVoice) move into the
-    bottom sheet via openSheetNodes and return on close; ✓ ပြီး inside
-    the box (and the backdrop) closes it */
- const vOpenBtn=E('voiceOpen');if(vOpenBtn)vOpenBtn.onclick=()=>{const box=E('voiceBox');if(!box)return;openSheetNodes('🎙️ အသံ',box);const sw=$('#sheetWrap');if(sw)sw.classList.add('voicePop')};
+ /* V213 toolbar: EVERY tool opens its feature as a bottom pop-up.
+    🤖 Script is NOT in the toolbar — the Script page IS the main view. */
+ [['toolSubs','homeSubs','🎨 စာတန်း'],['toolMixer','homeMixer','🔊 အသံ ချိန်ညှိ'],['toolTrim','homeTrim','✂️ Trim'],['toolAspect','homeAspect','🌫️ Blur / Aspect'],['toolTitle','homeTitle','📝 Title'],['toolText','homeText','➕ Text'],['toolLogo','homeLogo','🛡️ Logo'],['toolBorder','homeBorder','📐 Border']].forEach(([tid,home,title])=>{const b=E(tid);if(b)b.onclick=()=>openFeatureSheet(home,title)});
+ const tvBtn=E('toolVoice');if(tvBtn)tvBtn.onclick=()=>openVoiceSheet();
+ /* 🔑 Key (last toolbar item) opens the SAME Gemini-key drawer the old
+    ☰ button opened; it is not a pop-up tool */
+ const tkBtn=E('toolKey');if(tkBtn)tkBtn.onclick=()=>{markToolSel(null);openDrawer()};
+ /* ✓ ပြီး inside the voice box (and the backdrop) closes the sheet;
+    the box returns to its #homeVoice parking home on close */
  const vCloseBtn=E('voiceClose');if(vCloseBtn)vCloseBtn.onclick=()=>closeSheet();
  /* Text / Logo / Border controls — formerly one-off chip sheets, now the
     persistent controls inside their own feature sheets (single-instance). */

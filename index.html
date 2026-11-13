@@ -12,20 +12,25 @@
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
 input,textarea{user-select:text;-webkit-user-select:text}
 html,body{height:100%}
-body{font-family:'Inter','Padauk','Noto Sans Myanmar',system-ui,sans-serif;color:#2E2A23;background:#FFF8EC;min-height:100vh}
-.layout{padding:12px 12px 118px;max-width:980px;margin:0 auto}
-.main{padding:0}
+body{font-family:'Inter','Padauk','Noto Sans Myanmar',system-ui,sans-serif;color:#F2F2F5;background:#0B0B0F;height:100vh;height:100dvh;overflow:hidden}
+/* V210 CapCut-style shell: the app fills the viewport and the PAGE never
+   scrolls — preview / transport / timeline / toolbar are fixed zones and
+   only the bottom panel scrolls internally. */
+.layout{padding:0;max-width:980px;margin:0 auto;height:calc(100vh - var(--appbarH,56px));height:calc(100dvh - var(--appbarH,56px))}
+.main{padding:0;height:100%}
 .tabpage{display:none}.tabpage.active{display:block}
-/* ===== top app bar (reference: white bar, orange title, pill buttons) ===== */
+#page-recap{display:flex;flex-direction:column;height:100%}
+/* ===== top app bar (dark; Export pill top-right) ===== */
 :root{--appbarH:56px;--sheetTop:64px}
-.appbar{position:sticky;top:0;z-index:85;background:#fff;border-bottom:2px solid #F6C667;box-shadow:0 2px 10px rgba(146,110,20,.08)}
+.appbar{position:sticky;top:0;z-index:85;background:#17171C;border-bottom:1px solid #26262E}
 .appbar-in{max-width:980px;margin:0 auto;display:flex;align-items:center;gap:7px;padding:9px 10px}
-.appbar-ttl{flex:1;font-size:15.5px;font-weight:800;color:#E8710A;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.appbar-btns{display:flex;gap:7px}
-.icon-btn{width:38px;height:38px;flex:0 0 38px;border-radius:11px;border:1.5px solid #EFE0BC;background:#FFFDF6;font-size:16px;cursor:pointer;color:#4A4234;display:flex;align-items:center;justify-content:center;font-family:inherit}
-.pill-btn{padding:8px 9px;border-radius:999px;border:1.5px solid #EFE0BC;background:#FFFDF6;font-family:inherit;font-size:12.5px;font-weight:700;color:#4A4234;cursor:pointer;white-space:nowrap}
+.appbar-ttl{flex:1;font-size:15.5px;font-weight:800;color:#F5A623;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.appbar-btns{display:flex;gap:7px;align-items:center}
+.icon-btn{width:38px;height:38px;flex:0 0 38px;border-radius:11px;border:1.5px solid #2C2C35;background:#1E1E24;font-size:16px;cursor:pointer;color:#F2F2F5;display:flex;align-items:center;justify-content:center;font-family:inherit}
+.pill-btn{padding:8px 9px;border-radius:999px;border:1.5px solid #2C2C35;background:#1E1E24;font-family:inherit;font-size:12.5px;font-weight:700;color:#F2F2F5;cursor:pointer;white-space:nowrap}
 .pill-btn:disabled{opacity:.55}
-/* ===== slide-in drawer (☰): Gemini key + app info + settings reset ===== */
+.pill-btn.export-pill{background:linear-gradient(90deg,#F59E0B,#F97316);color:#fff;border:none;font-weight:800;box-shadow:0 4px 14px rgba(245,130,20,.35);display:inline-flex;align-items:center;gap:6px}
+/* ===== slide-in drawer (☰): Gemini key + app info + settings reset (unchanged) ===== */
 .drawer-wrap{position:fixed;inset:0;z-index:120;display:none}
 .drawer-wrap.open{display:block}
 .drawer-bg{position:absolute;inset:0;background:rgba(43,32,8,.45)}
@@ -33,78 +38,74 @@ body{font-family:'Inter','Padauk','Noto Sans Myanmar',system-ui,sans-serif;color
 .drawer-head{display:flex;align-items:center;justify-content:space-between;font-size:16px;font-weight:800;color:#E8710A;margin-bottom:6px}
 .drawer-sub{font-size:12.5px;color:#8A7B5C;line-height:1.65;margin-bottom:16px}
 .drawer-sec{font-size:13px;font-weight:800;color:#33302A;margin:18px 0 8px}
-/* ===== cards / fields / buttons ===== */
-.card{background:#fff;border:1px solid #F1E4C4;border-radius:20px;padding:18px;color:#2E2A23;box-shadow:0 10px 24px rgba(146,110,20,.08);margin-bottom:14px;scroll-margin-top:calc(var(--sheetTop,110px) + 10px)}
-.card h3{font-size:16px;font-weight:800;margin-bottom:6px;color:#33302A}
-.card h3.studio-h{color:#E8710A;font-size:17px}
-.card p{font-size:13px;color:#6E6455;line-height:1.55}
-.btn{padding:12px 18px;border-radius:999px;border:1.5px solid #EBDDBE;cursor:pointer;background:#FFFDF7;color:#3A352B;font-size:14px;font-weight:700;font-family:inherit;display:inline-flex;align-items:center;gap:8px;justify-content:center}
+/* ===== cards / fields / buttons (dark surfaces) ===== */
+.card{background:#17171C;border:1px solid #26262E;border-radius:20px;padding:18px;color:#F2F2F5;margin-bottom:14px}
+.card h3{font-size:16px;font-weight:800;margin-bottom:6px;color:#F2F2F5}
+.card h3.studio-h{color:#F5A623;font-size:17px}
+.card p{font-size:13px;color:#9A9AA5;line-height:1.55}
+.btn{padding:12px 18px;border-radius:999px;border:1.5px solid #2C2C35;cursor:pointer;background:#1E1E24;color:#F2F2F5;font-size:14px;font-weight:700;font-family:inherit;display:inline-flex;align-items:center;gap:8px;justify-content:center}
 .btn.primary{background:linear-gradient(90deg,#F59E0B,#F97316);color:#fff;border:none;box-shadow:0 8px 18px rgba(245,130,20,.32);width:100%}
-.btn.primary.outline{background:#fff;color:#E8710A;border:2px solid #F59E0B;box-shadow:none}
-.btn.light{background:#FFFDF7;color:#4A4234;border:1.5px solid #E9DCBE}
+.btn.primary.outline{background:#1E1E24;color:#FBBF24;border:2px solid #F59E0B;box-shadow:none}
+.btn.light{background:#1E1E24;color:#F2F2F5;border:1.5px solid #2C2C35}
 .btn.green{background:linear-gradient(90deg,#25B373,#1F9D66);color:#fff;border:none;box-shadow:0 8px 18px rgba(31,157,102,.30)}
 .btn.danger{background:#b3261e;color:#fff;border:none}
+.btn.danger.armed{background:#e5484d;box-shadow:0 0 0 3px rgba(229,72,77,.35)}
 .btn.small{padding:8px 13px;font-size:12.5px}
 .btn:disabled{opacity:.55}
 .btn.off{opacity:.45}
-.field{margin-bottom:14px}.field label{display:block;font-size:13px;font-weight:700;margin-bottom:6px;color:#3A352B}
-.field input[type=text],.field input[type=number],.field input[type=password],.field textarea{width:100%;padding:11px 13px;border-radius:13px;border:1.5px solid #E7D9B4;font-family:inherit;font-size:14px;background:#fff;color:#2E2A23}
+.field{margin-bottom:14px}.field label{display:block;font-size:13px;font-weight:700;margin-bottom:6px;color:#E8E8ED}
+.field input[type=text],.field input[type=number],.field input[type=password],.field textarea{width:100%;padding:11px 13px;border-radius:13px;border:1.5px solid #2C2C35;font-family:inherit;font-size:14px;background:#101014;color:#F2F2F5}
 .field textarea{min-height:110px;line-height:1.7;resize:vertical}
-.field .hint{font-size:11.5px;color:#A08D63;margin-top:4px}
-.hint{font-size:11.5px;color:#A08D63;line-height:1.55}
+.field .hint{font-size:11.5px;color:#8A8A95;margin-top:4px}
+.hint{font-size:11.5px;color:#8A8A95;line-height:1.55}
 .field.bad input,.field.bad textarea{border-color:#d32f2f;box-shadow:0 0 0 3px rgba(211,47,47,.18)}
-.err-text{display:none;font-size:12.5px;color:#b3261e;font-weight:600;margin-top:5px}.err-text.show{display:block}
-input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:99px;background:#F3E2BC;outline:none;cursor:pointer}
+.err-text{display:none;font-size:12.5px;color:#F28B82;font-weight:600;margin-top:5px}.err-text.show{display:block}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:99px;background:#2C2C35;outline:none;cursor:pointer}
 input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:22px;height:22px;border-radius:50%;background:linear-gradient(135deg,#F59E0B,#F97316);border:2.5px solid #fff;box-shadow:0 2px 6px rgba(180,110,0,.45);cursor:pointer}
 input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:#F97316;border:2.5px solid #fff;box-shadow:0 2px 6px rgba(180,110,0,.45);cursor:pointer}
-input[type=range]::-moz-range-track{height:6px;border-radius:99px;background:#F3E2BC}
+input[type=range]::-moz-range-track{height:6px;border-radius:99px;background:#2C2C35}
 input[type=checkbox]{width:19px;height:19px;accent-color:#22A06B;cursor:pointer}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .picker-row{display:flex;gap:10px;flex-wrap:wrap}
-.pick-btn{flex:1;padding:12px;border-radius:14px;border:1.5px solid #E9DCBE;background:#FFFDF7;cursor:pointer;font-family:inherit;text-align:left}
-.pick-btn b{display:block;font-size:13.5px;color:#33302A}.pick-btn span{font-size:12px;color:#6E6455}
+.pick-btn{flex:1;padding:12px;border-radius:14px;border:1.5px solid #2C2C35;background:#1E1E24;cursor:pointer;font-family:inherit;text-align:left}
+.pick-btn b{display:block;font-size:13.5px;color:#F2F2F5}.pick-btn span{font-size:12px;color:#9A9AA5}
 .switch-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0}
-.tgl{width:50px;height:28px;border-radius:999px;background:#D8CBA6;position:relative;cursor:pointer;flex:0 0 50px}
+.tgl{width:50px;height:28px;border-radius:999px;background:#3A3A45;position:relative;cursor:pointer;flex:0 0 50px}
 .tgl::after{content:'';position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:all .18s}
 .tgl.on{background:#F59E0B}.tgl.on::after{left:25px}
-video.preview{width:100%;border-radius:12px;background:#0E2233}
-video.preview.framed{max-height:25vh;object-fit:contain}
-.file-info{font-size:12.5px;color:#8A7B5C;margin-top:6px;word-break:break-all}
+video.preview{width:100%;border-radius:12px;background:#000}
+video.preview.framed{max-height:40vh;object-fit:contain}
+.file-info{font-size:12.5px;color:#9A9AA5;margin-top:6px;word-break:break-all}
 /* waveform loading */
 .wave{display:none;align-items:flex-end;gap:2.5px;height:16px}
 .wave i{display:block;width:3.5px;background:currentColor;border-radius:2px;animation:wv 0.9s ease-in-out infinite}
 .wave i:nth-child(2){animation-delay:.12s}.wave i:nth-child(3){animation-delay:.24s}.wave i:nth-child(4){animation-delay:.36s}.wave i:nth-child(5){animation-delay:.48s}
 @keyframes wv{0%,100%{height:5px}50%{height:16px}}
 .btn.loading .wave{display:inline-flex}.btn.loading .btn-label{opacity:.85}
+.pill-btn.loading .wave{display:inline-flex}.pill-btn.loading .btn-label{opacity:.85}
 body.locked{overflow:hidden}
-/* bottom sheet */
+/* bottom sheet — ONLY for the small pickers (voice detail / audio source) */
 .sheet-wrap{position:fixed;left:0;right:0;bottom:0;top:var(--sheetTop,0px);z-index:100;display:none}
 .sheet-wrap.open{display:block}
-.sheet-bg{position:absolute;inset:0;background:rgba(43,32,8,.5)}
-.sheet{position:absolute;left:0;right:0;bottom:0;max-width:640px;margin:0 auto;background:#FFFDF7;border-radius:24px 24px 0 0;padding:20px 18px 28px;color:#2E2A23;max-height:56vh;overflow:auto}
+.sheet-bg{position:absolute;inset:0;background:rgba(5,5,8,.5)}
+.sheet{position:absolute;left:0;right:0;bottom:0;max-width:640px;margin:0 auto;background:#17171C;border-radius:24px 24px 0 0;padding:20px 18px 28px;color:#F2F2F5;max-height:56vh;overflow:auto}
 .sheet h3{font-size:16px;font-weight:800;margin-bottom:12px}
-.opt{width:100%;text-align:left;padding:14px;border-radius:14px;border:1.5px solid #EFE3C2;background:#fff;margin-bottom:9px;cursor:pointer;font-family:inherit}
-.opt b{display:block;font-size:14px;color:#33302A}.opt span{font-size:12.5px;color:#6E6455}
-.opt.sel{border-color:#F59E0B;background:#FEF3C7}
+.opt{width:100%;text-align:left;padding:14px;border-radius:14px;border:1.5px solid #2C2C35;background:#1B1B21;margin-bottom:9px;cursor:pointer;font-family:inherit;color:#F2F2F5}
+.opt b{display:block;font-size:14px;color:#F2F2F5}.opt span{font-size:12.5px;color:#9A9AA5}
+.opt.sel{border-color:#F59E0B;background:rgba(245,158,11,.14)}
 /* notices */
-#notice{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:200;width:min(520px,calc(100% - 28px));display:none;padding:13px 16px;border-radius:15px;font-size:13.5px;font-weight:600;box-shadow:0 14px 34px rgba(60,40,0,.30)}
+#notice{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:200;width:min(520px,calc(100% - 28px));display:none;padding:13px 16px;border-radius:15px;font-size:13.5px;font-weight:600;box-shadow:0 14px 34px rgba(0,0,0,.5)}
 #notice.show{display:block}#notice.ok{background:#e6f7ee;color:#0a5c36;border:1px solid #7fd6a8}#notice.err{background:#fdecea;color:#8c1d18;border:1px solid #f0a49e}#notice.info{background:#FFF3CF;color:#7A5200;border:1px solid #F3CD72}
-#donePop{position:fixed;inset:0;z-index:210;display:none;place-items:center;background:rgba(43,32,8,.5)}
+#donePop{position:fixed;inset:0;z-index:210;display:none;place-items:center;background:rgba(5,5,8,.55)}
 #donePop.show{display:grid}
-#donePop .box{background:#fff;color:#2E2A23;border-radius:22px;padding:26px 22px;width:min(400px,calc(100% - 40px));text-align:center}
-.logbox{background:#10222E;color:#FFE1A8;border-radius:13px;padding:11px 13px;font-size:11.5px;max-height:130px;overflow:auto;white-space:pre-wrap;word-break:break-all;margin-top:10px;display:none}
-@media(max-width:720px){.layout{padding:10px 10px 112px}}
-/* ===== player card (compact, normal flow — NOT sticky, so it can never
-   overlay the Mode band or the Features list) + placeholder + overlays ===== */
-.vid-pin{background:#fff;padding:14px}
-/* V207: ONLY the video frame is pinned — sticky directly under the app bar,
-   compact (frame capped at 25vh). Everything else scrolls beneath it. */
-.vid-sticky{position:sticky;top:var(--appbarH,56px);z-index:80;background:#fff;border:1px solid #F1E4C4;border-radius:18px;padding:10px;box-shadow:0 8px 20px rgba(146,110,20,.10);margin-bottom:12px}
-.vid-pin .btn.primary{padding:11px 18px}
+#donePop .box{background:#1E1E24;color:#F2F2F5;border:1px solid #2C2C35;border-radius:22px;padding:26px 22px;width:min(400px,calc(100% - 40px));text-align:center}
+.logbox{background:#0A141C;color:#FFE1A8;border-radius:13px;padding:11px 13px;font-size:11.5px;max-height:130px;overflow:auto;white-space:pre-wrap;word-break:break-all;margin-top:10px;display:none}
+/* ===== preview zone (large, centred, top) + placeholder + overlays ===== */
+.vid-sticky{flex:0 0 auto;background:#000;padding:8px 10px 6px}
 .pick-row{display:flex;align-items:center;gap:10px;margin-bottom:10px}
 .pick-row .file-info{margin-top:0}
-.vid-wrap{position:relative}
-.ph-box{background:#0E2233;border-radius:12px;aspect-ratio:16/9;max-height:24vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;cursor:pointer}
+.vid-wrap{position:relative;max-width:600px;margin:0 auto}
+.ph-box{background:#0E2233;border-radius:12px;aspect-ratio:16/9;max-height:38vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;cursor:pointer}
 .ph-ic{font-size:38px}
 .ph-t{font-size:15px;font-weight:700;color:#E8F0F5}
 .ph-s{font-size:12px;color:#8FA6B5}
@@ -117,83 +118,86 @@ body.locked{overflow:hidden}
 .text-overlay{position:absolute;transform:translate(-50%,-50%);font-weight:700;line-height:1.5;color:#fff;text-shadow:0 0 7px rgba(0,0,0,.95),0 2px 4px rgba(0,0,0,.95);pointer-events:auto;cursor:grab;touch-action:none;display:none;z-index:6;white-space:pre-line;text-align:center;font-family:'Padauk','Noto Sans Myanmar',sans-serif;padding:2px 8px}
 .text-overlay:active{cursor:grabbing}
 .frame-border{position:absolute;inset:0;border:3px solid #FFE92E;border-radius:14px;pointer-events:none;display:none;z-index:7}
-/* custom transport (reference form, orange seek thumb) */
-.transport{display:flex;align-items:center;gap:7px;margin-top:9px}
-.tp-play{width:38px;height:38px;flex:0 0 38px;border-radius:50%;border:1.5px solid #E9DCBE;background:#fff;color:#16303F;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center}
-.tp-skip{padding:9px 10px;border-radius:10px;border:1.5px solid #E9DCBE;background:#FFFDF7;color:#E8710A;font-family:inherit;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap}
-.tp-time{font-size:12.5px;font-weight:700;color:#3A352B;min-width:34px;text-align:center}
+/* custom transport (dark, orange seek thumb) */
+.transport-wrap{flex:0 0 auto;padding:6px 12px 2px;background:#0B0B0F}
+.transport{display:flex;align-items:center;gap:7px}
+.tp-play{width:38px;height:38px;flex:0 0 38px;border-radius:50%;border:1.5px solid #2C2C35;background:#1E1E24;color:#F2F2F5;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.tp-skip{padding:9px 10px;border-radius:10px;border:1.5px solid #2C2C35;background:#1E1E24;color:#FBBF24;font-family:inherit;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap}
+.tp-time{font-size:12.5px;font-weight:700;color:#C9C9D2;min-width:34px;text-align:center}
 .transport input[type=range]{flex:1;min-width:40px;width:auto}
-/* mode band (pale yellow, under the transport) */
-.mode-band{background:#FFF3CF;border:1.5px solid #F3CD72;border-radius:16px;padding:10px 12px;margin-top:12px}
-.mode-row{display:flex;align-items:center;gap:10px}
-.mode-label{font-size:13.5px;font-weight:800;color:#7A5200;white-space:nowrap}
-.mode-field{flex:1;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 14px;border-radius:13px;border:1.5px solid #F59E0B;background:#fff;font-family:inherit;font-size:14px;font-weight:700;color:#3A352B;cursor:pointer;text-align:left;min-width:0}
-.mode-field span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.mode-chev{color:#D97706;font-size:15px;flex:0 0 auto}
-/* tool chips */
-.chips-row{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
-.tool-chip{padding:8px 11px;border-radius:999px;border:1.5px solid #E9DCBE;background:#FFFDF7;color:#4A4234;font-family:inherit;font-size:12.5px;font-weight:700;cursor:pointer}
-.tool-chip.on{border-color:#F59E0B;background:#FEF3C7;color:#B45309}
-/* ===== studio card ===== */
-.studio-status{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:#5C5344;margin:2px 0 14px}
+/* ===== V210 timeline (CapCut-style: ruler + video / subtitle / voice tracks) ===== */
+.tl-wrap{flex:0 0 auto;background:#101014;border-top:1px solid #26262E;border-bottom:1px solid #26262E;padding:6px 0 8px}
+.tl-scroll{overflow-x:auto;overflow-y:hidden}
+.tl-inner{position:relative;min-width:100%}
+.tl-ruler{position:relative;height:15px;cursor:pointer}
+.tl-tick{position:absolute;top:0;height:15px;line-height:15px;font-size:9px;color:#9A9AA5;border-left:1px solid #3A3A45;padding-left:3px;white-space:nowrap}
+.tl-track{position:relative;height:24px}
+.tl-track-subs{height:28px}
+.tl-block{position:absolute;top:3px;border-radius:4px;font-size:10px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:pointer;font-family:inherit;text-align:left}
+.tl-vblock{height:18px;line-height:18px;padding:0 6px;background:#2A2A33;border:1px solid #3A3A45;color:#F2F2F5}
+.tl-sblock{height:22px;line-height:22px;padding:0 5px;background:rgba(245,158,11,.22);border:1px solid #B97A0E;color:#FFD9A0}
+.tl-sblock.cur{background:#F59E0B;border-color:#F59E0B;color:#1A1206;font-weight:700}
+.tl-voblock{height:18px;line-height:18px;padding:0 6px;background:#1F3D2B;border:1px solid #25B373;color:#A7E8C6}
+.tl-voblock.stale{background:repeating-linear-gradient(45deg,#3A2329,#3A2329 6px,#2A1A1F 6px,#2A1A1F 12px);border-color:#8A4B52;color:#F0A49E}
+.tl-playhead{position:absolute;top:0;bottom:0;width:2px;background:#F97316;box-shadow:0 0 6px rgba(249,115,22,.8);z-index:4;pointer-events:none}
+/* ===== studio deck (HOME panel content) ===== */
+.studio-status{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:#C9C9D2;margin:2px 0 14px}
 .studio-status .dot{width:9px;height:9px;border-radius:50%;background:#22C55E;flex:0 0 9px;box-shadow:0 0 0 3px rgba(34,197,94,.18)}
 .chip-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 @media(max-width:420px){.chip-grid{grid-template-columns:repeat(2,1fr)}}
-.style-chip,.voice-chip{padding:12px 8px;border-radius:14px;border:1.5px solid #E9DCBE;background:#FFFDF7;font-family:inherit;font-size:13.5px;font-weight:700;color:#4A4234;cursor:pointer;text-align:center}
-.style-chip.sel,.voice-chip.sel{border-color:#F59E0B;background:#FEF3C7;color:#B45309}
+.style-chip,.voice-chip{padding:12px 8px;border-radius:14px;border:1.5px solid #2C2C35;background:#1B1B21;font-family:inherit;font-size:13.5px;font-weight:700;color:#C9C9D2;cursor:pointer;text-align:center}
+.style-chip.sel,.voice-chip.sel{border-color:#F59E0B;background:rgba(245,158,11,.14);color:#FBBF24}
 .voice-labelrow{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px}
-.voice-labelrow>label{font-size:13px;font-weight:700;color:#3A352B;margin-bottom:0}
-.field .duck-chk{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;color:#159947;cursor:pointer;margin-bottom:0}
+.voice-labelrow>label{font-size:13px;font-weight:700;color:#E8E8ED;margin-bottom:0}
+.field .duck-chk{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;color:#34D399;cursor:pointer;margin-bottom:0}
 .btn-row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
 .btn-row2 .btn{width:100%;padding:9px 10px;font-size:13px;white-space:nowrap}
-.sliders-box{margin-top:16px;border-top:1.5px solid #F3E7C8;padding-top:14px}
 /* SRT cue editor rows */
-.cue-row{display:flex;gap:6px;align-items:flex-start;padding:8px;border:1.5px solid #EFE3C2;border-radius:12px;margin-bottom:8px;background:#FFFDF8}
-.cue-row.cur{border-color:#F59E0B;background:#FEF3C7}
-.cue-row input[type=number]{width:66px;padding:7px 6px;border-radius:9px;border:1.5px solid #E7D9B4;font-family:inherit;font-size:12.5px;color:#2E2A23}
-.cue-row textarea{flex:1;padding:7px 9px;border-radius:9px;border:1.5px solid #E7D9B4;font-family:inherit;font-size:13px;line-height:1.55;resize:vertical;min-height:36px;color:#2E2A23;background:#fff}
+.cue-row{display:flex;gap:6px;align-items:flex-start;padding:8px;border:1.5px solid #2C2C35;border-radius:12px;margin-bottom:8px;background:#1B1B21}
+.cue-row.cur{border-color:#F59E0B;background:rgba(245,158,11,.12)}
+.cue-row input[type=number]{width:66px;padding:7px 6px;border-radius:9px;border:1.5px solid #2C2C35;font-family:inherit;font-size:12.5px;color:#F2F2F5;background:#101014}
+.cue-row textarea{flex:1;padding:7px 9px;border-radius:9px;border:1.5px solid #2C2C35;font-family:inherit;font-size:13px;line-height:1.55;resize:vertical;min-height:36px;color:#F2F2F5;background:#101014}
 .cue-times{display:flex;flex-direction:column;gap:4px}
-.cue-times label{font-size:9.5px;color:#A08D63;font-weight:700}
-.cue-ic{width:32px;height:32px;flex:0 0 32px;border-radius:9px;border:none;background:#FEF3C7;color:#B45309;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center}
-.cue-ic.del{background:#fdecea;color:#b3261e}
-.warnbox{margin-top:10px;padding:10px 12px;border-radius:12px;background:#fdf3e3;color:#8a5a00;font-size:13px;font-weight:600;line-height:1.55}
+.cue-times label{font-size:9.5px;color:#8A8A95;font-weight:700}
+.cue-ic{width:32px;height:32px;flex:0 0 32px;border-radius:9px;border:none;background:rgba(245,158,11,.16);color:#FBBF24;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center}
+.cue-ic.del{background:rgba(179,38,30,.20);color:#F0A49E}
+.warnbox{margin-top:10px;padding:10px 12px;border-radius:12px;background:rgba(245,158,11,.12);color:#FBBF24;font-size:13px;font-weight:600;line-height:1.55}
 /* voice mini player */
 .vp-row{display:flex;align-items:center;gap:10px}
 .vp-play{width:42px;height:42px;flex:0 0 42px;border-radius:50%;border:none;background:linear-gradient(135deg,#F59E0B,#F97316);color:#fff;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center}
-.vp-track{flex:1;height:6px;border-radius:99px;background:#F3E2BC;overflow:hidden}
+.vp-track{flex:1;height:6px;border-radius:99px;background:#2C2C35;overflow:hidden}
 .vp-bar{height:100%;width:0%;background:#F59E0B;border-radius:99px;transition:width .2s linear}
-.vp-time{font-size:12px;color:#8A7B5C;font-weight:600;white-space:nowrap}
-/* ===== fixed bottom action bar (reference) ===== */
-.bottombar{position:fixed;left:0;right:0;bottom:0;z-index:90;background:#fff;border-top:1.5px solid #F0DFB4;box-shadow:0 -6px 18px rgba(146,110,20,.10);padding:10px 12px calc(10px + env(safe-area-inset-bottom))}
-.bottombar-in{max-width:980px;margin:0 auto;display:flex;gap:9px}
-.bottombar .btn{border-radius:14px}
-.bottombar .btn.green{flex:1}
-.feat-row{display:flex;align-items:center;gap:11px;width:100%;padding:13px 12px;border:1.5px solid #F1E4C4;border-radius:15px;background:#FFFDF7;margin-bottom:9px;cursor:pointer;font-family:inherit;text-align:left}
-.feat-row:last-child{margin-bottom:0}
-.feat-ic{font-size:19px;flex:0 0 28px;text-align:center}
-.feat-main{flex:1;min-width:0}
-.feat-main b{display:block;font-size:14.5px;color:#33302A}
-.feat-sum{display:block;font-size:12px;color:#8A7B5C;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
-.feat-chev{font-size:19px;color:#D97706;font-weight:800;flex:0 0 auto}
-/* ===== V208: status strip (inside the pinned frame) + 3-tap action deck ===== */
-.status-strip{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;font-size:11.5px;font-weight:700;color:#8A7B5C}
-.status-strip span{background:#FFF8E8;border:1px solid #F1E4C4;border-radius:999px;padding:3px 9px;white-space:nowrap}
-.status-strip span b{color:#0a5c36}
+.vp-time{font-size:12px;color:#9A9AA5;font-weight:600;white-space:nowrap}
+/* ===== V210 status strip (under the preview frame) ===== */
+.status-strip{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;font-size:11.5px;font-weight:700;color:#9A9AA5;max-width:600px;margin-left:auto;margin-right:auto}
+.status-strip span{background:#17171C;border:1px solid #26262E;border-radius:999px;padding:3px 9px;white-space:nowrap}
+.status-strip span b{color:#34D399}
 .deck-sec{margin-top:14px}
-.deck-ttl{font-size:13.5px;font-weight:800;color:#3A352B;margin-bottom:8px}
+.deck-sec:first-child{margin-top:2px}
+.deck-ttl{font-size:13.5px;font-weight:800;color:#F2F2F5;margin-bottom:8px}
 .mode-btns{display:grid;grid-template-columns:1fr 1fr;gap:9px}
-.mode-btn{padding:12px 10px;border-radius:15px;border:1.5px solid #E9DCBE;background:#FFFDF7;font-family:inherit;cursor:pointer;text-align:center;width:100%}
-.mode-btn b{display:block;font-size:15px;color:#3A352B}
-.mode-btn span{display:block;font-size:11.5px;color:#8A7B5C;margin-top:2px;font-weight:600}
-.mode-btn.sel{border-color:#F59E0B;background:#FEF3C7}
-.mode-btn.sel b{color:#B45309}
+.mode-btn{padding:12px 10px;border-radius:15px;border:1.5px solid #2C2C35;background:#1B1B21;font-family:inherit;cursor:pointer;text-align:center;width:100%}
+.mode-btn b{display:block;font-size:15px;color:#F2F2F5}
+.mode-btn span{display:block;font-size:11.5px;color:#9A9AA5;margin-top:2px;font-weight:600}
+.mode-btn.sel{border-color:#F59E0B;background:rgba(245,158,11,.14)}
+.mode-btn.sel b{color:#FBBF24}
 .mode-btn:disabled{opacity:.55;cursor:default}
 .style-row{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}
 .style-row .style-chip{padding:8px 11px;border-radius:999px;font-size:12.5px}
+/* ===== V210 bottom panel + toolbar (CapCut-style) ===== */
+.panel{flex:1;min-height:0;display:flex;flex-direction:column;background:#17171C;border-top:1px solid #26262E}
+.panel-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px 2px}
+.panel-title{font-size:15px;font-weight:800;color:#F2F2F5}
+.panel-done{padding:7px 16px;border-radius:999px;border:none;background:linear-gradient(90deg,#F59E0B,#F97316);color:#fff;font-weight:800;font-family:inherit;cursor:pointer;font-size:13px;flex:0 0 auto}
+.panel-body{flex:1;min-height:0;overflow-y:auto;padding:12px 14px 18px}
+.toolbar{flex:0 0 auto;display:flex;gap:2px;overflow-x:auto;background:#101014;border-top:1px solid #26262E;padding:8px 6px calc(8px + env(safe-area-inset-bottom))}
+.tool-btn{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:3px;min-width:56px;padding:7px 4px;border:none;background:transparent;color:#C9C9D2;font-family:inherit;font-size:10.5px;font-weight:600;cursor:pointer;border-radius:10px}
+.tool-btn .tic{font-size:19px;line-height:1}
+.tool-btn.sel{color:#FBBF24;background:rgba(245,158,11,.12)}
 </style>
 </head>
 <body>
-<header class="appbar"><div class="appbar-in"><button class="icon-btn" id="recap-drawerBtn" aria-label="Menu">☰</button><div class="appbar-ttl">🎬 Movie Recaps</div><div class="appbar-btns"><button class="pill-btn" id="recap-voiceTest">🔊 စမ်းသပ်</button><button class="pill-btn" id="recap-swap">🔀 Swap Video</button></div></div></header>
+<header class="appbar"><div class="appbar-in"><button class="icon-btn" id="recap-drawerBtn" aria-label="Menu">☰</button><div class="appbar-ttl">🎬 Movie Recaps</div><div class="appbar-btns"><button class="pill-btn" id="recap-voiceTest">🔊 စမ်းသပ်</button><button class="pill-btn" id="recap-swap">🔀 Swap Video</button><button class="pill-btn export-pill" id="recap-export"><span class="wave"><i></i><i></i><i></i><i></i><i></i></span><span class="btn-label">🎬 Export</span></button></div></div></header>
 <div class="layout"><main class="main">
 <!-- Recap editor — the app's single feature; content injected by JS -->
 <section class="tabpage active" id="page-recap"></section>
@@ -218,6 +222,11 @@ const FF_WASM='https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm/ffmpeg-core.wasm';
 const ASPECTS={blurpad:{label:'9:16 — 1:1 ပုံ + Blur နောက်ခံ',desc:'ပုံ အလယ် 1:1၊ အပေါ်/အောက် blur၊ စာတန်း ပုံအောက်တွင်'},full916:{label:'9:16 — အပြည့် ဖြတ်',desc:'9:16 အပြည့် crop'},original:{label:'မူရင်း Aspect',desc:'မူရင်း အချိုးအတိုင်း'}};
 const VOICES=['Kore','Puck','Charon','Leda','Aoede'];
 const DEF={aspect:'blurpad',blur:28,voice:'Kore',subPosY:0.81};
+/* V210 subtitle containment: the subtitle band's TOP must stay within
+   4%–88% of the frame height so the whole band is always inside the frame.
+   ONE clamp shared by the preview slider + on-frame drag, the persisted
+   setting and the export band mapping — what he sees is what exports. */
+function clampSubPos(f){f=(typeof f==='number'&&isFinite(f))?f:0.81;return Math.max(0.04,Math.min(0.88,f))}
 function loadSettings(){try{return Object.assign({},DEF,JSON.parse(localStorage.getItem('recaps_settings')||'{}'))}catch(e){return Object.assign({},DEF)}}
 let SETTINGS=loadSettings();
 function saveSettings(){localStorage.setItem('recaps_settings',JSON.stringify(SETTINGS))}
@@ -291,19 +300,21 @@ const voiceChipsField='<div class="field"><label>🗣️ စကားပြေ�
 const duckField='<div class="field"><label class="duck-chk"><input type="checkbox" id="'+p+'-autoDuck" checked> BGM အလိုအလျောက် လျှော့မည်</label><p class="hint">အသံ အသစ် ရွေးလိုက်ရင် BGM ကို 15% သို့ အလိုအလျောက် လျှော့ပေးမည်</p></div>';
 const scriptHome=subsFieldRecap
 +'<div id="'+p+'-aiTxWrap" style="display:none;margin-top:4px"><div class="switch-row"><div><b style="font-size:14px">မူရင်း စာသား (AI ကြားရသလောက်)</b><div style="font-size:12px;color:#527884">ဖတ်ရန်သာ — ပြင်၍ မရပါ</div></div><button class="btn light small" id="'+p+'-aiTxTgl">ဖျောက်</button></div><div class="field" id="'+p+'-f-transcript" style="margin-bottom:0"><textarea id="'+p+'-transcript" readonly placeholder="AI ထုတ်ထားသော မူရင်း စာသား ဒီမှာ ပေါ်ပါမယ်"></textarea></div></div>'
-+'<button class="btn light" id="'+p+'-recreate" style="width:100%;margin-top:12px">🎬 Recaps ပြန်လုပ်</button><p class="hint" style="margin-top:6px">ပုံစံ ပြန်ရွေးပြီး Script အသစ် ပြန်ထုတ်ရန် (လက်ရှိ Script နှင့် cue များကို အစားထိုးပါမယ်)</p>';
++'<button class="btn light" id="'+p+'-recreate" style="width:100%;margin-top:12px">🎬 Recaps ပြန်လုပ်</button><p class="hint" style="margin-top:6px">ပုံစံ ပြန်ရွေးပြီး Script အသစ် ပြန်ထုတ်ရန် (လက်ရှိ Script နှင့် cue များကို အစားထိုးပါမယ်)</p>'
++'<button class="btn danger" id="'+p+'-clearAll" style="width:100%;margin-top:14px">🗑️ Script + စာတန်း အကုန် ဖျက်</button><p class="hint" style="margin-top:6px">Script, cue အားလုံး, မူရင်း စာသားနှင့် ထုတ်ထားသော အသံကို ဖျက်ပါမယ် — Video, Trim, Mode ရွေးထားတာတွေကို မထိပါ</p>';
 const subsHome=subToggleRow
 +'<p style="margin:8px 0 10px">Cue တစ်ခု၏ ▶ ကို နှိပ်ရင် video က အဲဒီ နေရာသို့ ရောက်သွားပါမယ်။ ဒီမှာ ပြင်လိုက်တာနဲ့ video ပေါ်က စာတန်းလည်း တန်း ပြောင်းပါမယ်။</p>'
-+'<div class="field"><label>စာတန်း နေရာ (အပေါ်/အောက်) — <span id="'+p+'-subPosVal">81%</span></label><input type="range" id="'+p+'-subPos" min="5" max="95" step="1" value="81"><p class="hint">Video ပေါ်က စာတန်းကို ဖိဆွဲပြီးလည်း ရွှေ့နိုင်ပါတယ် (Export မှာပါ ဒီ နေရာ သုံးပါမယ်)</p></div>'
++'<div class="field"><label>စာတန်း နေရာ (အပေါ်/အောက်) — <span id="'+p+'-subPosVal">81%</span></label><input type="range" id="'+p+'-subPos" min="4" max="88" step="1" value="81"><p class="hint">စာတန်း band တစ်ခုလုံး frame အထဲမှာ ဝင်အောင် 4%–88% အတွင်းသာ ရွှေ့လို့ရပါတယ်။ Video ပေါ်က စာတန်းကို ဖိဆွဲပြီးလည်း ရွှေ့နိုင်ပါတယ် (Export မှာပါ ဒီ နေရာ သုံးပါမယ်)</p></div>'
 +'<div class="picker-row" style="margin-bottom:10px;align-items:center"><button class="btn light small" id="'+p+'-subPosReset">↺ အလယ် ပြန်ထား</button><button class="btn light small" id="'+p+'-cueRebuild">↻ Script မှ အချိန် ပြန်ခွဲ</button><button class="btn light small" id="'+p+'-cueAdd">➕ Cue ထည့်</button></div>'
 +'<div class="file-info" id="'+p+'-cueCount" style="margin-bottom:10px">စာတန်း ၀ ကြောင်း</div><div id="'+p+'-cueList"></div><div class="warnbox" id="'+p+'-cueWarn" style="display:none"></div>'
 +'<div style="margin-top:10px">'+srtRow+'</div>';
 const voiceHome=voiceChipsField+audioInner
 +'<button class="btn primary outline" id="'+p+'-voiceGen" style="width:100%" disabled><span class="wave"><i></i><i></i><i></i><i></i><i></i></span><span class="btn-label">🎙️ အသံ ထုတ်မည်</span></button><div class="file-info" id="'+p+'-voiceStatus"></div><p class="hint" style="margin:6px 0 0">စာတန်း ပြင်ပြီးမှ အသံ ထုတ်ပါ</p><div id="'+p+'-voiceStale" style="display:none" class="warnbox">⚠️ စာသား ပြင်ထားပါတယ် — အသံ ပြန်ထုတ်ရန် လိုပါတယ်</div><div id="'+p+'-voicePlayer" style="display:none;margin-top:12px"><div class="vp-row"><button class="vp-play" id="'+p+'-vpPlay">▶️</button><div class="vp-track"><div class="vp-bar" id="'+p+'-vpBar"></div></div><span class="vp-time" id="'+p+'-vpTime">0:00 / —</span></div><audio id="'+p+'-vpAudio" style="display:none"></audio></div>'
-+genSpeedField+adjSpeedField;
++genSpeedField+adjSpeedField
++'<button class="btn light off" id="'+p+'-audioDl" style="width:100%;margin-top:10px" aria-disabled="true">🎵 Audio ဒေါင်း</button>';
 
-const controlsInner='<div class="transport"><button class="tp-play" id="'+p+'-tpPlay">▶</button><button class="tp-skip" id="'+p+'-tpBack">⏪ 5s</button><span class="tp-time" id="'+p+'-tpCur">00:00</span><input type="range" id="'+p+'-tpSeek" min="0" max="1000" value="0"><span class="tp-time" id="'+p+'-tpDur">00:00</span><button class="tp-skip" id="'+p+'-tpFwd">5s ⏩</button></div>'
-+'<div class="deck-sec"><div class="deck-ttl">① Script</div><div class="mode-btns"><button class="mode-btn" id="'+p+'-modeOrig"><b>🎧 Original</b><span>မူရင်း အသံအတိုင်း</span></button><button class="mode-btn" id="'+p+'-modeNew"><b>✨ New</b><span>ဇာတ်ကြောင်းပြော အသစ်</span></button></div>'
+const transportInner='<div class="transport"><button class="tp-play" id="'+p+'-tpPlay">▶</button><button class="tp-skip" id="'+p+'-tpBack">⏪ 5s</button><span class="tp-time" id="'+p+'-tpCur">00:00</span><input type="range" id="'+p+'-tpSeek" min="0" max="1000" value="0"><span class="tp-time" id="'+p+'-tpDur">00:00</span><button class="tp-skip" id="'+p+'-tpFwd">5s ⏩</button></div>';
+const deckInner='<div class="deck-sec"><div class="deck-ttl">① Script</div><div class="mode-btns"><button class="mode-btn" id="'+p+'-modeOrig"><b>🎧 Original</b><span>မူရင်း အသံအတိုင်း</span></button><button class="mode-btn" id="'+p+'-modeNew"><b>✨ New</b><span>ဇာတ်ကြောင်းပြော အသစ်</span></button></div>'
 +'<div class="style-row" id="'+p+'-styleChips"><button class="style-chip sel" data-v="standard">🎙️ စံပြ</button><button class="style-chip" data-v="exciting">🔥 စိတ်လှုပ်ရှား</button><button class="style-chip" data-v="funny">😂 ဟာသ</button><button class="style-chip" data-v="natural">🌿 သဘာဝ</button><button class="style-chip" data-v="horror">👻 သရဲ</button></div><p class="hint" style="margin:6px 0 0">🎭 ဇာတ်ကြောင်းပြော ပုံစံသည် ✨ New အတွက်သာ သက်ရောက်ပါတယ်</p>'
 +'<div class="studio-status" style="margin:8px 0 0"><span class="dot"></span><span id="'+p+'-createStatus">အသင့်ဖြစ်ပါပြီ</span></div></div>'
 +'<div class="deck-sec" id="'+p+'-deckVoice"><div class="deck-ttl">② အသံ</div>'+voiceHome+'</div>'
@@ -312,19 +323,25 @@ const mixerHome=duckField+bgmField+voiceVolField+syncField;
 const textHome='<div class="switch-row"><div><b style="font-size:14px">Text ပြရန်</b><div style="font-size:12px;color:#527884">Video ပေါ်တွင် ပြပြီး လက်ဖြင့် ရွှေ့နိုင်သည် — Export တွင်လည်း ပါမည်</div></div><div class="tgl" id="'+p+'-textTgl"></div></div><div class="field"><label>စာသား</label><input type="text" id="'+p+'-textStr" placeholder="ဥပမာ — ဆက်ကြည့်ပါ"></div><div class="field" style="margin-bottom:0"><label>စာလုံး အရွယ် — <span id="'+p+'-textSizeVal">44</span></label><input type="range" id="'+p+'-textSize" min="24" max="72" step="2" value="44"></div>';
 const logoHome='<div class="switch-row"><div><b style="font-size:14px">Logo ပြရန်</b><div style="font-size:12px;color:#527884">Video ဘယ်ဘက် အပေါ်တွင် သေးသေး ပြပြီး Export တွင်လည်း ပါမည်</div></div><div class="tgl" id="'+p+'-logoTgl"></div></div><div class="field" style="margin-bottom:0"><label>Logo စာသား</label><input type="text" id="'+p+'-logoStr"></div>';
 const borderHome='<div class="switch-row"><div><b style="font-size:14px">Border ပြရန်</b><div style="font-size:12px;color:#527884">Video ပတ်လည်တွင် ရွှေရောင် ဘောင် ပြမည်</div></div><div class="tgl" id="'+p+'-borderTgl"></div></div><p class="hint">ဖွင့်ထားရင် Export လုပ်သော video တွင်လည်း ရွှေရောင် ဘောင် ပါပါမည်</p>';
-function fr(id,ic,t,sv){return '<button class="feat-row" id="'+p+'-row'+id+'"><span class="feat-ic">'+ic+'</span><span class="feat-main"><b>'+t+'</b><span class="feat-sum" id="'+p+'-sum'+id+'">'+sv+'</span></span><span class="feat-chev">›</span></button>'}
-const featuresCard='<div class="card" id="'+p+'-secFeatures"><h3>🧩 Features</h3><p style="margin-bottom:12px">Feature တစ်ခုချင်း နှိပ်ရင် သက်ဆိုင်ရာ setting များ pop-up ဖြင့် ပွင့်လာပါမယ်</p>'
-+fr('Script','📝','Script စာသား','Script မရှိသေး')
-+fr('Subs','🎨','စာတန်း','ပိတ် · စာတန်း ၀ ကြောင်း')
-+fr('Mixer','🔊','အသံ ချိန်ညှိ','BGM 0% · Voice 100%')
-+fr('Trim','✂️','Trim','Video မရွေးရသေး')
-+fr('Aspect','🌫️','Blur / Aspect',ASPECTS[SETTINGS.aspect].label)
-+fr('Title','📝','Title','မရှိ')
-+fr('Text','➕','Text','မရှိ')
-+fr('Logo','🛡️','Logo','ပိတ်')
-+fr('Border','📐','Border','ပိတ်')
-+'</div>';
+/* ---- V210 timeline + panel + toolbar (CapCut-style) ----
+   Timeline: ruler (tap seeks) + a video block (tap -> Trim panel), one
+   block per subtitle cue (tap seeks to the cue), and a voice block; the
+   playhead follows playback. Blocks are (re)built by renderTimeline(). */
+const timelineInner='<div class="tl-wrap" id="'+p+'-timeline"><div class="tl-scroll" id="'+p+'-tlScroll"><div class="tl-inner" id="'+p+'-tlInner">'
++'<div class="tl-ruler" id="'+p+'-tlRuler"></div>'
++'<div class="tl-track"><button class="tl-block tl-vblock" id="'+p+'-tlVBlock" style="display:none"></button></div>'
++'<div class="tl-track tl-track-subs" id="'+p+'-tlSubs"></div>'
++'<div class="tl-track"><div class="tl-block tl-voblock" id="'+p+'-tlVoBlock" style="display:none"></div></div>'
++'<div class="tl-playhead" id="'+p+'-tlPlay" style="left:0"></div>'
++'</div></div></div>';
+const panelInner='<div class="panel" id="'+p+'-panel"><div class="panel-head" id="'+p+'-panelHead" style="display:none"><span class="panel-title" id="'+p+'-panelTitle"></span><button class="panel-done" id="'+p+'-panelDone">✓ ပြီး</button></div><div class="panel-body" id="'+p+'-panelBody"></div></div>';
+function tb(id,ic,t){return '<button class="tool-btn" id="'+p+'-tool'+id+'" data-v="home'+id+'"><span class="tic">'+ic+'</span>'+t+'</button>'}
+const toolbarInner='<nav class="toolbar" id="'+p+'-toolbar">'
++tb('Script','🤖','Script')+tb('Subs','🎨','စာတန်း')+tb('Mixer','🔊','Mixer')+tb('Trim','✂️','Trim')+tb('Aspect','🌫️','Aspect')+tb('Title','📝','Title')+tb('Text','➕','Text')+tb('Logo','🛡️','Logo')+tb('Border','📐','Border')
++'</nav>';
+const exportInner='<div class="logbox" id="'+p+'-log"></div><div id="'+p+'-result" style="margin-top:12px"></div>';
 const homes='<div id="'+p+'-sheetHomes" style="display:none">'
++'<div id="'+p+'-homeHome">'+deckInner+'</div>'
 +'<div id="'+p+'-homeScript">'+scriptHome+'</div>'
 +'<div id="'+p+'-homeSubs">'+subsHome+'</div>'
 +'<div id="'+p+'-homeMixer">'+mixerHome+'</div>'
@@ -334,25 +351,25 @@ const homes='<div id="'+p+'-sheetHomes" style="display:none">'
 +'<div id="'+p+'-homeText">'+textHome+'</div>'
 +'<div id="'+p+'-homeLogo">'+logoHome+'</div>'
 +'<div id="'+p+'-homeBorder">'+borderHome+'</div>'
++'<div id="'+p+'-homeExport">'+exportInner+'</div>'
 +'</div>';
-const exportInner='<div class="logbox" id="'+p+'-log"></div><div id="'+p+'-result" style="margin-top:12px"></div>';
-/* ---- Layout (V208): ONLY the compact video frame is pinned (sticky
-   .vid-sticky directly under the app bar, capped at 25vh, with the
-   glanceable status strip inside the pin) so feature edits are visible
-   LIVE on the video; beneath it scrolls the action deck (transport ->
-   ① Script mode buttons + style chips + Create status -> ② အသံ voice
-   block -> preview/insert), then ONE Features list card of setting rows
-   (each row opens its settings as a bottom sheet BELOW the pinned video;
-   controls live in the hidden #sheetHomes), and a slim Export card that
-   stays hidden until it has content. The daily job is 3 taps:
-   video -> ① mode button -> ② အသံ ထုတ်မည် -> bottom-bar Export. ---- */
+/* ---- Layout (V210, CapCut-style): dark editor that fills the viewport —
+   the page itself never scrolls. Top bar carries the Export pill
+   (top-right). Then: large preview frame + status strip, transport, the
+   TIMELINE (ruler / video / subtitle / voice tracks + playhead), the
+   bottom PANEL (HOME = the 3-tap action deck; a toolbar tool swaps the
+   panel to that tool's controls, ✓ ပြန် returns home — the preview is
+   never covered), and the TOOLBAR fixed at the very bottom. Control
+   blocks live in the hidden #sheetHomes and are mounted into the panel
+   one at a time (single-instance, like the old sheets). The daily job
+   stays 3 taps: video -> ① mode button -> ② အသံ ထုတ်မည် -> Export. ---- */
 return ''
 +'<div class="vid-sticky" id="'+p+'-framePin">'+frameInner+'</div>'
-+'<div class="card vid-pin" id="'+p+'-secPlayer">'+controlsInner+'</div>'
-+featuresCard
-+homes
-+'<div class="card" id="'+p+'-secExport" style="display:none"><h3>🎬 Export</h3><p style="margin-bottom:10px">Export ရလဒ်နှင့် log ကို ဒီမှာ ပြပါမယ်။ Setting များကို 🧩 Features မှာ ပြင်နိုင်ပါတယ် — Export မှာ စာတန်း burn-in နှင့် SRT ဖိုင်သည် 🎨 စာတန်း ကတ်က cue အချိန် အတိအကျ အတူတူ သုံးပါတယ် (⏱️ Sync Delay နှင့် အသံ ချိန်ညှိ တန်ဖိုးများပါ သက်ရောက်ပါတယ်)။</p>'+exportInner+'</div>'
-+'<div class="bottombar"><div class="bottombar-in"><button class="btn green" id="'+p+'-export"><span class="wave"><i></i><i></i><i></i><i></i><i></i></span><span class="btn-label">🎬 Export MP4</span></button><button class="btn light off" id="'+p+'-audioDl" aria-disabled="true">🎵 Audio</button><button class="btn light" id="'+p+'-srtBtn2">📝 SRT</button></div></div>';
++'<div class="transport-wrap" id="'+p+'-transport">'+transportInner+'</div>'
++timelineInner
++panelInner
++toolbarInner
++homes;
 }
 $('#page-recap').innerHTML=editorHTML('recap');
 syncPinGeometry();
@@ -362,7 +379,7 @@ const editors={};
 function fieldErr(p,key,msg){const f=$('#'+p+'-f-'+key),e=$('#'+p+'-e-'+key);if(f)f.classList.add('bad');if(e){e.textContent=msg;e.classList.add('show')}if(f)f.scrollIntoView({behavior:'smooth',block:'center'})}
 function clearErrs(p){['start','end','title','subs'].forEach(k=>{const f=$('#'+p+'-f-'+k),e=$('#'+p+'-e-'+k);if(f)f.classList.remove('bad');if(e)e.classList.remove('show')});const fi=$('#'+p+'-fileinfo');if(fi)fi.style.color=''}
 function makeEditor(p){
- const ed={p,file:null,url:null,duration:0,aspect:SETTINGS.aspect,blur:SETTINGS.blur,audioMode:'original',voice:SETTINGS.voice,busy:false,ttsEngine:'gemini',edgeVoice:'my-MM-ThihaNeural',voiceCache:null,voiceUrl:null,bgmVol:0,voiceVol:100,syncDelay:0,subPosY:(typeof SETTINGS.subPosY==='number'?SETTINGS.subPosY:0.81),subPosCustom:!!SETTINGS.subPosCustom};
+ const ed={p,file:null,url:null,duration:0,aspect:SETTINGS.aspect,blur:SETTINGS.blur,audioMode:'original',voice:SETTINGS.voice,busy:false,ttsEngine:'gemini',edgeVoice:'my-MM-ThihaNeural',voiceCache:null,voiceUrl:null,bgmVol:0,voiceVol:100,syncDelay:0,subPosY:clampSubPos(typeof SETTINGS.subPosY==='number'?SETTINGS.subPosY:0.81),subPosCustom:!!SETTINGS.subPosCustom};
  editors[p]=ed;
  const E=id=>$('#'+p+'-'+id);
  function refreshLabels(){$$('#'+p+'-aspectOpts .opt').forEach(o=>o.classList.toggle('sel',o.dataset.v===ed.aspect));E('blurVal').textContent=ed.blur;E('blur').value=ed.blur;E('audioBtn').textContent=ed.audioMode==='voice'?'🎙️ အသံအသစ် (Gemini voiceover)':'🔊 မူရင်းအသံ';E('voiceBtn').textContent=ed.ttsEngine==='edge'?edgeVoiceLabel(ed.edgeVoice):ed.voice;const s=parseFloat(E('start').value)||0,en=parseFloat(E('end').value)||0;E('durinfo').textContent=ed.duration?fmtDur(Math.max(0,en-s))+' (မူရင်း '+fmtDur(ed.duration)+')':'—';if(window.__refreshFeatureSummaries)window.__refreshFeatureSummaries()}
@@ -557,7 +574,7 @@ async function exportOne(ff,ed,seg,idx,total,log){
  else if(ed.aspect==='full916'){W=720;H=1280;picW=720;picH=1280;picY=0;subY=1060}
  else{const vw=ed.videoW||1280,vh=ed.videoH||720;const sc=Math.min(1,720/vw);W=Math.max(2,Math.round(vw*sc/2)*2);H=Math.max(2,Math.round(vh*sc/2)*2);picW=W;picH=H;picY=0;subY=H-170}
  /* dragged subtitle position: % of frame height -> top of the export subtitle band */
- if(ed.subPosCustom)subY=Math.max(0,Math.min(H-170,Math.round((ed.subPosY||0.81)*H)));
+ if(ed.subPosCustom)subY=Math.round(clampSubPos(ed.subPosY)*H); /* V210: same 4%–88% containment as the preview slider/drag */
  const useSub=$('#'+ed.p+'-subTgl').classList.contains('on')&&seg.cues.length;
  const useTitle=$('#'+ed.p+'-titleTgl').classList.contains('on')&&($('#'+ed.p+'-title').value||'').trim();
  const fetchFile=window.FFmpegUtil&&window.FFmpegUtil.fetchFile;
@@ -641,7 +658,8 @@ async function exportEditor(ed){
  /* --- run --- */
  ed.busy=true;const btn=E('export');btn.classList.add('loading');btn.disabled=true;btn.querySelector('.btn-label').textContent='လုပ်ဆောင်နေပါတယ်…';
  const logBox=E('log');logBox.style.display='block';logBox.textContent='';
- const secExp=E('secExport');if(secExp)secExp.style.display='';const log=m=>{logBox.textContent+=m+'\n';logBox.scrollTop=logBox.scrollHeight};
+ if(window.__recapShowExport)window.__recapShowExport(); /* V210: the Export view is a bottom panel now */
+ const log=m=>{logBox.textContent+=m+'\n';logBox.scrollTop=logBox.scrollHeight};
  E('result').innerHTML='';showNotice('▶️ Export စတင်ပါပြီ — အပိုင်း '+segments.length+' ပိုင်း','info');
  const baseName=(ed.file.name||'recap').replace(/\.[^.]+$/,'').replace(/[^\w\- ]+/g,'').trim()||'recap';
  try{
@@ -675,14 +693,17 @@ async function exportEditor(ed){
   if(window.__recapDone)window.__recapDone(3);
   showDone('✅ အသံ ရပါပြီ — Export ပြီးပါပြီ','Video '+made.length+' ပိုင်း ထုတ်ပြီးပါပြီ — အောက်က ဒေါင်း link များမှ ယူပါ။');
  }catch(err){console.error(err);log('❌ '+humanErr(err));showNotice('❌ Export မအောင်မြင်ပါ: '+humanErr(err),'err')}
- finally{ed.busy=false;ed._cachedVoice=null;ed._cachedVoiceExt=null;btn.classList.remove('loading');btn.disabled=false;btn.querySelector('.btn-label').textContent='🎬 Export MP4'}
+ finally{ed.busy=false;ed._cachedVoice=null;ed._cachedVoiceExt=null;btn.classList.remove('loading');btn.disabled=false;btn.querySelector('.btn-label').textContent='🎬 Export'}
 }
 </script>
 <script>
 /* ================= AI Script pipeline (Gemini, visitor's own key) =================
    Flow: video audio → transcript → Myanmar script (2 modes) → script box → voiceover/SRT */
+/* Model chains: gemini-3.5-flash-lite leads EVERY chain — it is the most
+   reliable model in production (2026-11-13); 3.8-flash is the 503-prone one
+   and must never lead. Both chains share this order now. */
 const GEM_MODELS=['gemini-3.5-flash-lite','gemini-3.8-flash','gemini-2.5-flash','gemini-2.5-flash-lite'];
-const GEM_MODELS_Q=['gemini-3.8-flash','gemini-3.5-flash-lite','gemini-2.5-flash','gemini-2.5-flash-lite'];
+const GEM_MODELS_Q=['gemini-3.5-flash-lite','gemini-3.8-flash','gemini-2.5-flash','gemini-2.5-flash-lite'];
 async function geminiGen(key,parts,temp,statusFn,qFirst){
  const sleep=ms=>new Promise(r=>setTimeout(r,ms));
  let lastErr=null,quotaErr=null,busyErr=null;
@@ -690,17 +711,17 @@ async function geminiGen(key,parts,temp,statusFn,qFirst){
   for(let attempt=0;attempt<2;attempt++){
    let res,data,timedOut=false;
    const ctl=(typeof AbortController!=='undefined')?new AbortController():null;
-   const timer=ctl?setTimeout(()=>{timedOut=true;ctl.abort()},60000):null;
+   const timer=ctl?setTimeout(()=>{timedOut=true;ctl.abort()},45000):null;
    try{
     res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+model+':generateContent',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify({contents:[{parts}],generationConfig:{temperature:(temp==null?0.2:temp)}}),signal:ctl?ctl.signal:undefined});
     if(timer)clearTimeout(timer);
     data=await res.json().catch(()=>({}));
    }catch(netErr){
     if(timer)clearTimeout(timer);
-    if(timedOut){ /* a 60s timeout is handled exactly like a 503 (busy): record busyErr, retry once after the busy wait, then move to the next model */
-     const err=new Error('Gemini ('+model+') — 60 စက္ကန့် အတွင်း ပြန်မရပါ (timeout)');lastErr=err;if(!busyErr)busyErr=err;
-     if(attempt===0){if(statusFn)statusFn('⏳ Google server busy ဖြစ်နေလို့ 6 စက္ကန့် စောင့်ပြီး ပြန်ကြိုးစားနေပါတယ်… ('+model+')');await sleep(6000);continue}
-     break;
+    if(timedOut){ /* a 45s timeout is handled exactly like a 503 (busy): record it and move straight to the next model — a busy model never gets a second attempt */
+     const err=new Error('Gemini ('+model+') — 45 စက္ကန့် အတွင်း ပြန်မရပါ (timeout)');lastErr=err;if(!busyErr)busyErr=err;
+     if(statusFn)statusFn('⏳ Google server busy ဖြစ်နေလို့ နောက် model ပြောင်းနေပါတယ်… ('+model+')');
+     await sleep(2000);break;
     }
     lastErr=netErr;break;
    }
@@ -714,11 +735,15 @@ async function geminiGen(key,parts,temp,statusFn,qFirst){
    const err=new Error('Gemini အမှား '+res.status+' ('+model+'): '+msg);lastErr=err;
    const modelErr=res.status===404||/not found|not supported/i.test(msg);
    if(modelErr)break;
-   if(res.status===429||res.status>=500){
-    if(res.status===429&&!quotaErr)quotaErr=err;
-    if(res.status>=500&&!busyErr)busyErr=err;
-    if(attempt===0){const wait=res.status===429?20000:6000;if(statusFn)statusFn('⏳ '+(res.status===429?'Quota ပြည့်နေလို့':'Google server busy ဖြစ်နေလို့')+' '+Math.round(wait/1000)+' စက္ကန့် စောင့်ပြီး ပြန်ကြိုးစားနေပါတယ်… ('+model+')');await sleep(wait);continue}
+   if(res.status===429){ /* quota: wait ~20s and retry the SAME model once, then move on */
+    if(!quotaErr)quotaErr=err;
+    if(attempt===0){if(statusFn)statusFn('⏳ Quota ပြည့်နေလို့ 20 စက္ကန့် စောင့်ပြီး ပြန်ကြိုးစားနေပါတယ်… ('+model+')');await sleep(20000);continue}
     break;
+   }
+   if(res.status>=500){ /* busy/overloaded: ONE attempt only — a short pause, then the NEXT model (a busy model used to burn a second 45-60s attempt here) */
+    if(!busyErr)busyErr=err;
+    if(statusFn)statusFn('⏳ Google server busy ဖြစ်နေလို့ နောက် model ပြောင်းနေပါတယ်… ('+model+')');
+    await sleep(2000);break;
    }
    throw err;
   }
@@ -729,38 +754,131 @@ async function geminiGen(key,parts,temp,statusFn,qFirst){
 }
 function cleanLines(txt){return String(txt||'').split('\n').map(s=>s.replace(/^```[a-z]*$/i,'').trim()).filter(Boolean)}
 function u8ToB64(u8){let s='';const STEP=0x8000;for(let i=0;i<u8.length;i+=STEP)s+=String.fromCharCode.apply(null,u8.subarray(i,Math.min(u8.length,i+STEP)));return btoa(s)}
-/* --- extract the trim-range audio as <=60s MP3 chunks via the shared ffmpeg instance ---
+/* ---------- per-chunk result cache — the resume half of the speed fix ----------
+   A completed chunk is never re-requested: results live in a memory map and
+   are persisted per file signature (file+size+trim, the txSignature) in
+   localStorage. Text only and bounded (<=1MB per signature, one signature
+   kept — the app edits one video at a time); quota errors fall back to
+   memory-only silently. Transcription chunks key on (sig, 'tx', index);
+   translation chunks key on (sig, 'tr:'+content hash, 0) so a chunk is only
+   ever reused for the exact source lines it translated. */
+const chunkCacheMem=new Map();
+function strHash(s){let h=5381;for(let i=0;i<s.length;i++)h=((h<<5)+h+s.charCodeAt(i))|0;return (h>>>0).toString(36)}
+function chunkLsKey(sig){return 'recaps_chunks_'+strHash(sig)}
+function chunkStoreLoad(sig){
+ if(chunkCacheMem.has(sig))return chunkCacheMem.get(sig);
+ let store={};
+ try{const raw=localStorage.getItem(chunkLsKey(sig));if(raw)store=JSON.parse(raw)||{}}catch(e){}
+ chunkCacheMem.set(sig,store);return store;
+}
+function chunkCacheGet(sig,stage,idx){
+ if(!sig)return null;
+ const v=chunkStoreLoad(sig)[stage+':'+idx];return (typeof v==='string')?v:null;
+}
+function chunkCachePut(sig,stage,idx,text){
+ if(!sig)return;
+ const store=chunkStoreLoad(sig);store[stage+':'+idx]=text;
+ try{
+  const raw=JSON.stringify(store);
+  if(raw.length>1000000)return; /* too big to persist — memory-only */
+  const lk=chunkLsKey(sig);const dead=[];
+  for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&k.indexOf('recaps_chunks_')===0&&k!==lk)dead.push(k)}
+  dead.forEach(k=>{try{localStorage.removeItem(k)}catch(e){}});
+  localStorage.setItem(lk,raw);
+ }catch(e){/* quota / private mode → memory-only */}
+}
+/* Bounded parallel map: at most `limit` workers in flight, result order
+   preserved. On the first failure no new work starts; in-flight calls still
+   finish (and cache) before the error is thrown. */
+async function poolMap(items,limit,worker){
+ const out=new Array(items.length);let next=0,firstErr=null;
+ async function runner(){
+  while(next<items.length){
+   const i=next++;
+   if(firstErr)return;
+   try{out[i]=await worker(items[i],i)}catch(e){if(!firstErr)firstErr=e;return}
+  }
+ }
+ const rs=[];for(let k=0;k<Math.min(limit,items.length);k++)rs.push(runner());
+ await Promise.all(rs);
+ if(firstErr)throw firstErr;
+ return out;
+}
+/* --- transcription: <=60s audio chunks, extracted serially but transcribed
+   through a pool of 3 as soon as each chunk's audio is ready ---
    60s chunks: a single long transcription call can return partial output (proven live
    2026-11-12: a 73s video came back as one tail fragment; a 99.8s test call returned
-   only the first ~50s). Per-chunk calls + ordered concatenation cover start to end. */
+   only the first ~50s). Per-chunk calls + ordered concatenation cover start to end.
+   Speed (2026-11-13): ffmpeg.wasm is a single instance, so extraction stays
+   serial — but it is fast local work; the API calls are the cost, so each one
+   fires the moment ITS chunk is extracted instead of after all of them, and
+   3 run at once. Completed chunks are cached (chunkCachePut) so a re-run
+   resumes at the first missing chunk. extractOne(i) must return chunk i's
+   audio bytes; it is only called for chunks with no cached result. */
 const AI_NO_AUDIO='AI_NO_AUDIO';
-async function extractAiAudio(ff,ed,start,end){
- const fetchFile=window.FFmpegUtil&&window.FFmpegUtil.fetchFile;
- await ff.writeFile('ai_in.mp4',fetchFile?await fetchFile(ed.file):new Uint8Array(await ed.file.arrayBuffer()));
- const chunks=[];const CHUNK=60;
- try{
-  for(let s=start;s<end-0.05;s+=CHUNK){
-   const e=Math.min(end,s+CHUNK);const fn='ai_a'+chunks.length+'.mp3';
-   const code=await ff.exec(['-ss',s.toFixed(2),'-i','ai_in.mp4','-t',(e-s).toFixed(2),'-vn','-ac','1','-ar','16000','-b:a','32k',fn],600000);
-   if(code!==0){if(chunks.length===0)throw new Error(AI_NO_AUDIO);throw new Error('အသံ ထုတ်ရာတွင် ffmpeg exit code '+code)}
-   chunks.push(await ff.readFile(fn));
-   try{await ff.deleteFile(fn)}catch(e2){}
+const TRANSCRIBE_PROMPT='Transcribe ALL of the speech in this audio clip exactly, in its original language, from the very beginning to the very end. Every sentence, in the order spoken — do NOT skip, shorten, summarize or stop early, even if the clip is long. One sentence per line. If a word is unclear, write your best hearing of it and keep going until the end of the audio. Output ONLY the transcript lines — no translation, no labels, no commentary.';
+async function transcribeChunksPiped(key,total,extractOne,statusFn,sig,seeded){
+ let done=0;for(let i=0;i<total;i++)if(seeded[i]!=null)done++;
+ const report=()=>{if(statusFn)statusFn('🎧 နားထောင်/စာဖော်: အပိုင်း '+done+'/'+total+' ✓')};
+ if(total>1&&done>0)report();
+ const jobs=[];const waiters=[];let closed=false,firstErr=null;
+ const push=j=>{if(waiters.length)waiters.shift()(j);else jobs.push(j)};
+ const take=()=>{if(jobs.length)return Promise.resolve(jobs.shift());if(closed)return Promise.resolve(null);return new Promise(r=>waiters.push(r))};
+ async function worker(){
+  for(;;){
+   const job=await take();if(!job)return;
+   if(firstErr)continue; /* failed already: drain without new calls (serial semantics) */
+   try{
+    const txt=await geminiGen(key,[{inlineData:{mimeType:'audio/mp3',data:u8ToB64(job.audio)}},{text:TRANSCRIBE_PROMPT}],0.2,statusFn);
+    seeded[job.i]=txt;chunkCachePut(sig,'tx',job.i,txt);done++;if(total>1)report();
+   }catch(e){if(!firstErr)firstErr=e}
   }
- }finally{try{await ff.deleteFile('ai_in.mp4')}catch(e3){}}
- return chunks;
-}
-async function transcribeChunks(key,chunks,statusFn){
- const texts=[];
- for(let ci=0;ci<chunks.length;ci++){const ch=chunks[ci];if(ci>0)await new Promise(r=>setTimeout(r,2500));
-  if(statusFn&&chunks.length>1)statusFn('📝 စာသား ထုတ်နေပါတယ်… အပိုင်း '+(ci+1)+'/'+chunks.length);
-  const parts=[{inlineData:{mimeType:'audio/mp3',data:u8ToB64(ch)}},{text:'Transcribe ALL of the speech in this audio clip exactly, in its original language, from the very beginning to the very end. Every sentence, in the order spoken — do NOT skip, shorten, summarize or stop early, even if the clip is long. One sentence per line. If a word is unclear, write your best hearing of it and keep going until the end of the audio. Output ONLY the transcript lines — no translation, no labels, no commentary.'}];
-  texts.push(await geminiGen(key,parts,0.2,statusFn));
  }
- return texts.join('\n');
+ const workers=[];for(let w=0;w<Math.min(3,total);w++)workers.push(worker());
+ let extractErr=null;
+ try{
+  for(let i=0;i<total;i++){
+   if(seeded[i]!=null)continue;
+   push({i,audio:await extractOne(i)});
+  }
+ }catch(e){extractErr=e}
+ closed=true;while(waiters.length)waiters.shift()(null);
+ await Promise.all(workers);
+ if(extractErr)throw extractErr;
+ if(firstErr)throw firstErr;
+ return seeded;
 }
-async function translateFaithful(key,transcript,statusFn){
- const prompt='Translate the following transcript into natural SPOKEN Burmese (Myanmar language) — translate the MEANING of every sentence, the way a real person would SAY it out loud in Burmese, NOT formal written style.\nRules:\n- Translate sentence by sentence: keep EXACTLY the same number of lines, one output line per input line, in the same order.\n- Translate what each sentence MEANS. Every ordinary word must be replaced by its Burmese meaning — NEVER write a foreign word as a Burmese sound-spelling of how it sounds. Sound-spelling (transliterating) ordinary words is FORBIDDEN.\n- The ONLY exception: names of people and places (proper names) that have no Burmese equivalent may be written in Burmese script the way they sound.\n- Keep facts accurate — translate faithfully, do not add or remove content, do not invent facts.\n- Write ALL numbers as Burmese words (for example တစ်သောင်း, နှစ်ဆယ်, သုံးရာ) — never use digits.\n- Use natural spoken forms, not stiff written forms.\n- Output ONLY the Burmese lines — no labels, no notes, no blank lines.\n\nTranscript:\n'+transcript;
- return geminiGen(key,[{text:prompt}],0.2,statusFn,true);
+function translatePrompt(group){
+ return 'Translate the following transcript into natural SPOKEN Burmese (Myanmar language) — translate the MEANING of every sentence, the way a real person would SAY it out loud in Burmese, NOT formal written style.\nRules:\n- Translate sentence by sentence: keep EXACTLY the same number of lines — the transcript below has exactly '+group.length+' lines — one output line per input line, in the same order.\n- Translate what each sentence MEANS. Every ordinary word must be replaced by its Burmese meaning — NEVER write a foreign word as a Burmese sound-spelling of how it sounds. Sound-spelling (transliterating) ordinary words is FORBIDDEN.\n- The ONLY exception: names of people and places (proper names) that have no Burmese equivalent may be written in Burmese script the way they sound.\n- Keep facts accurate — translate faithfully, do not add or remove content, do not invent facts.\n- Write ALL numbers as Burmese words (for example တစ်သောင်း, နှစ်ဆယ်, သုံးရာ) — never use digits.\n- Use natural spoken forms, not stiff written forms.\n- Output ONLY the Burmese lines — no labels, no notes, no blank lines.\n\nTranscript:\n'+group.join('\n');
+}
+/* Faithful translation, chunked for speed + reliability (2026-11-13): the
+   transcript is split into groups of 15 lines and the groups are translated
+   through a pool of 3 (order preserved). One giant call for a long video was
+   both slow and prone to truncated output; a group whose line count drifts
+   gets ONE retry, then its first result is kept (same tolerance as the old
+   single call). Completed groups are cached by content hash (see above). */
+async function translateFaithful(key,transcript,statusFn,sig){
+ const lines=cleanLines(transcript);
+ if(!lines.length)return '';
+ const GROUP=15;const groups=[];
+ for(let i=0;i<lines.length;i+=GROUP)groups.push(lines.slice(i,i+GROUP));
+ const total=groups.length;let done=0;
+ const report=()=>{if(statusFn)statusFn('🌐 ဘာသာပြန်: အပိုင်း '+done+'/'+total+' ✓')};
+ if(total>1)report();
+ const outs=await poolMap(groups,3,async group=>{
+  const ck='tr:'+strHash(group.join('\n'));
+  if(sig){const c=chunkCacheGet(sig,ck,0);if(c!=null){done++;if(total>1)report();return c}}
+  let out=cleanLines(await geminiGen(key,[{text:translatePrompt(group)}],0.2,statusFn,true));
+  if(out.length!==group.length){
+   const out2=cleanLines(await geminiGen(key,[{text:translatePrompt(group)}],0.2,statusFn,true));
+   if(out2.length===group.length)out=out2;
+  }
+  const text=out.join('\n');
+  if(sig)chunkCachePut(sig,ck,0,text);
+  done++;if(total>1)report();
+  return text;
+ });
+ return outs.join('\n');
 }
 async function sampleFrames(ed,start,end){
  const v=$('#'+ed.p+'-video');if(!v||!v.videoWidth||!ed.url)return[];
@@ -840,14 +958,14 @@ function unifiedCues(ed){
     builds cues; Voice entry refreshes its gates). doneStep / undoneStep /
     renderSteps are intentional no-ops so older call sites stay valid. */
  function goStep(i){
-  /* one-screen + feature sheets: 0 -> player card, 1 -> စာတန်း sheet,
-     2 -> deck ② အသံ section, 3 -> export card (visible only once it has content) */
+  /* V210 panels: 0 -> HOME panel (the deck), 1 -> စာတန်း panel,
+     2 -> HOME panel scrolled to the ② အသံ deck section, 3 -> Export panel */
   i=Math.max(0,Math.min(3,i));
   if(previewMode&&i!==1&&i!==2)exitPreview(true);
-  if(i===1){ensureCues();updateVoiceWarn();openFeatureSheet('homeSubs','🎨 စာတန်း')}
-  else if(i===2){checkVoiceStale();refreshVoiceGate();updateVoiceWarn();const t=E('deckVoice');if(t)t.scrollIntoView({behavior:'smooth',block:'start'})}
-  else if(i===0){const t=E('secPlayer');if(t)t.scrollIntoView({behavior:'smooth',block:'start'})}
-  else if(i===3){const t=E('secExport');if(t&&t.style.display!=='none')t.scrollIntoView({behavior:'smooth',block:'start'})}
+  if(i===1){showPanel('homeSubs','🎨 စာတန်း')}
+  else if(i===2){checkVoiceStale();refreshVoiceGate();updateVoiceWarn();showPanel('homeHome');const t=E('deckVoice');if(t)t.scrollIntoView({behavior:'smooth',block:'start'})}
+  else if(i===0){showPanel('homeHome')}
+  else if(i===3){showPanel('homeExport','🎬 Export')}
   updateOverlay(true);
  }
  function doneStep(){}
@@ -861,7 +979,7 @@ function unifiedCues(ed){
  function trimRange(){const s=parseFloat(E('start').value),e=parseFloat(E('end').value);return{start:isNaN(s)?0:s,end:isNaN(e)?0:e}}
  function cueSigNow(){const r=trimRange();return scriptLines().join('\n')+'|'+r.start+'|'+r.end}
  function cuesStale(){return !ed.cues.length||ed.cuesSig!==cueSigNow()}
- function rebuildCues(){ed.cues=unifiedCues(ed);ed.cuesSig=cueSigNow();ed.cuesManual=false;renderCueList();updateCueCount();if(ed.cues.length)doneStep(1)}
+ function rebuildCues(){ed.cues=unifiedCues(ed);ed.cuesSig=cueSigNow();ed.cuesManual=false;renderCueList();updateCueCount();renderTimeline();if(ed.cues.length)doneStep(1)}
  function ensureCues(){
   if(!cuesStale()){renderCueList();updateCueCount();return}
   if(ed.cuesManual&&ed.cues.length){renderCueList();updateCueCount();showNotice('⚠️ Script/Trim ပြောင်းထားပါတယ် — လက်ရှိ ပြင်ထားသော cue များကို ထိန်းထားပါတယ်။ ပြန်ခွဲချင်ရင် "↻ Script မှ အချိန် ပြန်ခွဲ" နှိပ်ပါ','info');return}
@@ -878,10 +996,10 @@ function unifiedCues(ed){
     +'<button class="cue-ic del" title="ဒီ cue ဖျက်">🗑</button>';
    const cs=row.querySelector('.cs'),ce=row.querySelector('.ce'),ct=row.querySelector('.ct');
    row.querySelector('.seek').onclick=()=>{try{vidEl.currentTime=cue.start;vidEl.play().catch(()=>{})}catch(e){}updateOverlay(true)};
-   row.querySelector('.del').onclick=()=>{ed.cues.splice(i,1);ed.cuesManual=true;renderCueList();updateCueCount();updateOverlay(true)};
-   cs.onchange=()=>{let v=parseFloat(cs.value);if(isNaN(v)||v<0)v=cue.start;cue.start=Math.min(v,Math.max(0,cue.end-0.1));cs.value=cue.start.toFixed(1);ed.cuesManual=true;updateOverlay(true)};
-   ce.onchange=()=>{let v=parseFloat(ce.value);if(isNaN(v))v=cue.end;cue.end=Math.max(v,cue.start+0.1);ce.value=cue.end.toFixed(1);ed.cuesManual=true;updateOverlay(true)};
-   ct.addEventListener('input',()=>{cue.text=ct.value;ed.cuesManual=true;updateOverlay(true)});
+   row.querySelector('.del').onclick=()=>{ed.cues.splice(i,1);ed.cuesManual=true;renderCueList();updateCueCount();updateOverlay(true);renderTimeline()};
+   cs.onchange=()=>{let v=parseFloat(cs.value);if(isNaN(v)||v<0)v=cue.start;cue.start=Math.min(v,Math.max(0,cue.end-0.1));cs.value=cue.start.toFixed(1);ed.cuesManual=true;updateOverlay(true);renderTimeline()};
+   ce.onchange=()=>{let v=parseFloat(ce.value);if(isNaN(v))v=cue.end;cue.end=Math.max(v,cue.start+0.1);ce.value=cue.end.toFixed(1);ed.cuesManual=true;updateOverlay(true);renderTimeline()};
+   ct.addEventListener('input',()=>{cue.text=ct.value;ed.cuesManual=true;updateOverlay(true);renderTimeline()});
    box.appendChild(row);
   });
  }
@@ -890,7 +1008,7 @@ function unifiedCues(ed){
   const r=trimRange();const last=ed.cues[ed.cues.length-1];
   const s=last?last.end:r.start;const e=r.end?Math.min(r.end,s+2):s+2;
   if(r.end&&s>=r.end-0.05){showNotice('⚠️ Cue အသစ် ထည့်ရန် နေရာ မကျန်တော့ပါ — ✂️ Trim Feature မှာ Trim ဆုံးချိန်ကို အရင် ရှည်ပေးပါ','err');return}
-  ed.cues.push({text:'',start:s,end:e});ed.cuesManual=true;renderCueList();updateCueCount();
+  ed.cues.push({text:'',start:s,end:e});ed.cuesManual=true;renderCueList();updateCueCount();renderTimeline();
   const rows=E('cueList').children;const nr=rows[rows.length-1];if(nr){nr.scrollIntoView({behavior:'smooth',block:'center'});const t=nr.querySelector('.ct');if(t)t.focus()}
  };
  /* --- live subtitle overlay on the video frame (SRT section + combined preview) --- */
@@ -898,14 +1016,51 @@ function unifiedCues(ed){
  function cueAt(t){for(let i=0;i<ed.cues.length;i++){if(t>=ed.cues[i].start&&t<ed.cues[i].end)return i}return -1}
  function updateOverlay(){
   if(!overlayEl)return;
-  if(!overlayActive()){overlayEl.style.display='none';return}
+  if(!overlayActive()){overlayEl.style.display='none';updatePlayhead();return}
   const t=(previewMode?previewTime():vidEl.currentTime)-(ed.syncDelay||0); /* ⏱️ Sync Delay: display-time shift only */
   const i=cueAt(t);
   if(i<0||!ed.cues[i].text){overlayEl.style.display='none'}else{overlayEl.textContent=ed.cues[i].text;overlayEl.style.display='block'}
   const rows=E('cueList')?E('cueList').children:[];for(let k=0;k<rows.length;k++)rows[k].classList.toggle('cur',k===i);
+  updatePlayhead();
  }
  vidEl.addEventListener('timeupdate',()=>{if(!previewMode)updateOverlay()});
  vidEl.addEventListener('seeked',()=>{if(!previewMode)updateOverlay()});
+ /* ================= V210 timeline (CapCut-style tracks) =================
+    Ruler (tap = seek) + a video block spanning the trimmed range (tap ->
+    Trim panel), one block per subtitle cue (width/position ∝ cue timing,
+    tap = seek to the cue), and a voice block (hatched + labelled when the
+    voice is stale). Rebuilt whenever cues / trim / voice change; the
+    playhead follows playback and the strip auto-scrolls to keep it in
+    view. Scale: 12 px per second. */
+ const TL_PPS=12;
+ function renderTimeline(){
+  const inner=E('tlInner');if(!inner)return;
+  const dur=ed.duration||0,r=trimRange();
+  const scroller=E('tlScroll');const cw=(scroller&&scroller.clientWidth)||0;
+  inner.style.width=Math.max(cw,Math.ceil(dur*TL_PPS))+'px';
+  const ruler=E('tlRuler');
+  if(ruler){ruler.innerHTML='';const step=dur>180?30:(dur>90?15:(dur>45?10:5));for(let t=0;t<=dur+0.001;t+=step){const tick=document.createElement('span');tick.className='tl-tick';tick.style.left=(t*TL_PPS)+'px';tick.textContent=fmtDur(t);ruler.appendChild(tick)}}
+  const vb=E('tlVBlock');
+  if(vb){if(ed.file&&dur>0){vb.style.display='block';vb.style.left=(r.start*TL_PPS)+'px';vb.style.width=Math.max(24,(r.end-r.start)*TL_PPS)+'px';vb.textContent='🎬 '+(ed.file.name||'video')+' · '+fmtDur(Math.max(0,r.end-r.start))}else vb.style.display='none'}
+  const subs=E('tlSubs');ed._tlBlocks=[];
+  if(subs){subs.innerHTML='';(ed.cues||[]).forEach(cue=>{const b=document.createElement('button');b.className='tl-block tl-sblock';b.style.left=(cue.start*TL_PPS)+'px';b.style.width=Math.max(16,(cue.end-cue.start)*TL_PPS)+'px';b.textContent=graphemeList(cue.text||'').slice(0,8).join('');b.onclick=()=>{try{vidEl.currentTime=cue.start;vidEl.play().catch(()=>{})}catch(e){}updateOverlay(true)};subs.appendChild(b);ed._tlBlocks.push(b)})}
+  const vo=E('tlVoBlock');
+  if(vo){const c=ed.voiceCache;if(c&&c.dur){const vd=c.dur/effSpeedOf(ed);const stale=!voiceFresh();vo.style.display='block';vo.style.left=(r.start*TL_PPS)+'px';vo.style.width=Math.max(24,vd*TL_PPS)+'px';vo.classList.toggle('stale',stale);vo.textContent='🎙️ အသံ '+fmtDur(vd)+(stale?' · အသံ မကိုက်တော့':'')}else vo.style.display='none'}
+  updatePlayhead();
+ }
+ function updatePlayhead(){
+  const ph=E('tlPlay');if(!ph)return;
+  const t=previewMode?previewTime():(vidEl.currentTime||0);
+  ph.style.left=(t*TL_PPS)+'px';
+  const ci=cueAt(t-(ed.syncDelay||0));
+  if(ed._tlBlocks)ed._tlBlocks.forEach((b,k)=>{if(b)b.classList.toggle('cur',k===ci)});
+  const sc=E('tlScroll');
+  if(sc&&!vidEl.paused&&sc.clientWidth){const x=t*TL_PPS;if(x<sc.scrollLeft+30||x>sc.scrollLeft+sc.clientWidth-60)sc.scrollLeft=Math.max(0,x-sc.clientWidth/3)}
+ }
+ const tlRulerEl=E('tlRuler');
+ if(tlRulerEl)tlRulerEl.onclick=e=>{const inner=E('tlInner');if(!inner||!ed.duration)return;const rect=inner.getBoundingClientRect();const t=Math.max(0,Math.min(ed.duration,((e.clientX||0)-rect.left)/TL_PPS));try{vidEl.currentTime=t}catch(err){}updateOverlay(true);updatePlayhead()};
+ const tlVB=E('tlVBlock');if(tlVB)tlVB.onclick=()=>showPanel('homeTrim','✂️ Trim');
+ window.__recapTimeline=renderTimeline;
  /* --- draggable subtitle position (the reference studio's draggable texts):
     drag the live subtitle band up/down on the frame. The position is a
     fraction of the frame height, remembered on the editor + settings, used
@@ -916,7 +1071,7 @@ function unifiedCues(ed){
  (function(){
   let drag=null;const wrap=overlayEl.parentElement;
   overlayEl.addEventListener('pointerdown',e=>{drag={y:e.clientY,frac:(ed.subPosY||0.81)};try{overlayEl.setPointerCapture(e.pointerId)}catch(err){}e.preventDefault()});
-  overlayEl.addEventListener('pointermove',e=>{if(!drag||!wrap)return;const r=wrap.getBoundingClientRect();if(!r.height)return;let f=drag.frac+(e.clientY-drag.y)/r.height;f=Math.max(0.02,Math.min(0.95,f));ed.subPosY=f;applySubPos();updateSubPosLabel()});
+  overlayEl.addEventListener('pointermove',e=>{if(!drag||!wrap)return;const r=wrap.getBoundingClientRect();if(!r.height)return;let f=drag.frac+(e.clientY-drag.y)/r.height;f=clampSubPos(f);ed.subPosY=f;applySubPos();updateSubPosLabel()});
   const endDrag=()=>{if(!drag)return;drag=null;ed.subPosCustom=true;SETTINGS.subPosY=ed.subPosY;SETTINGS.subPosCustom=true;saveSettings()};
   overlayEl.addEventListener('pointerup',endDrag);
   overlayEl.addEventListener('pointercancel',endDrag);
@@ -976,7 +1131,7 @@ function unifiedCues(ed){
  }
  E('previewBtn').onclick=()=>previewMode?exitPreview():enterPreview();
  /* new source file: reset cues + preview state, refresh step locks */
- window.__recapNavRefresh=()=>{if(previewMode)exitPreview(true);ed.cues=[];ed.cuesSig='';ed.cuesManual=false;renderCueList();updateCueCount();renderSteps()};
+ window.__recapNavRefresh=()=>{if(previewMode)exitPreview(true);ed.cues=[];ed.cuesSig='';ed.cuesManual=false;renderCueList();updateCueCount();renderSteps();renderTimeline()};
  /* ================= shared helpers ================= */
  function setCreateStatus(t){const s=E('createStatus');if(s)s.textContent=t}
  /* every Create-pipeline stage reports on the step-1 status line */
@@ -1010,26 +1165,48 @@ function unifiedCues(ed){
  function txSignature(v){return (ed.file?ed.file.name+'|'+ed.file.size:'')+'|'+v.start+'|'+v.end}
  async function transcribeStage(v){
   const ff=await getFFmpeg(()=>{});
-  setCreateStatus('🔊 အသံ ထုတ်နေပါတယ်…');
-  let chunks;
-  try{chunks=await extractAiAudio(ff,ed,v.start,v.end)}
-  catch(ae){
-   if(ae&&ae.message===AI_NO_AUDIO){setCreateStatus('⚠️ ဒီ video မှာ အသံ မပါပါ');return 'empty'}
-   throw ae;
+  const sig=txSignature(v);
+  let N=0;for(let s=v.start;s<v.end-0.05;s+=60)N++;
+  if(!N){setCreateStatus('⚠️ စကားပြော မကြားရပါ');return 'empty'}
+  /* per-chunk resume: seed from the chunk cache — cached chunks are neither
+     re-extracted nor re-requested */
+  const seeded=new Array(N).fill(null);let cachedN=0;
+  for(let i=0;i<N;i++){const c=chunkCacheGet(sig,'tx',i);if(c!=null){seeded[i]=c;cachedN++}}
+  if(cachedN===N){
+   setCreateStatus('✅ စာသား အပိုင်းများ ရှိပြီးသား — ပြန်သုံးပါတယ် ('+N+'/'+N+')');
+  }else{
+   if(cachedN>0)setCreateStatus('↩️ ပြီးသား အပိုင်း '+cachedN+'/'+N+' ပြန်သုံးပါတယ် — ကျန်တာ ဆက်ထုတ်နေတယ်…');
+   else setCreateStatus('🔊 အသံ ထုတ်နေပါတယ်…');
+   const fetchFile=window.FFmpegUtil&&window.FFmpegUtil.fetchFile;
+   await ff.writeFile('ai_in.mp4',fetchFile?await fetchFile(ed.file):new Uint8Array(await ed.file.arrayBuffer()));
+   let pipeErr=null;
+   try{
+    await transcribeChunksPiped(v.key,N,async i=>{
+     const s=v.start+i*60,e=Math.min(v.end,s+60),fn='ai_a'+i+'.mp3';
+     const code=await ff.exec(['-ss',s.toFixed(2),'-i','ai_in.mp4','-t',(e-s).toFixed(2),'-vn','-ac','1','-ar','16000','-b:a','32k',fn],600000);
+     if(code!==0){if(i===0)throw new Error(AI_NO_AUDIO);throw new Error('အသံ ထုတ်ရာတွင် ffmpeg exit code '+code)}
+     const data=await ff.readFile(fn);try{await ff.deleteFile(fn)}catch(e2){}
+     return data;
+    },setCreateStatus,sig,seeded);
+   }catch(ae){pipeErr=ae}
+   try{await ff.deleteFile('ai_in.mp4')}catch(e3){}
+   if(pipeErr){
+    if(pipeErr.message===AI_NO_AUDIO){setCreateStatus('⚠️ ဒီ video မှာ အသံ မပါပါ');return 'empty'}
+    throw pipeErr;
+   }
   }
-  setCreateStatus('📝 စာသား ထုတ်နေတယ်… (အသံ အပိုင်း '+chunks.length+' ပိုင်း)');
-  const transcript=cleanLines(await transcribeChunks(v.key,chunks,setCreateStatus)).join('\n');
+  const transcript=cleanLines(seeded.join('\n')).join('\n');
   if(!transcript){setCreateStatus('⚠️ စကားပြော မကြားရပါ');return 'empty'}
   const wrap=E('aiTxWrap');if(wrap)wrap.style.display='block';
   const tx=E('transcript');if(tx)tx.value=transcript;
-  ed.txSig=txSignature(v);
+  ed.txSig=sig;
   return 'ok';
  }
  async function convertStage(v,mode,transcript){
   let lines=[];
   if(mode==='faithful'){
    if(!transcript)return null;
-   lines=cleanLines(await translateFaithful(v.key,transcript,setCreateStatus));
+   lines=cleanLines(await translateFaithful(v.key,transcript,setCreateStatus,txSignature(v)));
   }else{
    setCreateStatus('🎞️ Scene ပုံများ ယူနေပါတယ်…');
    const frames=await sampleFrames(ed,v.start,v.end);
@@ -1114,8 +1291,45 @@ function unifiedCues(ed){
  E('modeNew').onclick=()=>chooseModeAndRun('scene');
  /* deck style chips: select-only — the chosen style feeds ✨ New runs */
  $$('#'+p+'-styleChips .style-chip').forEach(c=>{c.onclick=()=>{ed.recapStyle=c.dataset.v;$$('#'+p+'-styleChips .style-chip').forEach(x=>x.classList.toggle('sel',x===c))}});
- const recreateBtn=E('recreate');if(recreateBtn)recreateBtn.onclick=()=>{closeSheet();const t=E('secPlayer');if(t)t.scrollIntoView({behavior:'smooth',block:'start'});showNotice('🎬 ① Script မှာ 🎧 Original / ✨ New ပြန်ရွေးပြီး Script အသစ် ထုတ်ပါ — လက်ရှိ Script နှင့် cue များကို အစားထိုးပါမယ်','info')};
+ const recreateBtn=E('recreate');if(recreateBtn)recreateBtn.onclick=()=>{showPanel('homeHome');showNotice('🎬 ① Script မှာ 🎧 Original / ✨ New ပြန်ရွေးပြီး Script အသစ် ထုတ်ပါ — လက်ရှိ Script နှင့် cue များကို အစားထိုးပါမယ်','info')};
  const txTgl=E('aiTxTgl');if(txTgl)txTgl.onclick=()=>{const f=E('f-transcript');const hidden=f.style.display==='none';f.style.display=hidden?'':'none';txTgl.textContent=hidden?'ဖျောက်':'ပြ'};
+ /* ================= 🗑️ clear-all (Script panel) =================
+    Two-tap confirm: the first tap arms the button for 4 seconds, the
+    second tap executes; switching panels disarms it (showPanel calls
+    disarmClear) and so does the timeout. Executing wipes the script box,
+    the cue list, the transcript view, the generated voice (it was made
+    from that script) and the V209 per-chunk caches + whole-transcript
+    signature for the CURRENT file, so the next Create re-requests every
+    chunk. The video file, trim, mode and style selections are untouched. */
+ let clearArmTimer=null;
+ function disarmClear(){const b=E('clearAll');if(b){b.textContent='🗑️ Script + စာတန်း အကုန် ဖျက်';b.classList.remove('armed');if(b.dataset)b.dataset.armed=''}if(clearArmTimer){clearTimeout(clearArmTimer);clearArmTimer=null}}
+ const clearBtn=E('clearAll');
+ if(clearBtn)clearBtn.onclick=()=>{
+  if(!(clearBtn.dataset&&clearBtn.dataset.armed==='1')){
+   if(clearBtn.dataset)clearBtn.dataset.armed='1';
+   clearBtn.textContent='တကယ် ဖျက်မလား? ထပ်နှိပ်ပါ';clearBtn.classList.add('armed');
+   if(clearArmTimer)clearTimeout(clearArmTimer);
+   clearArmTimer=setTimeout(disarmClear,4000);
+   return;
+  }
+  disarmClear();
+  const sb=E('subs');sb.value='';if(sb.dispatchEvent)sb.dispatchEvent(new Event('input'));
+  ed.cues=[];ed.cuesSig='';ed.cuesManual=false;renderCueList();updateCueCount();
+  const txEl=E('transcript');if(txEl)txEl.value='';const txW=E('aiTxWrap');if(txW)txW.style.display='none';
+  const sigs={};const cs0=txSignature(trimRange());if(cs0)sigs[cs0]=1;if(ed.txSig)sigs[ed.txSig]=1;
+  Object.keys(sigs).forEach(sg=>{chunkCacheMem.delete(sg);try{localStorage.removeItem(chunkLsKey(sg))}catch(e){}});
+  ed.txSig=null;
+  if(previewMode)exitPreview(true);
+  if(ed.voiceUrl){try{URL.revokeObjectURL(ed.voiceUrl)}catch(e){}ed.voiceUrl=null}
+  if(ed.renderUrl){try{URL.revokeObjectURL(ed.renderUrl)}catch(e){}ed.renderUrl=null}
+  ed.voiceCache=null;ed._effVoice=null;
+  const vp=E('voicePlayer');if(vp)vp.style.display='none';
+  const va=E('vpAudio');if(va){try{va.pause()}catch(e){}va.src=''}
+  setVoiceStatus('');
+  const adl9=E('audioDl');if(adl9)adl9.classList.add('off');
+  renderTimeline();checkVoiceStale();refreshVoiceGate();updateVoiceWarn();updateOverlay(true);refreshSummaries();
+  showNotice('🗑️ အကုန် ဖျက်ပြီးပါပြီ','ok');
+ };
  /* ================= voiceover (gated on script, engine choice, cache + mini player) ================= */
  function effVoice(){return ed.ttsEngine==='edge'?ed.edgeVoice:ed.voice}
  function voiceFresh(){const c=ed.voiceCache;return !!(c&&c.text===scriptText()&&c.engine===ed.ttsEngine&&c.voice===effVoice())}
@@ -1165,15 +1379,14 @@ function unifiedCues(ed){
   }catch(err){console.error(err);showNotice('❌ စမ်းသပ်အသံ ထုတ်မရပါ: '+humanErr(err),'err')}
   finally{vtBtn.disabled=false}
  };
- /* fixed bottom bar: 🎵 Audio (download the current effective voice) + 📝 SRT
-    (forwards to the in-card button, so the SRT path stays single) */
+ /* 🎵 Audio (in the HOME panel's voice block): download the current
+    effective voice. 📝 SRT lives in the စာတန်း panel (single path). */
  const adl=E('audioDl');
  if(adl)adl.onclick=()=>{
   const u=ed.renderUrl||ed.voiceUrl;
   if(!u){showNotice('⚠️ Audio ဒေါင်းရန် အသံ အရင် လိုပါတယ် — ② အသံ မှာ "🎙️ အသံ ထုတ်မည်" အရင် နှိပ်ပါ','err');return}
   const a=document.createElement('a');a.href=u;a.download=(((ed.file&&ed.file.name)||'recap').replace(/\.[^.]+$/,'').replace(/[^\w\- ]+/g,'').trim()||'recap')+'_voice.'+(ed.renderUrl?'wav':(ed.voiceCache?ed.voiceCache.ext:'wav'));document.body.appendChild(a);a.click();a.remove();showNotice('✅ အသံ ဖိုင် ဒေါင်းနေပါပြီ','ok');
  };
- const sb2=E('srtBtn2');if(sb2)sb2.onclick=()=>{const b=E('srtBtn');if(b)b.click()};
  if(duckEl&&duckEl.checked)applyAutoDuck();
  async function runVoiceGen(){
   if(ed.voiceBusy)return;
@@ -1193,6 +1406,7 @@ function unifiedCues(ed){
    E('voicePlayer').style.display='block';
    setVoiceStatus('🎙️ အသံ ရပါပြီ — ကြာချိန် တိုင်းနေပါတယ်…');
    ed.voiceCache.dur=await probeAudioDur(gv.bytes,gv.ext);
+   renderTimeline();
    updateVoiceWarn();
    const vi=voiceDurInfo();
    setVoiceStatus('✅ အသံ ရပါပြီ — နားထောင်ကြည့်ပါ။'+(vi?' အသံ ~'+vi.effDur.toFixed(1)+' စက္ကန့် / video အပိုင်း '+vi.seg.toFixed(1)+' စက္ကန့် (အမြန် '+fmtSpeed(vi.eff)+')။':'')+' Export မှာ ဒီ အသံကို ပြန်သုံးပါမယ်');
@@ -1237,7 +1451,7 @@ function unifiedCues(ed){
  E('adjSpeed').addEventListener('input',()=>{
   ed.adjSpeed=1+(parseFloat(E('adjSpeed').value)||0)/100;
   E('adjSpeedVal').textContent=fmtPct(parseFloat(E('adjSpeed').value)||0);
-  syncVoicePlayer();updateVoiceWarn();
+  syncVoicePlayer();updateVoiceWarn();renderTimeline();
  });
  E('renderSpeed').onclick=async()=>{
   if(ed.renderBusy)return;
@@ -1250,7 +1464,7 @@ function unifiedCues(ed){
    const rv=await effectiveVoiceBytes(ed,ed.voiceCache.bytes,ed.voiceCache.ext,()=>{});
    if(ed.renderUrl)URL.revokeObjectURL(ed.renderUrl);
    ed.renderUrl=URL.createObjectURL(new Blob([rv.bytes],{type:'audio/wav'}));
-   syncVoicePlayer();updateVoiceWarn();
+   syncVoicePlayer();updateVoiceWarn();renderTimeline();
    setVoiceStatus('✅ အမြန် '+fmtSpeed(eff)+' ဖြင့် အသံ ပြန်ထုတ်ပြီးပါပြီ — player မှာ နားထောင်ကြည့်ပါ');
    showNotice('✅ အသံ ပြန်ထုတ်ပြီးပါပြီ','ok');
   }catch(err){console.error(err);setVoiceStatus('❌ '+humanErr(err));showNotice('❌ အသံ ပြန်ထုတ်မရပါ: '+humanErr(err),'err')}
@@ -1311,10 +1525,8 @@ function unifiedCues(ed){
  E('voiceVol').addEventListener('input',()=>{ed.voiceVol=+E('voiceVol').value;E('voiceVolVal').textContent=ed.voiceVol+'%';refreshSummaries();if(previewMode)pvAudio.volume=Math.min(100,ed.voiceVol)/100});
  E('syncDelay').addEventListener('input',()=>setSyncDelay(parseFloat(E('syncDelay').value)||0));
  E('syncReset').onclick=()=>setSyncDelay(0);
- /* one-screen equivalent of "entering the SRT step": build cues the first
-    time the စာတန်း section scrolls into view */
- const secFeatEl=E('secFeatures');
- if(secFeatEl&&'IntersectionObserver' in window){const io=new IntersectionObserver(es=>{if(es.some(e=>e.isIntersecting)){ensureCues();updateVoiceWarn();io.disconnect()}},{rootMargin:'240px'});io.observe(secFeatEl)}
+ /* V210: cues are built when the စာတန်း panel opens (showPanel) — the old
+    scroll-into-view trigger went away with the scrolling page. */
  /* ================= studio player block (reference form) =================
     Top bar (🎬 Recap · ▶ စစ်ကြည့် shortcut · 🔀 Swap Video) + mode pill on the
     frame + CUSTOM transport (native controls removed) + Mode field (opens the
@@ -1340,7 +1552,7 @@ function unifiedCues(ed){
     tick and the insert flow use, so play state / seeks stay in sync --- */
  const tpPlay=E('tpPlay'),tpSeek=E('tpSeek'),tpCur=E('tpCur'),tpDur=E('tpDur');
  let tpSeeking=false;
- function tpSync(){if(!tpPlay)return;tpPlay.textContent=vidEl.paused?'▶':'⏸';const d=vidEl.duration;tpDur.textContent=(d&&isFinite(d))?fmtDur(d):'0:00';const c=vidEl.currentTime||0;tpCur.textContent=fmtDur(c);if(!tpSeeking&&d&&isFinite(d)&&d>0)tpSeek.value=Math.round(c/d*1000)}
+ function tpSync(){if(!tpPlay)return;tpPlay.textContent=vidEl.paused?'▶':'⏸';const d=vidEl.duration;tpDur.textContent=(d&&isFinite(d))?fmtDur(d):'0:00';const c=vidEl.currentTime||0;tpCur.textContent=fmtDur(c);if(!tpSeeking&&d&&isFinite(d)&&d>0)tpSeek.value=Math.round(c/d*1000);updatePlayhead()}
  if(tpPlay){
   tpPlay.onclick=()=>{if(!ed.file&&!ed.insertUrl){showNotice('⚠️ Video ဖိုင် အရင် လိုပါတယ် — "📱 Video ရွေးရန်" ကို နှိပ်ပြီး ဖိုင် ရွေးပါ','err');return}if(vidEl.paused)vidEl.play().catch(()=>{});else vidEl.pause()};
   E('tpBack').onclick=()=>{try{vidEl.currentTime=Math.max(0,(vidEl.currentTime||0)-5)}catch(e){}};
@@ -1369,13 +1581,34 @@ function unifiedCues(ed){
  })();
  /* script edits drive the cue count, the stale warning and the voice gate */
  E('subs').addEventListener('input',()=>{updateCueCount();checkVoiceStale();refreshVoiceGate();renderSteps()});
- ['start','end'].forEach(id=>{E(id).addEventListener('input',()=>{updateVoiceWarn();refreshSummaries()})});
- /* ================= feature list → pop-up sheets (Burmese Voice app style) =================
-    Each feature row opens a bottom sheet holding that feature's REAL controls:
-    the control blocks live in a hidden home (#recap-sheetHomes) and are moved
-    into the sheet while it is open (openSheetNodes), then moved back on close,
-    so every ID and handler stays single-instance. Row summaries mirror state. */
- function openFeatureSheet(homeId,title){const home=E(homeId);if(!home)return;if(homeId==='homeSubs'){ensureCues();updateVoiceWarn()}openSheetNodes(title,home);refreshSummaries()}
+ ['start','end'].forEach(id=>{E(id).addEventListener('input',()=>{updateVoiceWarn();refreshSummaries();renderTimeline()})});
+ /* ================= V210 bottom panel + toolbar (CapCut-style) =================
+    The bottom panel shows ONE home at a time: HOME (the 3-tap action
+    deck) by default; a toolbar tool swaps in that tool's REAL controls —
+    the control blocks live in the hidden #recap-sheetHomes and are
+    mounted into the panel body (single-instance), then parked back on
+    switch. The panel is in flow under the timeline, so the preview is
+    never covered and no scroll-lock is needed. ✓ ပြီး — or tapping the
+    active tool again — returns to HOME. Only one panel at a time. */
+ let curPanel=''; /* starts empty so the first showPanel('homeHome') actually mounts the deck */
+ function showPanel(homeId,title){
+  disarmClear();
+  const home=E(homeId);if(!home)return;
+  if(curPanel!==homeId){
+   const homesBox=E('sheetHomes');const cur=E(curPanel);
+   if(cur&&homesBox&&cur.parentElement!==homesBox)homesBox.appendChild(cur);
+   E('panelBody').appendChild(home);curPanel=homeId;
+  }
+  const head=E('panelHead');
+  if(homeId==='homeHome'){if(head)head.style.display='none'}
+  else{if(head)head.style.display='flex';const t=E('panelTitle');if(t)t.textContent=title||''}
+  $$('#'+p+'-toolbar .tool-btn').forEach(b=>b.classList.toggle('sel',b.dataset.v===homeId));
+  if(homeId==='homeSubs'){ensureCues();updateVoiceWarn()}
+  refreshSummaries();
+ }
+ function openFeatureSheet(homeId,title){showPanel(homeId,title)}
+ window.__recapShowExport=()=>showPanel('homeExport','🎬 Export');
+ const panelDoneBtn=E('panelDone');if(panelDoneBtn)panelDoneBtn.onclick=()=>showPanel('homeHome');
  function sumSet(id,txt){const s=E(id);if(s)s.textContent=txt}
  function refreshSummaries(){
   const sl=scriptLines().length;
@@ -1401,7 +1634,7 @@ function unifiedCues(ed){
   const stX=E('stExport');if(stX)stX.innerHTML='🎬 Export '+((ed.file&&sl>0&&(ed.audioMode!=='voice'||voiceFresh()))?'<b>အသင့်</b>':'—');
  }
  window.__refreshFeatureSummaries=refreshSummaries;
- [['rowScript','homeScript','📝 Script စာသား'],['rowSubs','homeSubs','🎨 စာတန်း'],['rowMixer','homeMixer','🔊 အသံ ချိန်ညှိ'],['rowTrim','homeTrim','✂️ Trim'],['rowAspect','homeAspect','🌫️ Blur / Aspect'],['rowTitle','homeTitle','📝 Title'],['rowText','homeText','➕ Text'],['rowLogo','homeLogo','🛡️ Logo'],['rowBorder','homeBorder','📐 Border']].forEach(([row,home,title])=>{const b=E(row);if(b)b.onclick=()=>openFeatureSheet(home,title)});
+ [['toolScript','homeScript','📝 Script စာသား'],['toolSubs','homeSubs','🎨 စာတန်း'],['toolMixer','homeMixer','🔊 အသံ ချိန်ညှိ'],['toolTrim','homeTrim','✂️ Trim'],['toolAspect','homeAspect','🌫️ Blur / Aspect'],['toolTitle','homeTitle','📝 Title'],['toolText','homeText','➕ Text'],['toolLogo','homeLogo','🛡️ Logo'],['toolBorder','homeBorder','📐 Border']].forEach(([tid,home,title])=>{const b=E(tid);if(b)b.onclick=()=>{if(curPanel===home)showPanel('homeHome');else showPanel(home,title)}});
  /* Text / Logo / Border controls — formerly one-off chip sheets, now the
     persistent controls inside their own feature sheets (single-instance). */
  const txtTgl=E('textTgl'),txtStr=E('textStr'),txtSize=E('textSize');
@@ -1419,9 +1652,11 @@ function unifiedCues(ed){
  if(bdTgl){bdTgl.classList.toggle('on',!!ed.borderOn);bdTgl.onclick=()=>{ed.borderOn=!ed.borderOn;bdTgl.classList.toggle('on',ed.borderOn);persistOvl();syncBorderOvl();refreshSummaries()}}
  /* subtitle position slider in the စာတန်း sheet (the on-frame drag still works) */
  const spEl=E('subPos');
- if(spEl){spEl.value=Math.round((ed.subPosY||0.81)*100);spEl.addEventListener('input',()=>{ed.subPosY=(parseFloat(spEl.value)||81)/100;applySubPos();updateSubPosLabel()});spEl.addEventListener('change',()=>{ed.subPosCustom=true;SETTINGS.subPosY=ed.subPosY;SETTINGS.subPosCustom=true;saveSettings()})}
+ if(spEl){spEl.value=Math.round(clampSubPos(ed.subPosY)*100);spEl.addEventListener('input',()=>{const pv=parseFloat(spEl.value);ed.subPosY=clampSubPos((isNaN(pv)?81:pv)/100);applySubPos();updateSubPosLabel()});spEl.addEventListener('change',()=>{ed.subPosCustom=true;SETTINGS.subPosY=ed.subPosY;SETTINGS.subPosCustom=true;saveSettings()})}
+ ed.subPosY=clampSubPos(ed.subPosY);
+ showPanel('homeHome');
  refreshSummaries();
- updateCueCount();refreshVoiceGate();updateVoiceWarn();applySubPos();updateSubPosLabel();setSyncDelay(0);updateModeUI();syncTitleOvl();syncTextOvl();syncLogoOvl();syncBorderOvl();syncChips();tpSync();
+ updateCueCount();refreshVoiceGate();updateVoiceWarn();applySubPos();updateSubPosLabel();setSyncDelay(0);updateModeUI();syncTitleOvl();syncTextOvl();syncLogoOvl();syncBorderOvl();syncChips();tpSync();renderTimeline();
 })();
 </script>
 </body>

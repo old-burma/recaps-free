@@ -174,7 +174,6 @@ body.locked{overflow:hidden}
 <div class="sheet-wrap" id="sheetWrap"><div class="sheet-bg" id="sheetBg"></div><div class="sheet"><h3 id="sheetTitle"></h3><div id="sheetBody"></div></div></div>
 <div id="notice"></div>
 <div id="donePop"><div class="box"><div style="font-size:34px">✅</div><h3 style="margin:8px 0" id="doneTitle">ရပါပြီ</h3><p id="doneText" style="font-size:13.5px;color:#527884"></p><button class="btn primary" id="doneOk" style="margin-top:14px">ဟုတ်ကဲ့</button></div></div>
-<input type="file" id="globalFile" accept="video/*" style="display:none">
 <script>
 'use strict';
 /* ================= Recaps Stage 1 — 100% client-side =================
@@ -224,7 +223,6 @@ function pickVoice(current,cb){openSheet('အသံ ရွေးပါ',VOICES.m
 <script>
 /* ================= Recap editor ================= */
 function editorHTML(p){
-const head='<h2 class="page-title">Recap လုပ်ရန်</h2><p class="page-sub">ဖုန်းထဲက video တင်ပြီး တစ်မျက်နှာတည်းမှာ Recap ထုတ်ပါ</p>';
 const videoInner='<input type="file" id="'+p+'-file" accept="video/*" style="display:none">'
 +'<div class="pick-row"><button class="btn light small" id="'+p+'-pick">📱 Video ရွေးရန်</button><div class="file-info" id="'+p+'-fileinfo">ဖိုင် မရွေးရသေးပါ</div></div>'
 +'<div class="vid-wrap"><div class="ph-box" id="'+p+'-ph"><div class="ph-ic">🎬</div><div class="ph-t">Tap to Upload Video</div><div class="ph-s">နှိပ်ပြီး video ဖိုင် ရွေးပါ</div></div><video class="preview" id="'+p+'-video" playsinline style="display:none"></video><div class="mode-pill" id="'+p+'-modePill">🎬 Movie Recap Mode</div><div class="title-overlay" id="'+p+'-titleOvl"></div><div class="logo-overlay" id="'+p+'-logoOvl"></div><div class="sub-overlay" id="'+p+'-overlay"></div><div class="text-overlay" id="'+p+'-textOvl"></div><div class="frame-border" id="'+p+'-borderOvl"></div></div>'
@@ -290,7 +288,6 @@ function makeEditor(p){
  refreshLabels();return ed;
 }
 makeEditor('recap');
-function syncEditorsFromSettings(){Object.values(editors).forEach(ed=>{ed.aspect=SETTINGS.aspect;ed.blur=SETTINGS.blur;ed.voice=SETTINGS.voice;if(ed.refresh)ed.refresh()})}
 /* ---------- canvas text PNGs (browser shapes Myanmar correctly) ---------- */
 /* Wrap fix (V191): Burmese cues contain long spaceless runs. The old wrap split only
    on whitespace, so one over-wide token was drawn centred and clipped at BOTH edges,
@@ -586,7 +583,7 @@ async function exportEditor(ed){
   if(window.__recapDone)window.__recapDone(3);
   showDone('✅ အသံ ရပါပြီ — Export ပြီးပါပြီ','Video '+made.length+' ပိုင်း ထုတ်ပြီးပါပြီ — အောက်က ဒေါင်း link များမှ ယူပါ။');
  }catch(err){console.error(err);log('❌ '+humanErr(err));showNotice('❌ Export မအောင်မြင်ပါ: '+humanErr(err),'err')}
- finally{ed.busy=false;ed._cachedVoice=null;ed._cachedVoiceExt=null;btn.classList.remove('loading');btn.disabled=false;btn.querySelector('.btn-label').textContent='🎬 Export ထုတ်မယ်'}
+ finally{ed.busy=false;ed._cachedVoice=null;ed._cachedVoiceExt=null;btn.classList.remove('loading');btn.disabled=false;btn.querySelector('.btn-label').textContent='🎬 Export MP4'}
 }
 </script>
 <script>
@@ -838,7 +835,7 @@ function unifiedCues(ed){
  function pvUseRendered(){return !!(ed._effVoice&&ed.renderUrl&&ed._effVoice.key===effVoiceKey(ed))}
  function pvFactor(){return pvUseRendered()?1:Math.max(0.05,effSpeedOf(ed))}
  function previewTime(){const r=trimRange();if(vidEl.ended&&pvAudio)return r.start+(pvAudio.currentTime||0)/pvFactor();return vidEl.currentTime}
- function setPreviewBtns(){const t=previewMode?'⏹ Preview ပိတ်':'▶ စစ်ကြည့်မယ် (စာတန်း + အသံ)';const b1=E('previewBtn');if(b1)b1.textContent=t;const b2=E('previewBtn2');if(b2)b2.textContent=t;const b3=E('pvTop');if(b3)b3.textContent=previewMode?'⏹ ပိတ်':'▶ စစ်ကြည့်'}
+ function setPreviewBtns(){const t=previewMode?'⏹ Preview ပိတ်':'▶ စစ်ကြည့်မယ် (စာတန်း + အသံ)';const b1=E('previewBtn');if(b1)b1.textContent=t;const b2=E('previewBtn2');if(b2)b2.textContent=t}
  function enterPreview(){
   if(!ed.voiceCache||!ed.voiceUrl){showNotice('⚠️ စစ်ကြည့်ရန် အသံ အရင် လိုပါတယ် — 🎬 Studio ကတ်မှာ အသံ အရင် ထုတ်ပါ','err');goStep(2);return}
   if(!ed.file){showNotice('⚠️ Video ဖိုင် အရင် လိုပါတယ် — အပေါ်မှာ ရွေးပါ','err');goStep(0);return}
@@ -1010,7 +1007,6 @@ function unifiedCues(ed){
   if(has&&fresh)doneStep(2);else if(has)undoneStep(2);
  }
  function refreshVoiceGate(){if(ed.voiceBusy)return;const b=E('voiceGen');if(b)b.disabled=!scriptText()}
- function refreshEngineBtn(){const b=E('engineBtn');if(b)b.textContent=ed.ttsEngine==='edge'?'🌐 Edge TTS (key မလို)':'✨ Gemini TTS (ကိုယ့် key)'}
  /* studio default voice = Edge Thiha (the 👨 သီဟ chip is pre-selected in the markup) */
  ed.ttsEngine='edge';ed.edgeVoice='my-MM-ThihaNeural';if(ed.refresh)ed.refresh();
  /* ================= studio controls: style chips · voice chips + BGM auto-duck ·
@@ -1078,7 +1074,6 @@ function unifiedCues(ed){
    ed.voiceUrl=URL.createObjectURL(new Blob([gv.bytes],{type:gv.ext==='mp3'?'audio/mpeg':'audio/wav'}));
    const au=E('vpAudio');au.src=ed.voiceUrl;au.playbackRate=effSpeedOf(ed);
    E('voicePlayer').style.display='block';
-   const adj=E('adjWrap');if(adj)adj.style.display='block';
    setVoiceStatus('🎙️ အသံ ရပါပြီ — ကြာချိန် တိုင်းနေပါတယ်…');
    ed.voiceCache.dur=await probeAudioDur(gv.bytes,gv.ext);
    updateVoiceWarn();
@@ -1275,7 +1270,7 @@ function unifiedCues(ed){
  /* script edits drive the cue count, the stale warning and the voice gate */
  E('subs').addEventListener('input',()=>{updateCueCount();checkVoiceStale();refreshVoiceGate();renderSteps()});
  ['start','end'].forEach(id=>{E(id).addEventListener('input',()=>{updateVoiceWarn()})});
- refreshEngineBtn();updateCueCount();refreshVoiceGate();updateVoiceWarn();applySubPos();updateSubPosLabel();setSyncDelay(0);updateModeUI();syncTitleOvl();syncTextOvl();syncLogoOvl();syncBorderOvl();syncChips();tpSync();
+ updateCueCount();refreshVoiceGate();updateVoiceWarn();applySubPos();updateSubPosLabel();setSyncDelay(0);updateModeUI();syncTitleOvl();syncTextOvl();syncLogoOvl();syncBorderOvl();syncChips();tpSync();
 })();
 </script>
 </body>

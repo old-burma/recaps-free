@@ -106,6 +106,14 @@ body.locked{overflow:hidden}
 #donePop.show{display:grid}
 #donePop .box{background:#1E1E24;color:#F2F2F5;border:1px solid #2C2C35;border-radius:22px;padding:26px 22px;width:min(400px,calc(100% - 40px));text-align:center}
 .logbox{background:#0A141C;color:#FFE1A8;border-radius:13px;padding:11px 13px;font-size:11.5px;max-height:130px;overflow:auto;white-space:pre-wrap;word-break:break-all;margin-top:10px;display:none}
+.exp-prog{margin-top:12px;background:#101820;border:1px solid #223544;border-radius:13px;padding:12px 14px}
+.exp-prog-head{display:flex;align-items:center;gap:10px}
+.exp-prog .wave{display:inline-flex;color:#F59E0B}
+.exp-pct{font-size:26px;font-weight:800;color:#FFD88A;line-height:1}
+.exp-bar{height:8px;border-radius:5px;background:#22303C;margin-top:10px;overflow:hidden}
+.exp-bar-fill{height:100%;width:0%;background:linear-gradient(90deg,#F59E0B,#F97316);border-radius:5px;transition:width .2s ease}
+.exp-meta{display:flex;justify-content:space-between;gap:10px;margin-top:8px;font-size:12px;color:#9FB4C0}
+.exp-meta .exp-elapsed{font-variant-numeric:tabular-nums;white-space:nowrap}
 /* ===== preview zone (large, centred, top) + placeholder + overlays ===== */
 .vid-sticky{flex:0 0 auto;background:#000;padding:8px 10px 6px}
 .pick-row{display:flex;align-items:center;gap:10px;margin-bottom:10px}
@@ -154,12 +162,12 @@ body.locked{overflow:hidden}
    its corner handle. The effect itself (backdrop-filter) is always
    live so the preview shows exactly what export will cover. */
 .blur-layer{position:absolute;inset:0;z-index:3;pointer-events:none}
-.blur-region{position:absolute;border-radius:4px;pointer-events:none;overflow:visible}
+.blur-region{position:absolute;border-radius:4px;pointer-events:none;overflow:visible;touch-action:none}
 .blur-region.fx-blur{-webkit-backdrop-filter:blur(20px) saturate(.9);backdrop-filter:blur(20px) saturate(.9)}
 .blur-region.fx-mosaic{-webkit-backdrop-filter:blur(3px) saturate(.55) contrast(1.15);backdrop-filter:blur(3px) saturate(.55) contrast(1.15);background-image:repeating-conic-gradient(rgba(0,0,0,.20) 0% 25%,rgba(255,255,255,.12) 0% 50%)}
 .vid-wrap.blur-editing .blur-region{pointer-events:auto;cursor:move;outline:1.5px dashed rgba(255,255,255,.6)}
 .vid-wrap.blur-editing .blur-region.sel{outline:2px solid #F97316}
-.blur-region .br-handle{position:absolute;right:-10px;bottom:-10px;width:22px;height:22px;border-radius:50%;background:#F97316;border:2px solid #fff;cursor:nwse-resize;display:none;z-index:2}
+.blur-region .br-handle{position:absolute;right:-10px;bottom:-10px;width:22px;height:22px;border-radius:50%;background:#F97316;border:2px solid #fff;cursor:nwse-resize;display:none;z-index:2;touch-action:none}
 .vid-wrap.blur-editing .blur-region.sel .br-handle{display:block}
 .swatches{display:flex;gap:8px;flex-wrap:wrap}
 .sw{width:46px;height:36px;border-radius:11px;border:2px solid #2C2C35;cursor:pointer;padding:0}
@@ -422,8 +430,8 @@ const syncField='<div class="field" style="margin-bottom:0"><label>⏱️ စာ
    value spans keep their ids (genSpeedVal / adjSpeedVal); the effInfo
    line now sits as the single helper line under BOTH sliders (in
    voiceHome), not between them. Hints cut to one short line each. */
-const genSpeedField='<div class="field vs-field"><div class="vs-head"><label>အသံအမြန်နှုန်း (Speed) — ထုတ်ချိန်</label><span class="vs-val" id="'+p+'-genSpeedVal">0%</span></div><input type="range" class="vs-range" id="'+p+'-genSpeed" min="-50" max="100" step="5" value="0"><p class="hint">အသံ မထုတ်ခင် ရွေးပါ — 0% = ပုံမှန် (1.00×)</p></div>';
-const adjSpeedField='<div class="field vs-field"><div class="vs-head"><label>အသံအမြန်နှုန်း (Speed) — ပြန်ချိန်</label><span class="vs-val" id="'+p+'-adjSpeedVal">0%</span></div><input type="range" class="vs-range" id="'+p+'-adjSpeed" min="-50" max="100" step="5" value="0"><p class="hint">ထုတ်ထားသော အသံကနေပဲ ပြန်ချိန်တာပါ — player မှာ တန်း နားထောင်နိုင်ပါတယ်</p></div><div class="warnbox" id="'+p+'-voiceWarn" style="display:none"></div>';
+const genSpeedField='<div class="field vs-field"><div class="vs-head"><label>အသံအမြန်နှုန်း (Speed) — ထုတ်ချိန်</label><span class="vs-val" id="'+p+'-genSpeedVal">0%</span></div><input type="range" class="vs-range" id="'+p+'-genSpeed" min="-50" max="100" step="1" value="0"><p class="hint">အသံ မထုတ်ခင် ရွေးပါ — 0% = ပုံမှန် (1.00×)</p></div>';
+const adjSpeedField='<div class="field vs-field"><div class="vs-head"><label>အသံအမြန်နှုန်း (Speed) — ပြန်ချိန်</label><span class="vs-val" id="'+p+'-adjSpeedVal">0%</span></div><input type="range" class="vs-range" id="'+p+'-adjSpeed" min="-50" max="100" step="1" value="0"><p class="hint">ထုတ်ထားသော အသံကနေပဲ ပြန်ချိန်တာပါ — player မှာ တန်း နားထောင်နိုင်ပါတယ်</p></div><div class="warnbox" id="'+p+'-voiceWarn" style="display:none"></div>';
 /* V215: ONE big select-style field for the whole voice choice (Burmese
    Voice app sheet layout) — it replaces the V211 chips scroll row AND
    the audio-source / voice-detail picker pills. audioInner stays as a
@@ -528,7 +536,7 @@ const toolbarInner='<nav class="toolbar" id="'+p+'-toolbar">'
 +tb('Subs','🎨','စာတန်း')+tb('Voice','🎙️','Voice Create')+tb('Mixer','🔊','Mixer')+tb('Trim','✂️','Trim')+tb('Aspect','🌫️','Aspect')+tb('Title','📝','Title')+tb('Text','➕','Text')+tb('Logo','🛡️','Logo')+tb('Border','📐','Border')+tb('Blur','🫥','Blur')
 +'<button class="tool-btn" id="'+p+'-toolKey"><span class="tic">🔑</span>Key</button>'
 +'</nav>';
-const exportInner='<div class="logbox" id="'+p+'-log"></div><div id="'+p+'-result" style="margin-top:12px"></div>';
+const exportInner='<div class="exp-prog" id="'+p+'-expProg" style="display:none"><div class="exp-prog-head"><span class="wave"><i></i><i></i><i></i><i></i><i></i></span><span class="exp-pct" id="'+p+'-expPct">0%</span></div><div class="exp-bar"><div class="exp-bar-fill" id="'+p+'-expBar"></div></div><div class="exp-meta"><span id="'+p+'-expStage">ပြင်ဆင်နေပါတယ်…</span><span class="exp-elapsed" id="'+p+'-expElapsed">0s</span></div></div><button class="btn light small" id="'+p+'-logToggle" style="margin-top:10px">📄 Log ပြရန်</button><div class="logbox" id="'+p+'-log"></div><div id="'+p+'-result" style="margin-top:12px"></div>';
 /* V214: the 🔑 Key pop-up content — the old slide-in drawer's innards
    (Gemini key card + ⚙️ settings reset), now parked in #homeKey and
    mounted into the bottom sheet by openKeySheet like every other tool.
@@ -655,13 +663,14 @@ function wrapLines(ctx,text,maxW,maxLines){const lines=wrapAllLines(ctx,text,max
    contains an overflowing cue. */
 let _measureCtx=null;
 function cueLinesAt(text,fs,maxW){if(!_measureCtx)_measureCtx=document.createElement('canvas').getContext('2d');_measureCtx.font='700 '+fs+'px Padauk, "Noto Sans Myanmar", sans-serif';return wrapAllLines(_measureCtx,text,maxW)}
-function splitLongCues(cues,maxW,floorFs){
+function splitLongCues(cues,maxW,floorFs,maxLines){
+ const capLines=maxLines||2;
  const out=[];
  for(const cue of cues){
   const parts=[{text:cue.text,start:cue.start,end:cue.end}];
   let guard=0;
-  while(guard++<8){
-   const idx=parts.findIndex(pt=>graphemeList(pt.text).length>8&&cueLinesAt(pt.text,floorFs||28,maxW).length>2);
+  while(guard++<40){
+   const idx=parts.findIndex(pt=>graphemeList(pt.text).length>8&&cueLinesAt(pt.text,floorFs||28,maxW).length>capLines);
    if(idx<0)break;
    const pt=parts[idx];const gs=graphemeList(pt.text);
    let mid=Math.floor(gs.length/2),best=-1,bestD=1e9;
@@ -778,9 +787,66 @@ async function edgeTTSLong(text,voiceName,statusFn){
  const total=parts.reduce((a,c)=>a+c.length,0);const out=new Uint8Array(total);let off=0;for(const c of parts){out.set(c,off);off+=c.length}return out;
 }
 /* ---------- voice dispatcher: ONE route for the voice step and the export fallback ---------- */
+/* ---------- V219: per-line TTS — the voice speaks the CANONICAL line
+   list, exactly one chunk per display line, in order (no sentence
+   re-grouping: the old geminiTTSLong/edgeTTSLong chunkers remain only
+   as unused legacy helpers). Each chunk is cached under a hash of
+   (engine + voice + generation speed + the line's EXACT text), so an
+   edited line can never silently reuse audio spoken for other words,
+   and re-generating after a one-line edit re-speaks only that line.
+   The chunks are decoded and re-assembled into ONE wav with a fixed
+   silence pause between lines; the measured per-chunk durations +
+   that pause are what the subtitle timings are derived from, so the
+   cues and the speech share one timeline by construction. */
+const VOICE_LINE_PAUSE=0.35;
+const ttsLineCache=new Map();
+function ttsLineKey(ed,text){return strHash([ed.ttsEngine,ed.ttsEngine==='edge'?ed.edgeVoice:ed.voice,genSpeedFactor(ed.p).toFixed(3),String(text).length,String(text)].join('|'))}
+async function synthLine(ed,text,statusFn){
+ if(ed.ttsEngine==='edge')return{bytes:await edgeServerTTS(text,ed.edgeVoice,statusFn),ext:'mp3'};
+ return{bytes:await geminiTTS(getApiKey(),text,ed.voice),ext:'wav'};
+}
+async function assembleLineChunks(raws){
+ try{
+  const Ctx=window.AudioContext||window.webkitAudioContext;if(!Ctx)throw new Error('AudioContext မရှိပါ');
+  const ctx=new Ctx();const bufs=[];
+  for(const r of raws){const ab=r.bytes.buffer.slice(r.bytes.byteOffset||0,(r.bytes.byteOffset||0)+r.bytes.byteLength);bufs.push(await ctx.decodeAudioData(ab))}
+  if(!bufs.length)throw new Error('အသံ chunk မရှိပါ');
+  const sr=bufs[0].sampleRate||24000,pauseN=Math.round(VOICE_LINE_PAUSE*sr);
+  const total=bufs.reduce((a,b)=>a+b.length,0)+pauseN*Math.max(0,bufs.length-1);
+  const pcm=new Uint8Array(total*2);const dv=new DataView(pcm.buffer);let off=0;
+  bufs.forEach((b,bi)=>{
+   const d=b.getChannelData(0);const n=Math.min(b.length,d.length);
+   for(let i=0;i<n;i++){const s=Math.max(-1,Math.min(1,d[i]));dv.setInt16(off,s<0?s*0x8000:s*0x7FFF,true);off+=2}
+   off+=(b.length-n)*2;
+   if(bi<bufs.length-1)off+=pauseN*2;
+  });
+  return{bytes:pcmBytesToWav(pcm,sr),ext:'wav',chunkDurs:bufs.map(b=>b.duration),pause:VOICE_LINE_PAUSE};
+ }catch(e){
+  /* decode fallback: plain byte concatenation (the old assembly) with
+     per-chunk durations probed; the recorded pause is 0 because the
+     fallback inserts none — cue timings stay exact against the audio
+     that was actually assembled. */
+  const total=raws.reduce((a,r)=>a+r.bytes.length,0);const out=new Uint8Array(total);let off=0;
+  for(const r of raws){out.set(r.bytes,off);off+=r.bytes.length}
+  const durs=[];for(const r of raws)durs.push(await probeAudioDur(r.bytes,r.ext));
+  return{bytes:out,ext:raws[0].ext,chunkDurs:durs.every(d=>d>0)?durs:null,pause:0};
+ }
+}
+async function generateVoiceLines(ed,lines,statusFn){
+ if(!lines||!lines.length)throw new Error('အသံ ထုတ်ရန် စာသား မရှိပါ');
+ const raws=[];
+ for(let i=0;i<lines.length;i++){
+  const key=ttsLineKey(ed,lines[i]);
+  let hit=ttsLineCache.get(key);
+  if(!hit){hit=await synthLine(ed,lines[i],statusFn);ttsLineCache.set(key,hit);if(ttsLineCache.size>300)ttsLineCache.delete(ttsLineCache.keys().next().value)}
+  raws.push(hit);
+  if(statusFn&&lines.length>1)statusFn('🎙️ အသံ ထုတ်နေပါတယ်… အပိုင်း '+(i+1)+'/'+lines.length);
+ }
+ return assembleLineChunks(raws);
+}
 async function generateVoice(ed,text,statusFn){
- if(ed.ttsEngine==='edge'){const bytes=await edgeTTSLong(text,ed.edgeVoice,statusFn);return{bytes,ext:'mp3'}}
- const bytes=await geminiTTSLong(getApiKey(),text,ed.voice);return{bytes,ext:'wav'};
+ const gv=await generateVoiceLines(ed,[String(text)],statusFn);
+ return{bytes:gv.bytes,ext:gv.ext};
 }
 
 /* ---------- Gemini TTS (visitor's own key, direct from browser) ---------- */
@@ -807,7 +873,7 @@ async function geminiTTSLong(key,text,voice){ /* chunk long narration, concat PC
 </script>
 <script>
 /* ================= Export engine — ffmpeg.wasm single-thread ================= */
-let ffInstance=null,ffLoading=null,ffLogSink=null;
+let ffInstance=null,ffLoading=null,ffLogSink=null,ffProgSink=null;
 /* Raw ffmpeg.wasm log lines must never reach status elements: the wasm runtime
    prints a bare "Aborted()" line when an exec finishes/aborts, and streaming the
    log into the voice-step status made that text appear under the Create Voice
@@ -821,6 +887,7 @@ async function getFFmpeg(logFn){
  if(ffLoading)return ffLoading;
  ffLoading=(async()=>{const FFmpegWASM=window.FFmpegWASM;if(!FFmpegWASM)throw new Error('ffmpeg library မတင်ရသေးပါ — internet စစ်ပြီး ပြန်ကြိုးစားပါ');
   const ff=new FFmpegWASM.FFmpeg();ff.on('log',({message})=>{if(!message||/Aborted\(\)/.test(message))return;if(ffLogSink)ffLogSink(message)});
+  ff.on('progress',e=>{if(ffProgSink)ffProgSink(e)});
   /* Browsers block cross-origin classic Workers, so fetch the ffmpeg worker,
      core and wasm as blobs and pass same-origin blob URLs (fixes the live-site
      "Failed to construct 'Worker'" error from the unpkg URLs). */
@@ -831,6 +898,27 @@ async function getFFmpeg(logFn){
   await ff.load(loadCfg);ffInstance=ff;return ff})();
  try{return await ffLoading}catch(e){ffLoading=null;throw e}}
 async function ffReadU8(ff,name){const d=await ff.readFile(name);if(d instanceof Uint8Array)return d;if(typeof d==='string'){const u=new Uint8Array(d.length);for(let i=0;i<d.length;i++)u[i]=d.charCodeAt(i)&0xff;return u}return new Uint8Array(d.buffer||d)}
+/* V218: run one ffmpeg exec under a progress context. The loaded build is
+   @ffmpeg/ffmpeg 0.12, whose 'progress' events carry {progress:0..1 ratio,
+   time:µs encoded so far}. Conversion prefers time against the caller's
+   EXPECTED output seconds (the ratio can overshoot past 1 near the end);
+   with no expectation it falls back to the ratio. Fractions are clamped
+   0..1 and de-duped so the UI doesn't churn. Without onProg this is a
+   plain exec — the shared ffProgSink simply stays unset. */
+async function ffExecP(ff,args,timeout,expectSec,onProg){
+ if(!onProg)return ff.exec(args,timeout);
+ let last=-1;
+ ffProgSink=e=>{
+  let f=NaN;
+  if(e&&isFinite(e.time)&&expectSec>0)f=(e.time/1000000)/expectSec;
+  else if(e&&isFinite(e.progress))f=e.progress;
+  if(!isFinite(f))return;
+  f=Math.max(0,Math.min(1,f));
+  if(Math.abs(f-last)<0.002&&f<1)return;
+  last=f;try{onProg(f)}catch(_){}
+ };
+ try{return await ff.exec(args,timeout)}finally{ffProgSink=null}
+}
 /* atempo only accepts 0.5–2.0 per filter instance in the wasm ffmpeg build, so
    chain instances for wider factors. Product of the chain == requested speed. */
 function atempoChain(speed){const f=[];let s=speed;while(s>2.0){f.push('atempo=2.0000');s/=2}while(s<0.5){f.push('atempo=0.5000');s/=0.5}f.push('atempo='+s.toFixed(4));return f.join(',')}
@@ -843,13 +931,13 @@ function atempoChain(speed){const f=[];let s=speed;while(s>2.0){f.push('atempo=2
 function ffCopy(u8){return (u8 instanceof Uint8Array)?u8.slice(0):u8}
 /* Re-render a speed-adjusted copy from the PRISTINE generated audio (never from an
    already-adjusted copy, so repeated adjustments never compound). Output: WAV. */
-async function renderVoiceSpeed(pristine,ext,speed,logFn){
+async function renderVoiceSpeed(pristine,ext,speed,logFn,progFn){
  if(Math.abs(speed-1)<0.001)return{bytes:ffCopy(pristine),ext};
  const ff=await getFFmpeg(logFn||(()=>{}));
  const inName='spd_in.'+ext,outName='spd_out.wav';
  await ff.writeFile(inName,ffCopy(pristine));
  try{
-  const code=await ff.exec(['-i',inName,'-af',atempoChain(speed),'-vn','-c:a','pcm_s16le',outName],600000);
+  const code=await ffExecP(ff,['-i',inName,'-af',atempoChain(speed),'-vn','-c:a','pcm_s16le',outName],600000,0,progFn);
   if(code!==0)throw new Error('အသံ အမြန် ပြင်ရာတွင် ffmpeg exit code '+code);
   return{bytes:await ffReadU8(ff,outName),ext:'wav'};
  }finally{try{await ff.deleteFile(inName)}catch(e){}try{await ff.deleteFile(outName)}catch(e){}}
@@ -864,14 +952,14 @@ async function probeAudioDur(bytes,ext){
 function genSpeedFactor(p){const el=$('#'+p+'-genSpeed');const pct=el?parseFloat(el.value):0;return 1+(isNaN(pct)?0:pct)/100}
 function effSpeedOf(ed){const c=ed.voiceCache;return (c?(c.genSpeed||1):1)*(ed.adjSpeed||1)}
 function effVoiceKey(ed){const c=ed.voiceCache;if(!c)return'';return[c.text,c.engine,c.voice,effSpeedOf(ed).toFixed(3)].join('|')}
-async function effectiveVoiceBytes(ed,pristine,ext,logFn){
+async function effectiveVoiceBytes(ed,pristine,ext,logFn,progFn){
  const eff=effSpeedOf(ed),key=effVoiceKey(ed);
  if(ed._effVoice&&ed._effVoice.key===key)return ed._effVoice;
- const r=await renderVoiceSpeed(pristine,ext,eff,logFn);
+ const r=await renderVoiceSpeed(pristine,ext,eff,logFn,progFn);
  ed._effVoice={key,bytes:r.bytes,ext:r.ext};
  return ed._effVoice;
 }
-async function exportOne(ff,ed,seg,idx,total,log){
+async function exportOne(ff,ed,seg,idx,total,log,prog){
  /* seg = {start,end,cues:[{text,start,end}]} times absolute; output times relative */
  const dur=seg.end-seg.start;
  /* V216 canvas geometry: ONE geometry (canvasGeom) for every canvas —
@@ -894,7 +982,7 @@ async function exportOne(ff,ed,seg,idx,total,log){
  const fetchFile=window.FFmpegUtil&&window.FFmpegUtil.fetchFile;
  await ff.writeFile('in.mp4',fetchFile?await fetchFile(ed.file):new Uint8Array(await ed.file.arrayBuffer()));
  let voiceArr=null,voiceFile='voice.wav';
- if(ed.audioMode==='voice'){if(ed._cachedVoice){log('✅ အသံ အပိုင်းမှာ ထုတ်ထားသော အသံကို ပြန်သုံးပါတယ်');voiceArr=ed._cachedVoice;voiceFile='voice.'+(ed._cachedVoiceExt||'wav')}else{log('အသံ ထုတ်နေပါတယ်…');const gv=await generateVoice(ed,seg.cues.map(c=>c.text).join(' '),log);voiceArr=gv.bytes;voiceFile='voice.'+gv.ext}await ff.writeFile(voiceFile,ffCopy(voiceArr))}
+ if(ed.audioMode==='voice'){if(ed._cachedVoice){log('✅ အသံ အပိုင်းမှာ ထုတ်ထားသော အသံကို ပြန်သုံးပါတယ်');voiceArr=ed._cachedVoice;voiceFile='voice.'+(ed._cachedVoiceExt||'wav')}else{log('အသံ ထုတ်နေပါတယ်…');const gv=await generateVoiceLines(ed,seg.cues.map(c=>c.text),log);voiceArr=gv.bytes;voiceFile='voice.'+gv.ext}await ff.writeFile(voiceFile,ffCopy(voiceArr))}
  const overlays=[]; /* {file,y} */
  if(useTitle){const tbh=Math.round(170*S);const tty=Math.max(0,Math.min(H-tbh,Math.round(((ed.titleY==null?0.15:ed.titleY))*H-tbh/2)));await ff.writeFile('title.png',await textPNG($('#'+ed.p+'-title').value.trim(),W,tbh,{size:Math.round(((ed.titleSize||52))*S),color:'#FFE92E',cx:(ed.titleX==null?0.5:ed.titleX)}));overlays.push({file:'title.png',x:0,y:tty,from:0,to:dur})}
  if(useSub){for(let i=0;i<seg.cues.length;i++){const fn='sub'+i+'.png';await ff.writeFile(fn,await textPNG(seg.cues[i].text,W,Math.round(170*S),subPngOpts(ed,S)));overlays.push({file:fn,y:subY,from:seg.cues[i].start-seg.start,to:seg.cues[i].end-seg.start})}}
@@ -947,18 +1035,33 @@ async function exportOne(ff,ed,seg,idx,total,log){
     voiceover volume — applied here at Export (and in the voice section's insert). */
  const _mg=mixGains(ed);const bgmF=_mg.bgm,voiceF=_mg.voice;
  const fcMix=fc+';[0:a]atrim=start='+seg.start+':end='+seg.end+',asetpts=PTS-STARTPTS,volume='+bgmF.toFixed(3)+'[abg];[1:a]volume='+voiceF.toFixed(3)+',apad,atrim=0:'+dur.toFixed(2)+'[avc];[abg][avc]amix=inputs=2:duration=first:dropout_transition=0[aout]';
- function buildArgs(mix){
+ function buildArgs(mix,copyA){
   const a=['-i','in.mp4'];if(ed.audioMode==='voice')a.push('-i',voiceFile);overlays.forEach(ov=>a.push('-loop','1','-t',dur.toFixed(2),'-i',ov.file));
   a.push('-filter_complex',mix?fcMix:fc);
   if(ed.audioMode==='voice'){if(mix)a.push('-map','[vout]','-map','[aout]');else a.push('-map','[vout]','-map','1:a','-af','volume='+voiceF.toFixed(3)+',apad,atrim=0:'+dur.toFixed(2))}
-  else{a.push('-map','[vout]','-map','0:a?','-af','atrim=0:'+dur.toFixed(2)+',asetpts=PTS-STARTPTS')}
-  a.push('-t',dur.toFixed(2),'-c:v','libx264','-preset','veryfast','-crf','23','-pix_fmt','yuv420p','-c:a','aac','-b:a','128k','-movflags','+faststart','out'+idx+'.mp4');
+  else{a.push('-map','[vout]','-map','0:a?');if(!copyA)a.push('-af','atrim=0:'+dur.toFixed(2)+',asetpts=PTS-STARTPTS')}
+  /* V218 speed plumbing (look + geometry + mix UNCHANGED — the filter
+     graph above is byte-identical to before): x264 preset veryfast ->
+     ultrafast (the dominant cost when encoding 1080x1920 in the
+     single-threaded wasm build) and CRF 23 -> 25 so the faster preset
+     doesn't balloon the output file. When copyA is set (original audio:
+     nothing filters that stream — only a duration bound, which the
+     output -t already applies) the audio is stream-COPIED, not encoded. */
+  a.push('-t',dur.toFixed(2),'-c:v','libx264','-preset','ultrafast','-crf','25','-pix_fmt','yuv420p');
+  if(copyA)a.push('-c:a','copy');else a.push('-c:a','aac','-b:a','128k');
+  a.push('-movflags','+faststart','out'+idx+'.mp4');
   return a;
  }
  log('Video ထုတ်နေပါတယ် ('+(idx+1)+'/'+total+') — '+dur.toFixed(1)+' စက္ကန့်…');
  const wantMix=ed.audioMode==='voice'&&bgmF>0;
- let code=await ff.exec(buildArgs(wantMix),3600000);
- if(code!==0&&wantMix){log('ℹ️ မူရင်းအသံ ရောမရပါ (အသံ မပါသော video ဖြစ်နိုင်ပါတယ်) — voice သီးသန့်ဖြင့် ပြန်ထုတ်နေပါတယ်…');code=await ff.exec(buildArgs(false),3600000)}
+ let code;
+ if(ed.audioMode!=='voice'){
+  code=await ffExecP(ff,buildArgs(false,true),3600000,dur,prog);
+  if(code!==0){log('ℹ️ မူရင်းအသံကို copy မရပါ (codec မကိုက်နိုင်ပါ) — AAC ဖြင့် ပြန်ထုတ်နေပါတယ်…');code=await ffExecP(ff,buildArgs(false,false),3600000,dur,prog)}
+ }else{
+  code=await ffExecP(ff,buildArgs(wantMix),3600000,dur,prog);
+  if(code!==0&&wantMix){log('ℹ️ မူရင်းအသံ ရောမရပါ (အသံ မပါသော video ဖြစ်နိုင်ပါတယ်) — voice သီးသန့်ဖြင့် ပြန်ထုတ်နေပါတယ်…');code=await ffExecP(ff,buildArgs(false),3600000,dur,prog)}
+ }
  if(code!==0)throw new Error('ffmpeg exit code '+code+' — အသေးစိတ်ကို log တွင် ကြည့်ပါ');
  const data=await ff.readFile('out'+idx+'.mp4');
  const blob=new Blob([data.buffer||data],{type:'video/mp4'});
@@ -986,18 +1089,42 @@ async function exportEditor(ed){
  const v=E('video');ed.videoW=v.videoWidth||1280;ed.videoH=v.videoHeight||720;
  /* segments */
  const segments=[{start,end}];
- /* cues: the SAME cue list the SRT editor/SRT download use — char-weighted timing
-    (spreadCuesWeighted) + over-long cue splitting. If the SRT section's cue list matches the
-    current script + trim range, use it verbatim (including manual edits). */
- const cues=(ed.cues&&ed.cues.length&&ed.cuesSig===lines.join('\n')+'|'+start+'|'+end)?ed.cues:unifiedCues(ed);
+ /* cues: the SAME cue list the SRT editor/SRT download use (unifiedCues —
+    canonical one-line texts; voice-chunk timings in voice mode, char-
+    weighted spread otherwise). If the stored cue list's signature
+    matches the current state, use it verbatim (including manual edits). */
+ let cues=(ed.cues&&ed.cues.length&&ed.cuesSig===cueSigFor(ed))?ed.cues:unifiedCues(ed);
  const syncDl=ed.syncDelay||0; /* ⏱️ Sync Delay: shifted at use time only — stored cue times untouched */
- segments.forEach(sg=>{sg.cues=cues.filter(c=>{const mid=(c.start+c.end)/2;return mid>=sg.start-0.01&&mid<sg.end+0.01}).map(c=>({text:c.text,start:Math.max(sg.start,c.start+syncDl),end:Math.min(sg.end,c.end+syncDl)})).filter(c=>c.end-c.start>=0.05)});
+ const assignCues=cs=>{segments.forEach(sg=>{sg.cues=cs.filter(c=>{const mid=(c.start+c.end)/2;return mid>=sg.start-0.01&&mid<sg.end+0.01}).map(c=>({text:c.text,start:Math.max(sg.start,c.start+syncDl),end:Math.min(sg.end,c.end+syncDl)})).filter(c=>c.end-c.start>=0.05)})};
+ assignCues(cues);
  /* --- run --- */
  ed.busy=true;const btn=E('stExport');btn.classList.add('loading');btn.disabled=true;btn.querySelector('.btn-label').textContent='လုပ်ဆောင်နေပါတယ်…';
- const logBox=E('log');logBox.style.display='block';logBox.textContent='';
+ const logBox=E('log');logBox.style.display='none';logBox.textContent='';
+ const logTgl=E('logToggle');if(logTgl)logTgl.textContent='📄 Log ပြရန်';
  if(window.__recapShowExport)window.__recapShowExport(); /* V210: the Export view is a bottom panel now */
  const log=m=>{logBox.textContent+=m+'\n';logBox.scrollTop=logBox.scrollHeight};
  E('result').innerHTML='';showNotice('▶️ Export စတင်ပါပြီ — အပိုင်း '+segments.length+' ပိုင်း','info');
+ /* V218: REAL progress UI (big %, bar, waveform, stage, elapsed) instead
+    of streaming raw ffmpeg log lines at the user — the log now sits
+    behind the 📄 Log toggle above (hidden by default). Aggregation
+    across the sequential ffmpeg runs is weighted by each run's expected
+    OUTPUT DURATION: the voice speed-render (when it runs) weighs its
+    resulting voice seconds; each segment weighs its trim seconds. The
+    displayed % never runs backwards. */
+ const expProgEl=E('expProg'),expPctEl=E('expPct'),expBarEl=E('expBar'),expStageEl=E('expStage'),expElapsedEl=E('expElapsed');
+ const expT0=Date.now();
+ const expW={total:Math.max(1,dur),max:0};
+ const setExpProg=(frac,stage)=>{
+  const pct=Math.max(expW.max,Math.min(100,Math.round((frac||0)*100)));expW.max=pct;
+  if(expPctEl)expPctEl.textContent=pct+'%';
+  if(expBarEl)expBarEl.style.width=pct+'%';
+  if(stage&&expStageEl)expStageEl.textContent=stage;
+ };
+ const stepProg=(base,weight,stage)=>f=>setExpProg((base+f*Math.max(0,weight))/expW.total,stage);
+ let expTimer=null,voiceW=0;
+ if(expProgEl)expProgEl.style.display='block';
+ setExpProg(0,ed.audioMode==='voice'?'🎙️ အသံ ပြင်ဆင်နေပါတယ်…':'🎬 Video ထုတ်နေပါတယ်…');
+ expTimer=setInterval(()=>{if(expElapsedEl)expElapsedEl.textContent=Math.round((Date.now()-expT0)/1000)+'s'},250);
  const baseName=(ed.file.name||'recap').replace(/\.[^.]+$/,'').replace(/[^\w\- ]+/g,'').trim()||'recap';
  try{
   const ff=await getFFmpeg(log);
@@ -1008,29 +1135,38 @@ async function exportEditor(ed){
       speed controls; and NEVER silently trim a too-long voice mid-sentence —
       block with both durations + the speed needed (instructive error). */
    const vid=(ed.ttsEngine==='edge'?ed.edgeVoice:ed.voice);
-   let vc=(ed.voiceCache&&ed.voiceCache.text===lines.join(' ')&&ed.voiceCache.engine===ed.ttsEngine&&ed.voiceCache.voice===vid)?ed.voiceCache:null;
+   const canon=canonicalLines(ed);
+   let vc=(ed.voiceCache&&ed.voiceCache.engine===ed.ttsEngine&&ed.voiceCache.voice===vid&&(ed.voiceCache.linesSig!=null?ed.voiceCache.linesSig===canon.join('\n'):ed.voiceCache.text===lines.join(' ')))?ed.voiceCache:null;
    let pristine,pext;
    if(vc){pristine=vc.bytes;pext=vc.ext;log('✅ အသံ အပိုင်းမှာ ထုတ်ထားသော အသံကို ပြန်သုံးပါတယ်')}
-   else{log('အသံ ထုတ်နေပါတယ်…');const gv=await generateVoice(ed,lines.join(' '),log);pristine=gv.bytes;pext=gv.ext;vc={text:lines.join(' '),engine:ed.ttsEngine,voice:vid,bytes:pristine,ext:pext,genSpeed:genSpeedFactor(p),dur:0};ed.voiceCache=vc}
-   if(!vc.dur)vc.dur=await probeAudioDur(pristine,pext);
+   else{log('အသံ ထုတ်နေပါတယ်…');const gv=await generateVoiceLines(ed,canon,log);pristine=gv.bytes;pext=gv.ext;vc={text:lines.join(' '),lines:canon.slice(),linesSig:canon.join('\n'),engine:ed.ttsEngine,voice:vid,bytes:pristine,ext:pext,genSpeed:genSpeedFactor(p),chunkDurs:gv.chunkDurs,pause:gv.pause||0,dur:0};ed.voiceCache=vc}
+   if(!vc.dur)vc.dur=(vc.chunkDurs&&vc.chunkDurs.length)?vc.chunkDurs.reduce((a,b)=>a+b,0)+(vc.pause||0)*Math.max(0,vc.chunkDurs.length-1):await probeAudioDur(pristine,pext);
    const eff=effSpeedOf(ed),effDur=vc.dur?vc.dur/eff:0;
    if(vc.dur&&effDur>dur+0.05){
     const msg='အသံ ကြာချိန် ('+effDur.toFixed(1)+' စက္ကန့်) က video အပိုင်း ('+dur.toFixed(1)+' စက္ကန့်) ထက် ရှည်နေပါတယ် — အသံကို ဖြတ်မပစ်ပါ။ 🎙️ Voice Create မှာ အသံ အမြန်ကို စုစုပေါင်း '+(vc.dur/dur).toFixed(2)+'× အထိ တင်ပါ၊ သို့မဟုတ် ✂️ Trim pop-up မှာ Trim အပိုင်းကို ပိုရှည်အောင် ပြန်ဖြတ်ပါ။';
     log('⚠️ '+msg);showNotice('⚠️ '+msg,'err');return;
    }
-   const rv=await effectiveVoiceBytes(ed,pristine,pext,log);
+   voiceW=(Math.abs(eff-1)>=0.001&&effDur>0)?Math.max(1,effDur):0;
+   if(voiceW)expW.total+=voiceW;
+   const rv=await effectiveVoiceBytes(ed,pristine,pext,log,voiceW?stepProg(0,voiceW,'🎙️ အသံ အမြန် ပြင်နေပါတယ်…'):undefined);
    ed._cachedVoice=rv.bytes;ed._cachedVoiceExt=rv.ext;
    if(effDur)log('🎙️ အသံ အမြန် '+eff.toFixed(2)+'× — အသံ '+effDur.toFixed(1)+' စက္ကန့် / video '+dur.toFixed(1)+' စက္ကန့်');
   }
-  for(let i=0;i<segments.length;i++){const blob=await exportOne(ff,ed,segments[i],i,segments.length,log);
+  /* V219: the voice is fresh now (reused or just regenerated) — when the
+     cues were not hand-timed, re-derive them from the voice's own chunk
+     timeline so the burned subtitles match the speech exactly. */
+  if(ed.audioMode==='voice'&&ed.voiceCache&&ed.voiceCache.chunkDurs&&!ed.cuesManual){cues=unifiedCues(ed);ed.cues=cues;ed.cuesSig=cueSigFor(ed);assignCues(cues)}
+  let segBase=voiceW;
+  for(let i=0;i<segments.length;i++){const segDurI=segments[i].end-segments[i].start;const blob=await exportOne(ff,ed,segments[i],i,segments.length,log,stepProg(segBase,Math.max(1,segDurI),'🎬 Video ထုတ်နေပါတယ် ('+(i+1)+'/'+segments.length+')'));segBase+=segDurI;
    const name=baseName+(segments.length>1?'_part'+(i+1):'')+'.mp4';
    const segSrt=segments[i].cues.length?buildSRT(segments[i].cues,segments[i].start,segments[i].end):'';try{await idbAdd({name,date:Date.now(),size:blob.size,blob,srt:segSrt})}catch(e){log('⚠️ နောက်ခံ သိမ်းဆည်းမှု မအောင်မြင်ပါ — ဒေါင်း link မှ ယူပါ')}made.push({name,blob});log('✅ '+name+' — '+fmtSize(blob.size))}
+  setExpProg(1,'✅ ပြီးပါပြီ');
   const res=E('result');res.innerHTML='<b style="font-size:14px">✅ ပြီးပါပြီ — အောက်မှာ တန်းစီ ဒေါင်းနိုင်ပါတယ်</b>';
   made.forEach(m=>{const url=URL.createObjectURL(m.blob);const a=document.createElement('a');a.href=url;a.download=m.name;a.className='btn light small';a.style.margin='8px 8px 0 0';a.textContent='⬇️ '+m.name;res.appendChild(a)});
   if(window.__recapDone)window.__recapDone(3);
   showDone('✅ အသံ ရပါပြီ — Export ပြီးပါပြီ','Video '+made.length+' ပိုင်း ထုတ်ပြီးပါပြီ — အောက်က ဒေါင်း link များမှ ယူပါ။');
- }catch(err){console.error(err);log('❌ '+humanErr(err));showNotice('❌ Export မအောင်မြင်ပါ: '+humanErr(err),'err')}
- finally{ed.busy=false;ed._cachedVoice=null;ed._cachedVoiceExt=null;btn.classList.remove('loading');btn.disabled=false;btn.querySelector('.btn-label').textContent='🎬 Export';if(window.__refreshFeatureSummaries)window.__refreshFeatureSummaries()}
+ }catch(err){console.error(err);log('❌ '+humanErr(err));if(expStageEl)expStageEl.textContent='❌ မအောင်မြင်ပါ';logBox.style.display='block';if(logTgl)logTgl.textContent='📄 Log ဖျောက်ရန်';showNotice('❌ Export မအောင်မြင်ပါ: '+humanErr(err),'err')}
+ finally{if(expTimer)clearInterval(expTimer);ed.busy=false;ed._cachedVoice=null;ed._cachedVoiceExt=null;btn.classList.remove('loading');btn.disabled=false;btn.querySelector('.btn-label').textContent='🎬 Export';if(window.__refreshFeatureSummaries)window.__refreshFeatureSummaries()}
 }
 </script>
 <script>
@@ -1255,16 +1391,72 @@ function buildSRT(cues,offset,segEnd){
 }
 function downloadText(name,text){const b=new Blob([text],{type:'text/plain;charset=utf-8'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),5000)}
 /* --- ONE cue-building path for SRT editor, SRT download AND burned export ---
-   char-weighted timing (spreadCuesWeighted) + over-long cue splitting at the
-   export render width, so all three consumers share identical timings. */
+   V219: the script is split ONCE into the CANONICAL line list — every
+   entry fits ONE subtitle line at the current subtitle font size (the
+   export PNG start size, subPngOpts) across the frame's usable width,
+   measured with the app's own grapheme-aware wrap. That list is the
+   single source of truth: the TTS speaks exactly it (one chunk per
+   line) and the cues carry exactly its texts. Timings: with a fresh
+   per-line voice they ARE the voice's chunk timeline (below); in
+   original-audio mode they are the char-weighted spread over the trim,
+   as before. */
 function exportMaxW(ed){return canvasGeom(ed).W-40}
+function subLineFs(ed){const W=canvasGeom(ed).W;return Math.round(46*(W/720))}
+function canonicalSplit(ed){
+ const raw=($('#'+ed.p+'-subs').value||'').split('\n').map(s=>s.trim()).filter(Boolean);
+ const maxW=canvasGeom(ed).W-40,fs=subLineFs(ed);
+ const out=[];
+ raw.forEach((line,ri)=>{
+  splitLongCues([{text:line,start:0,end:1}],maxW,fs,1).forEach(pt=>out.push({text:pt.text,raw:ri}));
+ });
+ return out;
+}
+function canonicalLines(ed){return canonicalSplit(ed).map(x=>x.text)}
+/* Cue timings FROM THE VOICE: cue i starts where chunk i starts in the
+   assembled voice — cumulative (chunk duration + the assembly's
+   inter-chunk pause), the whole timeline divided by the effective
+   render speed (atempo scales speech and pauses alike), anchored at
+   the trim start where export/preview place the voice. Cues are
+   contiguous (each ends where the next starts); the LAST cue is never
+   cut at the voice's end when the segment runs longer — it stays on
+   screen to the segment end (the voice-shorter warning still fires). */
+function voiceCueTimings(durs,pause,anchor,eff,segEnd){
+ const f=(eff&&eff>0)?eff:1,P=pause||0,n=durs.length,out=[];
+ let t=anchor;
+ for(let i=0;i<n;i++){
+  const s=t;t+=(durs[i]+(i<n-1?P:0))/f;
+  out.push({start:s,end:(i<n-1)?t:Math.max(t,(typeof segEnd==='number'&&isFinite(segEnd))?segEnd:t)});
+ }
+ return out;
+}
 function unifiedCues(ed){
  const p=ed.p;
- const lines=($('#'+p+'-subs').value||'').split('\n').map(s=>s.trim()).filter(Boolean);
  const start=parseFloat($('#'+p+'-start').value),end=parseFloat($('#'+p+'-end').value);
- if(!lines.length||isNaN(start)||isNaN(end)||end<=start)return[];
- const W=canvasGeom(ed).W;
- return splitLongCues(spreadCuesWeighted(lines,start,end),W-40,Math.max(20,Math.round(28*W/720)));
+ if(isNaN(start)||isNaN(end)||end<=start)return[];
+ const lines=canonicalLines(ed);
+ if(!lines.length)return[];
+ const vc=ed.voiceCache;
+ if(ed.audioMode==='voice'&&vc&&vc.chunkDurs&&vc.chunkDurs.length===lines.length&&vc.linesSig===lines.join('\n')&&vc.engine===ed.ttsEngine&&vc.voice===(ed.ttsEngine==='edge'?ed.edgeVoice:ed.voice)){
+  const ts=voiceCueTimings(vc.chunkDurs,vc.pause||0,start,effSpeedOf(ed),end);
+  ed._cueSrc='voice';
+  return lines.map((text,i)=>({text,start:ts[i].start,end:ts[i].end}));
+ }
+ ed._cueSrc='spread';
+ return spreadCuesWeighted(lines,start,end);
+}
+/* ONE signature for the cue state, shared by the studio (cueSigNow),
+   the SRT download and exportEditor: raw script + trim, plus — in
+   voice mode with a per-line voice — the spoken line list and the
+   effective speed, so a voice regeneration or a speed change makes
+   the stored cues stale and they are re-derived from the voice. */
+function cueSigFor(ed){
+ const p=ed.p;
+ const raw=($('#'+p+'-subs').value||'').split('\n').map(s=>s.trim()).filter(Boolean);
+ const start=parseFloat($('#'+p+'-start').value),end=parseFloat($('#'+p+'-end').value);
+ let sig=raw.join('\n')+'|'+start+'|'+end;
+ const vc=ed.voiceCache;
+ if(ed.audioMode==='voice'&&vc&&vc.chunkDurs)sig+='|V'+effSpeedOf(ed).toFixed(3)+'|'+(vc.linesSig||'');
+ return sig;
 }
 /* --- wire the SRT button (Recap editor) --- */
 ['recap'].forEach(p=>{
@@ -1275,7 +1467,7 @@ function unifiedCues(ed){
   const start=parseFloat($('#'+p+'-start').value),end=parseFloat($('#'+p+'-end').value);
   if(isNaN(start)||isNaN(end)||end<=start){fieldErr(p,'end','SRT အတွက် ဖြတ်ထားသော အပိုင်း (စချိန်/ဆုံးချိန်) အရင် မှန်အောင် ထားပါ');showNotice('⚠️ Trim အချိန် ပြင်ပါ','err');return}
   clearErrs(p);
-  const rawCues=(ed&&ed.cues&&ed.cues.length&&ed.cuesSig===lines.join('\n')+'|'+start+'|'+end)?ed.cues:unifiedCues(ed);
+  const rawCues=(ed&&ed.cues&&ed.cues.length&&ed.cuesSig===cueSigFor(ed))?ed.cues:unifiedCues(ed);
   const syncDl=(ed&&ed.syncDelay)||0; /* ⏱️ Sync Delay applied at download time only */
   const cues=syncDl?rawCues.map(c=>({text:c.text,start:c.start+syncDl,end:c.end+syncDl})):rawCues;
   const srt=buildSRT(cues,start,end);
@@ -1316,7 +1508,7 @@ function unifiedCues(ed){
  ed.cues=[];ed.cuesSig='';ed.cuesManual=false;ed.adjSpeed=1;
  let previewMode=false,previewTimer=null;
  function trimRange(){const s=parseFloat(E('start').value),e=parseFloat(E('end').value);return{start:isNaN(s)?0:s,end:isNaN(e)?0:e}}
- function cueSigNow(){const r=trimRange();return scriptLines().join('\n')+'|'+r.start+'|'+r.end}
+ function cueSigNow(){return cueSigFor(ed)}
  function cuesStale(){return !ed.cues.length||ed.cuesSig!==cueSigNow()}
  function rebuildCues(){ed.cues=unifiedCues(ed);ed.cuesSig=cueSigNow();ed.cuesManual=false;renderCueList();updateCueCount();renderTimeline();if(ed.cues.length)doneStep(1)}
  function ensureCues(){
@@ -1359,6 +1551,28 @@ function unifiedCues(ed){
   ed.cuesSig=cueSigNow();
   updateCueCount();checkVoiceStale();refreshVoiceGate();
  }
+ /* V219: a cue born from SPLITTING a long script line has no 1:1 script
+    line, but the Script box is still the single source of truth — so a
+    text edit is spliced back into its parent script line (located via
+    the canonical split map) and the cue list is re-derived. The edited
+    text is re-split by the same one-line rule if it no longer fits,
+    and the voice goes stale through the normal text-change path, so
+    subtitle text and spoken text can never quietly diverge. (The
+    pop-up's manual times are re-derived in this branch; the 1:1
+    branch above keeps them, as before.) */
+ function spliceCueTextToScript(i,newText){
+  const parts=canonicalSplit(ed);const part=parts[i];if(!part)return;
+  const rawLines=(E('subs').value||'').split('\n');
+  let seen=-1,ti=-1;
+  for(let k=0;k<rawLines.length;k++){if(rawLines[k].trim()){seen++;if(seen===part.raw){ti=k;break}}}
+  if(ti<0)return;
+  const rawText=rawLines[ti],old=ed.cues[i].text;
+  const pos=rawText.indexOf(old);
+  if(pos>=0)rawLines[ti]=rawText.slice(0,pos)+newText+rawText.slice(pos+old.length);
+  else{const sib=[];parts.forEach((pt,pi)=>{if(pt.raw===part.raw)sib.push(pi===i?newText:pt.text)});rawLines[ti]=sib.join(' ')}
+  E('subs').value=rawLines.join('\n');
+  rebuildCues();checkVoiceStale();refreshVoiceGate();
+ }
  function openCuePop(i,fromSubs){
   const cue=ed.cues[i];if(!cue)return;
   cuePopIdx=i;cuePopFromSubs=!!fromSubs;
@@ -1379,7 +1593,7 @@ function unifiedCues(ed){
    const ns=Math.min(sv,Math.max(0,ev-0.1)),ne=Math.max(ev,ns+0.1);
    const nt=E('cpText').value,textChanged=nt!==c.text;
    c.start=ns;c.end=ne;c.text=nt;ed.cuesManual=true;
-   if(textChanged)syncCueTextToScript(cuePopIdx,nt);
+   if(textChanged){if(ed.cues.length===scriptLines().length)syncCueTextToScript(cuePopIdx,nt);else spliceCueTextToScript(cuePopIdx,nt)}
    renderCueList();updateCueCount();updateOverlay(true);renderTimeline();refreshSummaries();
    showNotice('✅ Cue ပြင်ပြီးပါပြီ','ok');
    closeSheet();
@@ -1716,7 +1930,7 @@ function unifiedCues(ed){
   if(previewMode)exitPreview(true);
   if(ed.voiceUrl){try{URL.revokeObjectURL(ed.voiceUrl)}catch(e){}ed.voiceUrl=null}
   if(ed.renderUrl){try{URL.revokeObjectURL(ed.renderUrl)}catch(e){}ed.renderUrl=null}
-  ed.voiceCache=null;ed._effVoice=null;
+  ed.voiceCache=null;ed._effVoice=null;try{ttsLineCache.clear()}catch(e){} /* V219: per-line TTS chunks go with the voice */
   const vp=E('voicePlayer');if(vp)vp.style.display='none';
   const va=E('vpAudio');if(va){try{va.pause()}catch(e){}va.src=''}
   setVoiceStatus('');
@@ -1726,7 +1940,7 @@ function unifiedCues(ed){
  };
  /* ================= voiceover (gated on script, engine choice, cache + mini player) ================= */
  function effVoice(){return ed.ttsEngine==='edge'?ed.edgeVoice:ed.voice}
- function voiceFresh(){const c=ed.voiceCache;return !!(c&&c.text===scriptText()&&c.engine===ed.ttsEngine&&c.voice===effVoice())}
+ function voiceFresh(){const c=ed.voiceCache;if(!c||c.engine!==ed.ttsEngine||c.voice!==effVoice())return false;/* V219: freshness is judged on the canonical line list the voice actually spoke */if(c.linesSig!=null)return c.linesSig===canonicalLines(ed).join('\n');return c.text===scriptText()}
  function checkVoiceStale(){
   const has=!!ed.voiceCache,fresh=voiceFresh();
   const st=E('voiceStale');if(st)st.style.display=(has&&!fresh)?'block':'none';
@@ -1831,8 +2045,11 @@ function unifiedCues(ed){
   ed.voiceBusy=true;const btn=E('voiceGen');busyBtn(btn,true,'အသံ ထုတ်နေပါတယ်…');
   setVoiceStatus('🎙️ အသံ ထုတ်နေပါတယ်…');showNotice('▶️ အသံ ထုတ်ခြင်း စတင်ပါပြီ','info');
   try{
-   const gv=await generateVoice(ed,txt,setVoiceStatus);
-   ed.voiceCache={text:txt,engine:ed.ttsEngine,voice:effVoice(),bytes:gv.bytes,ext:gv.ext,genSpeed:genSpeedFactor(p),dur:0};
+   /* V219: the voice speaks the CANONICAL line list (one chunk per
+      display line) — the same list the cues are built from */
+   const lines=canonicalLines(ed);
+   const gv=await generateVoiceLines(ed,lines,setVoiceStatus);
+   ed.voiceCache={text:txt,lines:lines.slice(),linesSig:lines.join('\n'),engine:ed.ttsEngine,voice:effVoice(),bytes:gv.bytes,ext:gv.ext,genSpeed:genSpeedFactor(p),chunkDurs:gv.chunkDurs,pause:gv.pause||0,dur:0};
    ed._effVoice=null;ed.renderUrl=null;
    ed.adjSpeed=1;const asEl=E('adjSpeed');if(asEl){asEl.value=0;E('adjSpeedVal').textContent='0%'}
    if(ed.voiceUrl)URL.revokeObjectURL(ed.voiceUrl);
@@ -1840,7 +2057,10 @@ function unifiedCues(ed){
    const au=E('vpAudio');au.src=ed.voiceUrl;au.playbackRate=effSpeedOf(ed);
    E('voicePlayer').style.display='block';
    setVoiceStatus('🎙️ အသံ ရပါပြီ — ကြာချိန် တိုင်းနေပါတယ်…');
-   ed.voiceCache.dur=await probeAudioDur(gv.bytes,gv.ext);
+   /* total duration is exact by construction (chunks + pauses); the
+      probe remains as the fallback for the decode-fallback assembly */
+   ed.voiceCache.dur=(gv.chunkDurs&&gv.chunkDurs.length)?gv.chunkDurs.reduce((a,b)=>a+b,0)+(gv.pause||0)*Math.max(0,gv.chunkDurs.length-1):await probeAudioDur(gv.bytes,gv.ext);
+   rebuildCues(); /* V219: cues snap to the voice's own chunk timeline */
    renderTimeline();
    updateVoiceWarn();
    const vi=voiceDurInfo();
@@ -1875,7 +2095,7 @@ function unifiedCues(ed){
   const txt=(info&&info.over)?('⚠️ အသံ ('+info.effDur.toFixed(1)+' စက္ကန့်) က video အပိုင်း ('+info.seg.toFixed(1)+' စက္ကန့်) ထက် ရှည်နေပါတယ် — အသံ အမြန် စုစုပေါင်း '+info.need.toFixed(2)+'× အထိ တင်ပါ၊ သို့မဟုတ် ✂️ Trim Feature မှာ Trim အပိုင်းကို ရှည်ပေးပါ။'):'';
   ['voiceWarn','cueWarn'].forEach(id=>{const w=E(id);if(w){w.style.display=txt?'block':'none';w.textContent=txt}});
   const ei=E('effInfo');
-  if(ei)ei.textContent=info?('အသံ ကြာချိန် ~'+info.effDur.toFixed(1)+' စက္ကန့် (စုစုပေါင်း အမြန် '+fmtSpeed(info.eff)+') · video အပိုင်း '+info.seg.toFixed(1)+' စက္ကန့်'):'';
+  if(ei){if(info){const d=info.seg-info.effDur;const diff=Math.abs(d)<1?' — အံကိုက် ✓':(d>0?(' — video ထက် '+Math.round(d)+'s တို'):(' — video ထက် '+Math.round(-d)+'s ရှည်'));ei.textContent='အသံ ကြာချိန် ~'+fmtDur(info.effDur)+' (စုစုပေါင်း အမြန် '+fmtSpeed(info.eff)+') · video အပိုင်း '+fmtDur(info.seg)+diff}else ei.textContent=''}
  }
  function syncVoicePlayer(){
   const a=E('vpAudio');if(!a)return;
@@ -1884,11 +2104,15 @@ function unifiedCues(ed){
   if(want&&a.src!==want)a.src=want;
   a.playbackRate=rendered?1:Math.max(0.05,effSpeedOf(ed));
  }
- E('genSpeed').addEventListener('input',()=>{E('genSpeedVal').textContent=fmtPct(parseFloat(E('genSpeed').value)||0)});
+ E('genSpeed').addEventListener('input',()=>{E('genSpeedVal').textContent=fmtPct(parseFloat(E('genSpeed').value)||0);updateVoiceWarn()});
  E('adjSpeed').addEventListener('input',()=>{
   ed.adjSpeed=1+(parseFloat(E('adjSpeed').value)||0)/100;
   E('adjSpeedVal').textContent=fmtPct(parseFloat(E('adjSpeed').value)||0);
   syncVoicePlayer();updateVoiceWarn();renderTimeline();
+  /* V219: voice-derived cues are timed by the effective speed — a
+     speed change re-derives them from the voice (hand-timed cues and
+     spread cues are left alone) */
+  if(ed._cueSrc==='voice'&&!ed.cuesManual&&ed.voiceCache&&ed.voiceCache.chunkDurs)rebuildCues();
  });
  E('renderSpeed').onclick=async()=>{
   if(ed.renderBusy)return;
@@ -2000,14 +2224,23 @@ function unifiedCues(ed){
   blurTimesTick();
  }
  function attachBlurDrag(d,r,handle){
-  const wrap=blurLayerEl.parentElement;let mode=null,sx=0,sy=0,orig=null;
-  function down(e){if(!wrap.classList.contains('blur-editing'))return;selectBlurRegion(r.id);mode=(e.target===handle)?'resize':'move';sx=e.clientX;sy=e.clientY;orig={x:r.x,y:r.y,w:r.w,h:r.h};e.preventDefault();e.stopPropagation()}
-  function move(e){if(!mode||!orig)return;const rc=wrap.getBoundingClientRect();if(!rc.width||!rc.height)return;const dx=(e.clientX-sx)/rc.width,dy=(e.clientY-sy)/rc.height;
+  /* V218 continuous tracking: the region takes pointer capture on
+     pointerdown (with touch-action:none in CSS the browser never steals
+     the gesture for scrolling, so one touch drags smoothly instead of
+     jumping per tap). Moves are coalesced through rAF: the latest point
+     is applied to the element style + the region fractions at frame
+     rate, so the sheet's W/H readouts (blurCtlSync) also update DURING
+     the drag; pointerup flushes the final point before persisting. */
+  const wrap=blurLayerEl.parentElement;let mode=null,sx=0,sy=0,orig=null,raf=0,pend=null;
+  function flush(){raf=0;if(!mode||!orig||!pend)return;const rc=wrap.getBoundingClientRect();if(!rc.width||!rc.height)return;const dx=(pend.x-sx)/rc.width,dy=(pend.y-sy)/rc.height;
    if(mode==='move'){r.x=Math.max(0,Math.min(1-r.w,orig.x+dx));r.y=Math.max(0,Math.min(1-r.h,orig.y+dy))}
    else{r.w=Math.max(0.04,Math.min(1-r.x,orig.w+dx));r.h=Math.max(0.03,Math.min(1-r.y,orig.h+dy))}
    d.style.left=(r.x*100)+'%';d.style.top=(r.y*100)+'%';d.style.width=(r.w*100)+'%';d.style.height=(r.h*100)+'%';blurCtlSync()}
-  function up(){if(!mode)return;mode=null;orig=null;persistBlur();blurListRender();blurCtlSync()}
-  d.addEventListener('pointerdown',down);window.addEventListener('pointermove',move);window.addEventListener('pointerup',up);
+  function queue(e){pend={x:e.clientX,y:e.clientY};if(!raf)raf=requestAnimationFrame(flush)}
+  function down(e){if(!wrap.classList.contains('blur-editing'))return;selectBlurRegion(r.id);mode=(e.target===handle)?'resize':'move';sx=e.clientX;sy=e.clientY;orig={x:r.x,y:r.y,w:r.w,h:r.h};try{d.setPointerCapture(e.pointerId)}catch(err){}e.preventDefault();e.stopPropagation()}
+  function move(e){if(!mode)return;queue(e)}
+  function up(){if(!mode)return;if(raf){cancelAnimationFrame(raf);raf=0}if(pend)flush();pend=null;mode=null;orig=null;persistBlur();blurListRender();blurCtlSync()}
+  d.addEventListener('pointerdown',down);d.addEventListener('pointermove',move);d.addEventListener('pointerup',up);d.addEventListener('pointercancel',up);
  }
  function selectBlurRegion(id){ed.blurSel=id;if(!blurLayerEl)return;$$('#'+p+'-blurLayer .blur-region').forEach(d=>d.classList.toggle('sel',d.dataset.rid===id));blurListRender();blurCtlSync()}
  function blurListRender(){
@@ -2284,6 +2517,9 @@ function unifiedCues(ed){
   markToolSel('toolVoice');
  }
  window.__recapShowExport=()=>showPanel('homeExport','🎬 Export');
+ /* V218: the raw ffmpeg log in the Export view hides behind this toggle
+    (collapsed by default; export failures open it automatically). */
+ const logTglBtn=E('logToggle');if(logTglBtn)logTglBtn.onclick=()=>{const lb=E('log');if(!lb)return;const show=lb.style.display!=='block';lb.style.display=show?'block':'none';logTglBtn.textContent=show?'📄 Log ဖျောက်ရန်':'📄 Log ပြရန်'};
  const panelDoneBtn=E('panelDone');if(panelDoneBtn)panelDoneBtn.onclick=()=>showPanel('homeHome');
  function refreshSummaries(){
   /* V216 dead-code removal: the per-feature sum* summary lines went away

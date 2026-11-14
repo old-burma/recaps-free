@@ -121,10 +121,10 @@ body.locked{overflow:hidden}
 .exp-meta .exp-elapsed{font-variant-numeric:tabular-nums;white-space:nowrap}
 .exp-meta .exp-eta{white-space:nowrap;color:#FFD88A;font-variant-numeric:tabular-nums}
 /* ===== preview zone (large, centred, top) + placeholder + overlays ===== */
-.vid-sticky{flex:0 0 auto;background:#000;padding:8px 10px 6px}
+.vid-sticky{flex:0 0 auto;background:#000;padding:8px 10px 6px;position:relative;display:flex;flex-direction:column;height:50vh;height:50dvh}
 .pick-row{display:flex;align-items:center;gap:10px;margin-bottom:10px}
 .pick-row .file-info{margin-top:0}
-.vid-wrap{position:relative;max-width:600px;margin:0 auto}
+.vid-wrap{position:relative;max-width:600px;margin:auto}
 /* V216 WYSIWYG aspect stage: in a fixed-canvas mode the stage IS the
    export canvas (same ratio, same fit) — a blurred cover copy of the
    video fills the canvas (.preview-bg) and the sharp video sits inside
@@ -132,34 +132,42 @@ body.locked{overflow:hidden}
    landscape special case (.stg-square) moves the sharp video into the
    centred 1:1 region (top 21.875%, height 56.25% of the 9:16 stage =
    the export's picY 280/1280 and 720/1280 square), so the subtitle
-   band below it sits in the blur pad exactly as exported. Original
-   mode keeps the pre-V216 raw layout. Stage height was capped (~46vh)
-   so the panel below kept room; V229: the Script panel left the main
-   page (it is a toolbar sheet now), so the caps are raised to ~56vh
-   of stage height and the stage takes the freed space; width follows
-   from the ratio. V231 (user orders): the stage block takes only the
-   TOP HALF of the screen — every cap is in dvh (vh fallback line
-   first; vh on Android Chrome is the LARGE viewport, which is what
-   pushed the toolbar off the bottom in V230) and the stage height is
-   capped twice: ≤ 50dvh − 14px (the .vid-sticky padding, so frame +
-   padding ≤ the top 50%) AND ≤ 100dvh − 340px (the fixed chrome
-   budget: Main row + 61px timeline + toolbar + safe-area), so the
-   column can never overflow the visible height on any phone. Sheets
-   take the bottom 50dvh (see .sheet). */
-.vid-wrap.stg-916,.vid-wrap.stg-169,.vid-wrap.stg-11{overflow:hidden;background:#000;border-radius:12px}
-.vid-wrap.stg-916{aspect-ratio:9/16;width:min(600px,100%,calc((50vh - 14px)*0.5625),calc(max(0px,100vh - 340px)*0.5625));width:min(600px,100%,calc((50dvh - 14px)*0.5625),calc(max(0px,100dvh - 340px)*0.5625))}
-.vid-wrap.stg-169{aspect-ratio:16/9;width:min(600px,100%,calc((50vh - 14px)*1.7778),calc(max(0px,100vh - 340px)*1.7778));width:min(600px,100%,calc((50dvh - 14px)*1.7778),calc(max(0px,100dvh - 340px)*1.7778))}
-.vid-wrap.stg-11{aspect-ratio:1/1;width:min(600px,100%,calc(50vh - 14px),calc(max(0px,100vh - 340px)));width:min(600px,100%,calc(50dvh - 14px),calc(max(0px,100dvh - 340px)))}
+   band below it sits in the blur pad exactly as exported.
+   V233 FIXED REGION (user order 2026-11-14): the stage REGION
+   (.vid-sticky) is a fixed box of exactly 50dvh (vh fallback first) at
+   EVERY aspect — it never grows or shrinks, so nothing below it ever
+   jumps when the aspect changes. The canvas-aspect FRAME (.vid-wrap)
+   is centred inside the region (margin:auto in the region's flex
+   column) and sized to FIT the region: width capped by the region's
+   content height (50dvh − the 14px sticky padding) times the canvas
+   ratio, so frame height = min(region content height, width × H/W)
+   and the frame's aspect is always exactly the canvas aspect.
+   Original uses the same fit with the ratio supplied per file by
+   applyStage via --stg-ar. The transport is REGION chrome now: it
+   lives outside the frame, pinned to the region's bottom edge, so it
+   never moves either. Sheets take the bottom 50dvh (see .sheet). */
+.vid-wrap.stg-916,.vid-wrap.stg-169,.vid-wrap.stg-11,.vid-wrap.stg-orig{overflow:hidden;background:#000;border-radius:12px}
+.vid-wrap.stg-916{aspect-ratio:9/16;width:min(600px,100%,calc((50vh - 14px)*0.5625));width:min(600px,100%,calc((50dvh - 14px)*0.5625))}
+.vid-wrap.stg-169{aspect-ratio:16/9;width:min(600px,100%,calc((50vh - 14px)*1.7778));width:min(600px,100%,calc((50dvh - 14px)*1.7778))}
+.vid-wrap.stg-11{aspect-ratio:1/1;width:min(600px,100%,calc(50vh - 14px));width:min(600px,100%,calc(50dvh - 14px))}
+.vid-wrap.stg-orig{aspect-ratio:var(--stg-ar,1.7778);width:min(600px,100%,calc((50vh - 14px)*var(--stg-ar,1.7778)));width:min(600px,100%,calc((50dvh - 14px)*var(--stg-ar,1.7778)))}
 .vid-wrap .preview-bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0}
-.vid-wrap.stg-916 .preview,.vid-wrap.stg-169 .preview,.vid-wrap.stg-11 .preview{position:absolute;inset:0;width:100%;height:100%;max-height:none;object-fit:contain;border-radius:0;z-index:1}
+.vid-wrap.stg-916 .preview,.vid-wrap.stg-169 .preview,.vid-wrap.stg-11 .preview,.vid-wrap.stg-orig .preview{position:absolute;inset:0;width:100%;height:100%;max-height:none;object-fit:contain;border-radius:0;z-index:1}
 .vid-wrap.stg-square .preview{top:21.875%;bottom:auto;height:56.25%}
-.vid-wrap.stg-916 .ph-box,.vid-wrap.stg-169 .ph-box,.vid-wrap.stg-11 .ph-box{position:absolute;inset:0;aspect-ratio:auto;max-height:none;border-radius:0;z-index:2}
+.vid-wrap.stg-916 .ph-box,.vid-wrap.stg-169 .ph-box,.vid-wrap.stg-11 .ph-box,.vid-wrap.stg-orig .ph-box{position:absolute;inset:0;aspect-ratio:auto;max-height:none;border-radius:0;z-index:2}
 .ph-box{background:#0E2233;border-radius:12px;aspect-ratio:16/9;max-height:38vh;max-height:38dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;cursor:pointer}
 .ph-ic{font-size:38px}
 .ph-t{font-size:15px;font-weight:700;color:#E8F0F5}
 .ph-s{font-size:12px;color:#8FA6B5}
 .sub-overlay{position:absolute;left:4%;right:4%;bottom:9%;text-align:center;font-family:'Padauk','Noto Sans Myanmar',sans-serif;font-weight:700;font-size:clamp(15px,4.4vw,25px);line-height:1.55;color:#fff;text-shadow:0 0 7px rgba(0,0,0,.95),0 2px 4px rgba(0,0,0,.95),-1px 0 0 rgba(0,0,0,.85),1px 0 0 rgba(0,0,0,.85),0 -1px 0 rgba(0,0,0,.85);pointer-events:auto;cursor:grab;touch-action:none;display:none;white-space:pre-line;z-index:5}
 .sub-overlay:active{cursor:grabbing}
+/* V233: the overlay is the exported BAND box — applySubPos sets its
+   top + height from subBandGeom (frame fractions) and the text block
+   lives in .sub-inner, centred in the band exactly like textPNG
+   centres it in the export PNG; the optional plate rides the inner
+   div (textPNG draws its plate around the text block, not the band) */
+.sub-overlay{flex-direction:column;align-items:center;justify-content:center}
+.sub-inner{width:100%;box-sizing:border-box}
 .mode-pill{position:absolute;top:10px;left:50%;transform:translateX(-50%);background:rgba(10,28,38,.72);color:#fff;font-size:12px;font-weight:700;padding:5px 14px;border-radius:999px;pointer-events:none;z-index:8;white-space:nowrap;max-width:92%;overflow:hidden;text-overflow:ellipsis;transition:opacity .45s ease}
 .mode-pill.hide{opacity:0}
 .title-overlay{position:absolute;top:max(46px,13%);left:5%;right:5%;text-align:center;font-weight:800;font-size:clamp(16px,5vw,30px);line-height:1.4;color:#FFE92E;text-shadow:0 2px 6px rgba(0,0,0,.85),0 0 3px rgba(0,0,0,.8);pointer-events:auto;cursor:grab;touch-action:none;display:none;z-index:4;font-family:'Padauk','Noto Sans Myanmar',sans-serif;white-space:pre-line;transform:translate(-50%,-50%);width:max-content;max-width:94%}
@@ -387,6 +395,40 @@ function scaledGeom(W,H,res){const ev=n=>Math.max(2,Math.round(n/2)*2);const s=M
 function exportGeom(ed){const G=canvasGeom(ed);const res=(ed&&ed._expOpts&&ed._expOpts.res)||1080;return scaledGeom(G.W,G.H,res)}
 /* the standing special case: 9:16 canvas + landscape source */
 function aspectSpecial916(ed){if(ed&&ed.aspect&&ed.aspect!=='9:16')return false;return((ed&&ed.videoW)||1280)>((ed&&ed.videoH)||720)}
+/* V233: THE subtitle geometry — the ONE source of truth shared by the
+   ffmpeg export (exportOne), the Hardware plan (hwFramePlan) and the
+   stage overlay (applySubPos), replacing the three duplicated formula
+   blocks that DISAGREED (user report 2026-11-14: the subtitle sat at
+   one height on the stage and another in the exported file).
+   Semantics: subPosY is the subtitle BAND's TOP as a frame fraction
+   (the V210 definition) — for the default AND the dragged/custom
+   position alike. The band is the 170·S-tall subtitle PNG; textPNG
+   centres the text block inside it, and the stage overlay now renders
+   the same band box (top + height as frame fractions, text centred
+   inside), so what the stage shows is pixel-for-pixel what exports.
+   The old stage overlay instead positioned the bare TEXT block by the
+   same fraction, so its text always sat (bandH − textH)/2 higher than
+   the export's. Worse, the old export anchor ignored the band height:
+   bandH scales with the canvas WIDTH (S = W/720), so on a 16:9 canvas
+   the band is 453px of a 1080px frame and the 0.81 anchor centred the
+   text at 102% of H — half-clipped at the bottom edge (the user's
+   gallery recording). CONTAINMENT: the effective band top is clamped
+   to H − bandH here, once, for every consumer, so the band — and the
+   text centred inside it — is ALWAYS fully inside the frame, at every
+   aspect and every position. Fractions are resolution-invariant:
+   canvasGeom (stage) and exportGeom (export) give identical values. */
+function subBandGeom(ed,G){
+ const W=G.W,H=G.H,S=W/720,bandH=Math.round(170*S);
+ const special=aspectSpecial916(ed);
+ const picY=special?Math.round(H*0.21875):0;
+ let subY;
+ if(ed&&ed.subPosCustom)subY=Math.round(clampSubPos(ed.subPosY)*H); /* dragged position: band top, the V210 mapping */
+ else if(special)subY=Math.round(H*(1035/1280)); /* below the 1:1 picture, in the blur pad */
+ else if(ed&&ed.aspect==='Original')subY=H-bandH; /* band flush with the bottom edge */
+ else subY=Math.round(0.81*H);
+ subY=Math.max(0,Math.min(subY,H-bandH)); /* containment clamp — see above */
+ return{special:special,picY:picY,bandH:bandH,subY:subY,subYFrac:H?subY/H:0,bandHFrac:H?bandH/H:0};
+}
 /* V215: the full Gemini studio-voice catalogue (same 30 names as the
    Burmese Voice app's GEMINI_VOICES, Kore first). The old 5-name list
    only ever fed the retired voice-detail picker; generateVoice passes
@@ -460,13 +502,16 @@ async function idbAdd(item){return idbTx('readwrite',(s,o)=>{const q=s.add(item)
 <script>
 /* ================= Recap editor ================= */
 function editorHTML(p){
-/* V212: the transport floats INSIDE .vid-wrap on the frame's bottom
-   edge — an icon-only row (no glass, no button backgrounds) with a
-   separate slim seek line under it (defined before frameInner so it
-   can be embedded in it) */
+/* V212: the transport is an icon-only row (no glass, no button
+   backgrounds) with a separate slim seek line under it.
+   V233: it is REGION chrome, not frame chrome — it is appended AFTER
+   the .vid-wrap inside .vid-sticky, so it pins to the fixed 50dvh
+   region's bottom edge and never moves when the aspect (and with it
+   the centred frame) changes. Defined before frameInner so it can be
+   embedded beside it. */
 const transportInner='<div class="transport" id="'+p+'-transport"><div class="tp-row"><button class="tp-play" id="'+p+'-tpPlay" aria-label="Play / Pause">▶</button><button class="tp-skip" id="'+p+'-tpBack" aria-label="5 စက္ကန့် နောက်ပြန်">⏪</button><span class="tp-time" id="'+p+'-tpCur">0:00</span><span class="tp-time tp-right" id="'+p+'-tpDur">0:00</span><button class="tp-skip" id="'+p+'-tpFwd" aria-label="5 စက္ကန့် ရှေ့တိုး">⏩</button></div><input type="range" class="tp-seek" id="'+p+'-tpSeek" min="0" max="1000" value="0"></div>';
 const frameInner='<input type="file" id="'+p+'-file" accept="video/*" style="display:none">'
-+'<div class="vid-wrap"><div class="ph-box" id="'+p+'-ph"><div class="ph-ic">🎬</div><div class="ph-t">Tap to Upload Video</div><div class="ph-s">နှိပ်ပြီး video ဖိုင် ရွေးပါ</div></div><video class="preview-bg" id="'+p+'-videoBg" playsinline muted style="display:none"></video><video class="preview framed" id="'+p+'-video" playsinline style="display:none"></video><div class="mode-pill hide" id="'+p+'-modePill">🎬 Movie Recap Mode</div><div class="title-overlay" id="'+p+'-titleOvl"></div><div class="logo-overlay" id="'+p+'-logoOvl"></div><div class="blur-layer" id="'+p+'-blurLayer"></div><div class="sub-overlay" id="'+p+'-overlay"></div><div class="text-overlay" id="'+p+'-textOvl"></div><div class="frame-border" id="'+p+'-borderOvl"></div>'+transportInner+'</div>';
++'<div class="vid-wrap"><div class="ph-box" id="'+p+'-ph"><div class="ph-ic">🎬</div><div class="ph-t">Tap to Upload Video</div><div class="ph-s">နှိပ်ပြီး video ဖိုင် ရွေးပါ</div></div><video class="preview-bg" id="'+p+'-videoBg" playsinline muted style="display:none"></video><video class="preview framed" id="'+p+'-video" playsinline style="display:none"></video><div class="mode-pill hide" id="'+p+'-modePill">🎬 Movie Recap Mode</div><div class="title-overlay" id="'+p+'-titleOvl"></div><div class="logo-overlay" id="'+p+'-logoOvl"></div><div class="blur-layer" id="'+p+'-blurLayer"></div><div class="sub-overlay" id="'+p+'-overlay"></div><div class="text-overlay" id="'+p+'-textOvl"></div><div class="frame-border" id="'+p+'-borderOvl"></div></div>'+transportInner;
 const pickRow='<div class="pick-row"><button class="btn light small" id="'+p+'-pick">📱 Video ရွေးရန်</button><div class="file-info" id="'+p+'-fileinfo">ဖိုင် မရွေးရသေးပါ</div></div>';
 const trimInner='<div class="row2"><div class="field" id="'+p+'-f-start"><label>စချိန် (စက္ကန့်)</label><input type="number" id="'+p+'-start" value="0" min="0" step="0.1"><div class="err-text" id="'+p+'-e-start"></div></div><div class="field" id="'+p+'-f-end"><label>ဆုံးချိန် (စက္ကန့်)</label><input type="number" id="'+p+'-end" value="0" min="0" step="0.1"><div class="err-text" id="'+p+'-e-end"></div></div></div>'
 +'<div class="field"><label>စချိန် slider</label><input type="range" id="'+p+'-rstart" value="0" min="0" max="100" step="0.1"></div><div class="field"><label>ဆုံးချိန် slider</label><input type="range" id="'+p+'-rend" value="0" min="0" max="100" step="0.1"></div><p class="hint" style="font-size:12px;color:#527884">ကြာချိန်: <b id="'+p+'-durinfo">—</b></p><button class="btn light" id="'+p+'-trimReset" style="width:100%">↺ အပြည့် ပြန်ထား (Video တစ်ခုလုံး)</button>';
@@ -652,9 +697,9 @@ const homes='<div id="'+p+'-sheetHomes" style="display:none">'
 /* ---- Layout (V213, CapCut-style; V229 Script sheet; V230 Main row +
    Export sheet; V231 strip deleted + 50/50 split): dark editor that
    fills the viewport — the page itself never scrolls. NO top bar —
-   first comes the preview frame (transparent icon transport + slim
-   seek line overlaid on its bottom edge), capped at the TOP 50dvh of
-   the screen, then the MAIN ROW (Original/New mode buttons + style
+   first comes the preview REGION — a fixed 50dvh box (V233) holding
+   the centred canvas-aspect frame, with the transport pinned to the
+   region's bottom edge — then the MAIN ROW (Original/New mode buttons + style
    chips + SRT/Voice quick toggles + the 🎬 Export button + Create
    status — the mode section that used to live in the Script sheet;
    V231: the old status strip under the frame is DELETED and its
@@ -712,6 +757,11 @@ function makeEditor(p){
   wrap.classList.toggle('stg-11',ed.aspect==='1:1');
   wrap.classList.toggle('stg-orig',!fixed);
   wrap.classList.toggle('stg-square',fixed&&aspectSpecial916(ed));
+  /* V233: Original's frame ratio comes from the source file itself —
+     the .stg-orig CSS fits the frame inside the fixed 50dvh region
+     with this unitless ratio (canvasGeom's aspect for the file) */
+  if(fixed){wrap.style.removeProperty('--stg-ar')}
+  else{const aw=ed.videoW||0,ah=ed.videoH||0;wrap.style.setProperty('--stg-ar',(aw>0&&ah>0)?String(Math.round(aw/ah*10000)/10000):'1.7778')}
   if(bg){
    if(fixed){bg.style.display='block';const src=v.currentSrc||v.src;if(src&&bg.src!==src)bg.src=src;bg.style.filter='blur('+Math.max(2,Math.round((ed.blur||28)/2))+'px) brightness(.92) saturate(.85)';if(!v.paused&&bg.paused)bg.play().catch(()=>{})}
    else bg.style.display='none';
@@ -1282,12 +1332,9 @@ async function exportOne(ff,ed,seg,idx,total,log,progs){
     default 1080 exportGeom == canvasGeom and the graph is unchanged. */
  const G=exportGeom(ed);const W=G.W,H=G.H,S=W/720;
  const special=aspectSpecial916(ed);
- let picY=0,subY;
- if(special){picY=Math.round(H*0.21875);subY=Math.round(H*(1035/1280))}
- else if(ed.aspect==='Original')subY=H-Math.round(170*S);
- else subY=Math.round(0.81*H);
- /* dragged subtitle position: % of frame height -> top of the export subtitle band */
- if(ed.subPosCustom)subY=Math.round(clampSubPos(ed.subPosY)*H); /* V210: same 4%–88% containment as the preview slider/drag */
+ /* V233: picY/subY from the ONE shared geometry (subBandGeom) — the
+    stage overlay renders the identical band, containment included */
+ const SG=subBandGeom(ed,G);const picY=SG.picY,subY=SG.subY;
  const useSub=$('#'+ed.p+'-subTgl').classList.contains('on')&&seg.cues.length;
  /* V221: the chooser's per-export include toggles — off excludes the
     element from THIS export only; the Title/Logo settings themselves
@@ -1427,17 +1474,16 @@ function hwChunksToAnnexB(chunks,avcDesc,format){
    segment's), the mixed audio is stream-copied in beside it */
 function hwMuxArgs(fpsStr,audioFile,idx){const a=['-framerate',fpsStr,'-i','hw_v'+idx+'.h264'];if(audioFile)a.push('-i',audioFile);a.push('-map','0:v:0');if(audioFile)a.push('-map','1:a:0');a.push('-c','copy','-movflags','+faststart','out'+idx+'.mp4');return a}
 /* PURE frame plan: every pixel value mirrors exportOne's graph math
-   (same G/S, picY/subY formulas, region clamping, border width), so
-   the canvas compositor draws exactly the layout the graph encodes */
+   (same G/S, picY/subY from the shared subBandGeom, region clamping,
+   border width), so the canvas compositor draws exactly the layout
+   the graph encodes */
 function hwFramePlan(ed,seg,G){
  const W=G.W,H=G.H,S=W/720,dur=seg.end-seg.start;
  const vw=(ed&&ed.videoW)||1280,vh=(ed&&ed.videoH)||720;
  const special=aspectSpecial916(ed);
- let picY=0,subY;
- if(special){picY=Math.round(H*0.21875);subY=Math.round(H*(1035/1280))}
- else if(ed.aspect==='Original')subY=H-Math.round(170*S);
- else subY=Math.round(0.81*H);
- if(ed.subPosCustom)subY=Math.round(clampSubPos(ed.subPosY)*H);
+ /* V233: picY/subY/bandH from the ONE shared geometry (subBandGeom),
+    identical to exportOne and to the stage overlay */
+ const SG=subBandGeom(ed,G);const picY=SG.picY,subY=SG.subY;
  const blurPx=Math.max(2,Math.round(((ed&&ed.blur)||28)/2*S));
  let bg=null,fg;
  if(ed.aspect!=='Original'){const sc=Math.max(W/vw,H/vh);const w=Math.round(vw*sc),h=Math.round(vh*sc);bg={x:Math.round((W-w)/2),y:Math.round((H-h)/2),w:w,h:h}}
@@ -1451,7 +1497,7 @@ function hwFramePlan(ed,seg,G){
   return{x:rx,y:ry,w:rw,h:rh,type:r.type==='mosaic'?'mosaic':'blur',blurPx:Math.max(2,Math.round(((r.strength||40)/2)*S)),block:Math.max(4,Math.round(((r.strength||40)/2)*S)),timed:timed,from:timed?Math.max(0,r.start||0):0,to:timed?Math.min(dur,r.end):dur};
  });
  const bI=Math.max(2,Math.round(((ed&&ed.borderW)||6)*S));
- return{W:W,H:H,S:S,special:special,picY:picY,subY:subY,bandH:Math.round(170*S),blurPx:blurPx,bg:bg,fg:fg,regions:regions,border:{on:!!ed.borderOn,w:bI,color:String((ed&&ed.borderColor)||'#FFE92E')},dur:dur};
+ return{W:W,H:H,S:S,special:special,picY:picY,subY:subY,bandH:SG.bandH,blurPx:blurPx,bg:bg,fg:fg,regions:regions,border:{on:!!ed.borderOn,w:bI,color:String((ed&&ed.borderColor)||'#FFE92E')},dur:dur};
 }
 /* draw ONE composited frame in the ffmpeg graph's z-order: blurred
    cover fill -> main picture -> blur/mosaic regions -> title ->
@@ -1698,6 +1744,252 @@ async function hwEncodeSegmentRt(ed,seg,plan,layers,onProg){
   try{v.removeAttribute('src');v.load()}catch(e){}
  }
 }
+/* ================= V233: ⚡ Fast = decoder PIPELINE first =================
+   The seek-step pump pays one seek + one keyframe decode per output
+   frame (a 1-minute clip took ~10 minutes on the user's phone). The
+   pipeline pump replaces ONLY the frame source: mp4box demuxes the
+   source MP4 (loaded lazily, only when a Hardware Fast export starts,
+   from the same unpkg CDN pattern as the ffmpeg loads), the encoded
+   samples overlapping the segment are fed sequentially to a WebCodecs
+   VideoDecoder, and each decoded frame is composited onto the SAME
+   30fps grid by the SAME calls (hwDrawFrame, the export-preview
+   mirror, the same encoder setup and chunk collection) — so for the
+   same plan/segment its (timestamp, duration, keyframe) output is
+   identical to the seek-step pump's. Anything that is not a plain
+   H.264 MP4 — WebM, an unparseable file, HEVC, a CDN failure, a
+   decoder error mid-stream — throws out of the pipeline and the
+   dispatcher below falls back to the seek-step pump for that export;
+   the Real-time pump is untouched. Memory stays bounded for 1-hour
+   sources: the file streams through mp4box in 1 MB Blob slices (never
+   one whole-file arrayBuffer), the sample queue is capped, and every
+   decoded frame is closed right after compositing or when a newer
+   frame supersedes it. */
+const MP4BOX_SRC='https://unpkg.com/mp4box@0.5.2/dist/mp4box.all.min.js';
+/* lazy demuxer load — a function declaration on purpose: the same
+   test-overridable seam pattern as hwWaitMeta / hwRtStallMs */
+async function hwLoadMp4Box(){
+ if(window.MP4Box&&window.MP4Box.createFile)return window.MP4Box;
+ if(hwLoadMp4Box._p)return hwLoadMp4Box._p;
+ const pr=new Promise((res,rej)=>{
+  const s=document.createElement('script');s.src=MP4BOX_SRC;s.async=true;
+  s.onload=()=>{hwLoadMp4Box._p=null;(window.MP4Box&&window.MP4Box.createFile)?res(window.MP4Box):rej(new Error('mp4box library မရပါ'))};
+  s.onerror=()=>{hwLoadMp4Box._p=null;rej(new Error('mp4box library တင် မရပါ — internet စစ်ပါ'))};
+  (document.head||document.documentElement).appendChild(s);
+ });
+ hwLoadMp4Box._p=pr;return pr;
+}
+/* the avcC decoder-configuration record (avcC box minus its 8-byte
+   header) from the track's sample-description entry; undefined when
+   anything about the box walk is unavailable — the decoder then
+   negotiates from the in-band SPS/PPS instead */
+function hwAvcCDescription(MP4B,mp4f,trackId){
+ try{
+  const trak=mp4f&&mp4f.getTrackById?mp4f.getTrackById(trackId):null;
+  const e=trak&&trak.mdia&&trak.mdia.minf&&trak.mdia.minf.stbl&&trak.mdia.minf.stbl.stsd&&trak.mdia.minf.stbl.stsd.entries&&trak.mdia.minf.stbl.stsd.entries[0];
+  if(!e||!e.avcC||typeof e.avcC.write!=='function'||!MP4B||!MP4B.DataStream)return undefined;
+  const ds=new MP4B.DataStream(undefined,0,MP4B.DataStream.BIG_ENDIAN);
+  e.avcC.write(ds);
+  const buf=ds.buffer?new Uint8Array(ds.buffer):new Uint8Array(0);
+  return buf.length>8?buf.slice(8):undefined;
+ }catch(err){return undefined}
+}
+async function hwEncodeSegmentPipe(ed,seg,plan,layers,onProg){
+ const st=expHwStatus();if(!st.ok)throw new Error('Hardware engine မရပါ — '+st.reason);
+ if(ed.file&&((ed.file.type||'')==='video/webm'||/\.webm$/i.test(ed.file.name||'')))throw new Error('WebM ဖိုင် — decoder pipeline မရပါ');
+ if(typeof window.VideoDecoder!=='function')throw new Error('VideoDecoder မရပါ (fast pipeline)');
+ if(typeof window.EncodedVideoChunk!=='function')throw new Error('EncodedVideoChunk မရပါ (fast pipeline)');
+ if(!ed.file||typeof ed.file.slice!=='function'||typeof ed.file.size!=='number')throw new Error('source ဖိုင် မရပါ (fast pipeline)');
+ const MP4B=await hwLoadMp4Box();
+ if(!MP4B||typeof MP4B.createFile!=='function')throw new Error('mp4box မရပါ (fast pipeline)');
+ const dur=seg.end-seg.start,fpsOut=30,totalFrames=Math.max(1,Math.round(dur*fpsOut)),frameDurUs=Math.round(1000000/fpsOut);
+ const chkCancel=()=>{if(ed._expCancel&&ed._expCancel.hit)throw expCancelError()};
+ const startUs=Math.round(seg.start*1000000),endUs=Math.round(seg.end*1000000);
+ const REORDER_US=250000;   /* a slot's frame is final once a frame 0.25s past it has been delivered */
+ /* ---- demux + decode feeder state ---- */
+ const mp4f=MP4B.createFile();
+ const chunkQ=[];            /* encoded samples waiting for the decoder (capped in the feeder) */
+ const framesBuf=[];         /* decoded VideoFrames, kept sorted by timestamp */
+ let bufMaxUs=-1,inputDone=false,feedErr=null,decErr=null,pumpDead=false;
+ let track=null,dec=null,decReady=null,samplesSeen=0,samplesTotal=-1;
+ let cur=null;   /* the frame currently composited (owned; closed when superseded or in finally) */
+ let feeding=false,stopAfter=false,windowDone=false,pendingGop=[],demuxEnded=false;
+ function fail(e){if(!feedErr)feedErr=e}
+ function sampleTs(s){return(s&&typeof s.timescale==='number'&&s.timescale>0)?s.timescale:((track&&track.timescale)||1000)}
+ function queueSample(s){const ts=sampleTs(s);chunkQ.push(new window.EncodedVideoChunk({type:s.is_sync?'key':'delta',timestamp:Math.round((s.cts/ts)*1000000),duration:Math.max(1,Math.round((((s.duration||0)/ts)*1000000))),data:s.data}))}
+ /* segment window: whole GOPs before the segment are dropped except
+    the one CONTAINING seg.start (decoding starts at its keyframe);
+    feeding stops at the first keyframe at/after seg.end */
+ function gateSample(s){
+  if(stopAfter)return;
+  const ptsUs=Math.round((s.cts/sampleTs(s))*1000000);
+  if(!feeding){
+   if(s.is_sync){
+    if(pendingGop.length){
+     if(ptsUs<=startUs){pendingGop=[s];return}
+     for(const ps of pendingGop)queueSample(ps);pendingGop=[];feeding=true;
+     if(ptsUs>=endUs){stopAfter=true;windowDone=true;return}
+     queueSample(s);return;
+    }
+    pendingGop=[s];return;
+   }
+   if(pendingGop.length)pendingGop.push(s);
+   return;
+  }
+  if(s.is_sync&&ptsUs>=endUs){stopAfter=true;windowDone=true;return}
+  queueSample(s);
+ }
+ function finishSamples(){
+  if(windowDone)return;windowDone=true;
+  if(!feeding&&pendingGop.length){for(const ps of pendingGop)queueSample(ps);pendingGop=[];feeding=true}
+ }
+ mp4f.onError=e=>{fail(new Error('mp4 parse မရပါ: '+((e&&e.message)||e)))};
+ mp4f.onReady=info=>{
+  try{
+   const vt=(info&&info.videoTracks&&info.videoTracks[0])||((info&&info.tracks)||[]).filter(t=>t&&t.type==='video')[0];
+   if(!vt){fail(new Error('video track မတွေ့ပါ (fast pipeline)'));return}
+   if(!/^avc1/.test(vt.codec||'')){fail(new Error('codec '+((vt&&vt.codec)||'?')+' — H.264 မဟုတ်ပါ (fast pipeline)'));return}
+   track=vt;samplesTotal=(typeof vt.nb_samples==='number')?vt.nb_samples:-1;
+   mp4f.setExtractionOptions(vt.id,null,{nbSamples:50});
+   decReady=(async()=>{
+    const cfg={codec:vt.codec,codedWidth:(vt.video&&vt.video.width)||0,codedHeight:(vt.video&&vt.video.height)||0,optimizeForLatency:true};
+    if(!cfg.codedWidth||!cfg.codedHeight)throw new Error('video အရွယ်အစား မရပါ (fast pipeline)');
+    const desc=hwAvcCDescription(MP4B,mp4f,vt.id);if(desc)cfg.description=desc;
+    let sup=null;try{sup=await window.VideoDecoder.isConfigSupported(cfg)}catch(e){}
+    if(!sup||!sup.supported)throw new Error('VideoDecoder က ဒီ H.264 ပုံစံကို မထောက်ပံ့ပါ (fast pipeline)');
+    dec=new window.VideoDecoder({
+     output:vf=>{const us=(typeof vf.timestamp==='number')?vf.timestamp:0;let i=framesBuf.length;while(i>0&&framesBuf[i-1].timestamp>us)i--;framesBuf.splice(i,0,vf);if(us>bufMaxUs)bufMaxUs=us},
+     error:e=>{if(!decErr)decErr=e}
+    });
+    dec.configure(sup.config||cfg);
+   })();
+   decReady.catch(e=>fail(e));
+   mp4f.start();
+  }catch(e){fail(e)}
+ };
+ mp4f.onSamples=(id,user,samples)=>{
+  if(!track||id!==track.id||!samples)return;
+  samplesSeen+=samples.length;
+  for(const s of samples)gateSample(s);
+  if(samplesTotal>=0&&samplesSeen>=samplesTotal)finishSamples();
+ };
+ /* the feeder: streams the file, drains the sample queue into the
+    decoder under its queue cap, and flushes the decoder once the
+    segment window is complete. It NEVER rejects — errors land in
+    feedErr/decErr for the pump loop, and it stops when the pump dies. */
+ const feedTask=(async()=>{
+  try{
+   const f=ed.file,CHUNK=1<<20;let off=0;
+   while(!pumpDead){
+    if(ed._expCancel&&ed._expCancel.hit)return;
+    if(feedErr||decErr)return;
+    let progressed=false;
+    if(dec&&chunkQ.length&&dec.decodeQueueSize<=8){dec.decode(chunkQ.shift());progressed=true}
+    if(!windowDone&&off<f.size&&chunkQ.length<=32&&framesBuf.length<=12){
+     const ab=await f.slice(off,Math.min(f.size,off+CHUNK)).arrayBuffer();
+     if(pumpDead)return;
+     if(!ab||!ab.byteLength){off=f.size}
+     else{ab.fileStart=off;mp4f.appendBuffer(ab);off+=ab.byteLength}
+     progressed=true;
+    }
+    if(!windowDone&&off>=f.size){
+     if(!demuxEnded){demuxEnded=true;try{mp4f.flush()}catch(e){}}
+     else{await hwSleep(30);finishSamples();if(!track){fail(new Error('mp4 parse မရပါ (fast pipeline)'));return}}
+    }
+    if(windowDone&&dec&&!chunkQ.length){try{await dec.flush()}catch(e){if(!decErr)decErr=e}return}
+    if(!progressed)await hwSleep(5);
+   }
+  }catch(e){fail(e)}
+  finally{inputDone=true}
+ })();
+ /* ---- canvas + encoder: the seek-step pump's exact setup ---- */
+ let enc=null;
+ try{
+  const cv=document.createElement('canvas');cv.width=plan.W;cv.height=plan.H;
+  const ctx=cv.getContext('2d');if(!ctx)throw new Error('Canvas 2D context မရပါ');
+  const cfg=await hwEncoderConfig(plan.W,plan.H,fpsOut,st);chkCancel();
+  const chunks=[];let encErr=null,avcDesc=null;
+  enc=new window.VideoEncoder({
+   output:(chunk,meta)=>{try{const buf=new Uint8Array(chunk.byteLength);chunk.copyTo(buf);chunks.push({buf:buf,type:chunk.type});if(meta&&meta.decoderConfig&&meta.decoderConfig.description&&!avcDesc)avcDesc=new Uint8Array(meta.decoderConfig.description)}catch(e){if(!encErr)encErr=e}},
+   error:e=>{if(!encErr)encErr=e}
+  });
+  try{enc.configure(cfg)}catch(e){throw new Error('Hardware encoder configure မရပါ: '+((e&&e.message)||e))}
+  /* V229 live preview — the same show/mirror lines as the other pumps */
+  let pctx=null;
+  try{const pv=$('#'+ed.p+'-expPrev');if(pv){pv.width=plan.W;pv.height=plan.H;pctx=pv.getContext('2d');if(pctx)pv.style.display='block'}}catch(e){pctx=null}
+  const fmt=(cfg.avc&&cfg.avc.format)||st.format||'annexb';
+  let frames=0,prevTs=null;
+  while(frames<totalFrames){
+   chkCancel();if(encErr)throw new Error('Hardware encoder error: '+((encErr&&encErr.message)||encErr));
+   while(enc.encodeQueueSize>8){await hwSleep(10);chkCancel();if(encErr)throw new Error('Hardware encoder error: '+((encErr&&encErr.message)||encErr))}
+   if(decErr)throw new Error('VideoDecoder error: '+((decErr&&decErr.message)||decErr));
+   /* the frame on screen at this slot's media time: the newest decoded
+      frame at or before it, once the reorder window has settled */
+   const target=Math.min(seg.start+frames/fpsOut,seg.end-0.001),targetUs=Math.round(target*1000000);
+   let best=null,bestIdx=-1,spins=0;
+   for(;;){
+    chkCancel();if(encErr)throw new Error('Hardware encoder error: '+((encErr&&encErr.message)||encErr));
+    if(decErr)throw new Error('VideoDecoder error: '+((decErr&&decErr.message)||decErr));
+    best=null;bestIdx=-1;
+    for(let k=framesBuf.length-1;k>=0;k--){if(framesBuf[k].timestamp<=targetUs){best=framesBuf[k];bestIdx=k;break}}
+    const settled=inputDone||bufMaxUs>targetUs+REORDER_US;
+    if(best&&settled)break;
+    if(!best&&settled&&framesBuf.length){best=framesBuf[0];bestIdx=0;break}
+    if(settled&&!framesBuf.length)break;   /* nothing newer: duplicate cur below */
+    if(feedErr&&!best)throw feedErr;
+    if(++spins>1200)break;   /* pathological stall: proceed with what exists; the no-frame case throws below */
+    await hwSleep(5);
+   }
+   let superseded=null;
+   if(best){
+    for(let j=0;j<bestIdx;j++){try{framesBuf[j].close()}catch(e){}}   /* older frames can never be on screen again */
+    framesBuf.splice(0,bestIdx+1);
+    superseded=(cur&&cur!==best)?cur:null;
+    cur=best;
+   }else{
+    if(feedErr)throw feedErr;
+    if(!cur)throw new Error('decoder မှ frame မရပါ (fast pipeline)');
+    /* slot with no new frame: duplicate the last one (cur) */
+   }
+   const ts=hwFrameTs(seg.start,target,prevTs);prevTs=ts;
+   hwDrawFrame(ctx,cv,plan,cur,layers,ts/1000000);
+   if(superseded){try{superseded.close()}catch(e){}}   /* closed immediately after compositing its replacement */
+   if(pctx){try{pctx.drawImage(cv,0,0)}catch(e){pctx=null}} /* V229: live-preview mirror of the exact frame about to be encoded */
+   const vf=new window.VideoFrame(cv,{timestamp:ts,duration:frameDurUs});
+   try{enc.encode(vf,{keyFrame:frames===0||frames%150===0})}finally{vf.close()}
+   frames++;
+   if(onProg)onProg(frames/totalFrames,{timeUs:Math.round(frames/fpsOut*1000000)});
+  }
+  chkCancel();
+  try{await enc.flush()}catch(e){if(!encErr)encErr=e}
+  if(encErr)throw new Error('Hardware encoder error: '+((encErr&&encErr.message)||encErr));
+  if(!frames)throw new Error('frame တစ်ပုံမှ မရပါ');
+  return{stream:hwChunksToAnnexB(chunks,avcDesc,fmt),frames:frames,format:fmt};
+ }finally{
+  pumpDead=true;
+  if(enc){try{enc.close()}catch(e){}}
+  if(dec){try{dec.close()}catch(e){}}
+  /* the last composited frame + any buffered leftovers close here */
+  if(cur){try{cur.close()}catch(e){}}
+  for(const f2 of framesBuf){try{f2.close()}catch(e){}}
+  feedTask.catch(()=>{});
+ }
+}
+/* ⚡ Fast dispatcher: pipeline first; ANY pipeline failure (except a
+   user cancel) falls back to the seek-step pump for this export, and
+   the outcome is written to the export Log so support questions are
+   answerable. The Real-time pump never passes through here. */
+async function hwEncodeSegmentFast(ed,seg,plan,layers,onProg,log){
+ const note=(typeof log==='function')?log:function(){};
+ try{
+  const r=await hwEncodeSegmentPipe(ed,seg,plan,layers,onProg);
+  note('⚡ Fast: decoder pipeline နဲ့ ထုတ်ထားပါတယ်');
+  return r;
+ }catch(e){
+  if(e&&e.cancelled)throw e;
+  note('ℹ️ Fast pipeline မရပါ — '+(((e&&e.message)||e))+' · seek-step နည်းနဲ့ ပြန်ထုတ်နေပါတယ်…');
+  return hwEncodeSegment(ed,seg,plan,layers,onProg);
+ }
+}
 /* the mixed audio track, produced by an audio-only ffmpeg run over
    the SAME mix math as exportOne's fcMix (mixGains, apad/atrim,
    amix) — or, in original mode, the same copy-then-AAC order as
@@ -1752,8 +2044,14 @@ async function exportOneHw(ff,ed,seg,idx,total,log,progs){
  prepStep('🎙️ အသံ ပြင်နေပါတယ်…');
  log('Video ထုတ်နေပါတယ် ('+(idx+1)+'/'+total+') — '+dur.toFixed(1)+' စက္ကန့် (Hardware)…');
  if(runP)runP(0,'🎬 Hardware နဲ့ ထုတ်နေပါတယ် ('+(idx+1)+'/'+total+')');
- const hwPump=(ed._expOpts&&ed._expOpts.hwPace==='rt')?hwEncodeSegmentRt:hwEncodeSegment; /* V232: per-export pacing choice (chooser → SETTINGS.hwPace → _expOpts snapshot); absent = Fast */
- const enc=await hwPump(ed,seg,plan,layers,runP?(f,info)=>runP(f*0.9,info):null);
+ /* V232: per-export pacing choice (chooser → SETTINGS.hwPace →
+    _expOpts snapshot); absent = Fast. V233: ⚡ Fast routes through
+    the pipeline dispatcher (decoder pipeline first, seek-step
+    fallback, outcome logged); ▶️ Real-time is unchanged. */
+ const hwPaceRt=!!(ed._expOpts&&ed._expOpts.hwPace==='rt');
+ if(hwPaceRt)log('▶️ Real-time နည်းနဲ့ ထုတ်နေပါတယ် (video အရှည် အတိုင်း ကြာပါမည်)');
+ const enc=hwPaceRt?await hwEncodeSegmentRt(ed,seg,plan,layers,runP?(f,info)=>runP(f*0.9,info):null)
+                   :await hwEncodeSegmentFast(ed,seg,plan,layers,runP?(f,info)=>runP(f*0.9,info):null,log);
  await ff.writeFile('hw_v'+idx+'.h264',enc.stream);
  const fpsStr=(enc.frames/Math.max(0.01,dur)).toFixed(3);
  const code=await ffExecP(ff,hwMuxArgs(fpsStr,mixFile,idx),3600000,dur,runP?(f,info)=>runP(0.9+0.1*f,info):null);
@@ -2289,6 +2587,10 @@ function cueSigFor(ed){
  window.__recapDone=function(){};
  /* ================= SRT cue editor + live overlay + combined preview ================= */
  const vidEl=E('video'),overlayEl=E('overlay'),pvAudio=E('pvAudio');
+ /* V233: the subtitle text block lives in an inner div of the overlay
+    (the overlay itself is the exported band box — see applySubPos);
+    created lazily so the template markup stays untouched */
+ function subInnerEl(){if(!overlayEl)return null;let d=overlayEl.firstElementChild;if(!d){d=document.createElement('div');d.className='sub-inner';overlayEl.appendChild(d)}return d}
  ed.cues=[];ed.cuesSig='';ed.cuesManual=false;ed.adjSpeed=1;
  let previewMode=false,previewTimer=null;
  function trimRange(){const s=parseFloat(E('start').value),e=parseFloat(E('end').value);return{start:isNaN(s)?0:s,end:isNaN(e)?0:e}}
@@ -2406,9 +2708,10 @@ function cueSigFor(ed){
   if(key===subRenderKey)return;subRenderKey=key;
   const body=ed.subColMain||'#FFFFFF',kw=ed.subColHi||'#FFD740';
   overlayEl.style.color=body;
-  overlayEl.style.background=ed.subBand?'rgba(0,0,0,0.55)':'';
-  overlayEl.style.padding=ed.subBand?'6px 12px':'';
-  overlayEl.style.borderRadius=ed.subBand?'10px':'';
+  /* V233: the plate belongs to the TEXT BLOCK (inner div), matching
+     textPNG, which draws its plate around the block inside the band */
+  const inEl=subInnerEl();
+  if(inEl){inEl.style.background=ed.subBand?'rgba(0,0,0,0.55)':'';inEl.style.padding=ed.subBand?'6px 12px':'';inEl.style.borderRadius=ed.subBand?'10px':''}
   /* V224: preview size — the CSS clamp() size is the 100% base; the
      slider factor multiplies it live (clear first, read the computed
      base, then set the scaled px, so repeated renders never compound).
@@ -2416,7 +2719,7 @@ function cueSigFor(ed){
   const sf=subSizeFactor(ed);
   if(sf===1){overlayEl.style.fontSize=''}
   else{overlayEl.style.fontSize='';const base=parseFloat(getComputedStyle(overlayEl).fontSize)||17;overlayEl.style.fontSize=(base*sf).toFixed(1)+'px'}
-  overlayEl.innerHTML=parseKwRuns(txt).map(r=>r.kw?'<span style="color:'+kw+'">'+escapeHtml(r.t)+'</span>':escapeHtml(r.t)).join('');
+  if(inEl)inEl.innerHTML=parseKwRuns(txt).map(r=>r.kw?'<span style="color:'+kw+'">'+escapeHtml(r.t)+'</span>':escapeHtml(r.t)).join('');
  }
  function updateOverlay(){
   if(!overlayEl)return;
@@ -2424,7 +2727,7 @@ function cueSigFor(ed){
   if(!overlayActive()){overlayEl.style.display='none';updatePlayhead();return}
   const t=(previewMode?previewTime():vidEl.currentTime)-(ed.syncDelay||0); /* ⏱️ Sync Delay: display-time shift only */
   const i=cueAt(t);
-  if(i<0||!ed.cues[i].text){overlayEl.style.display='none';subRenderKey=''}else{renderSubOverlay(ed.cues[i].text);overlayEl.style.display='block'}
+  if(i<0||!ed.cues[i].text){overlayEl.style.display='none';subRenderKey=''}else{applySubPos();renderSubOverlay(ed.cues[i].text);overlayEl.style.display='flex'} /* V233: flex = the band box with the text centred inside (see .sub-overlay) */
   const rows=E('cueList')?E('cueList').children:[];for(let k=0;k<rows.length;k++)rows[k].classList.toggle('cur',k===i);
   updatePlayhead();
  }
@@ -2605,16 +2908,24 @@ function cueSigFor(ed){
  window.addEventListener('resize',tlStripSoon);
  window.__waveHelpers={peaksFromPCM,normalizePeaks,tickIntervalFor,rulerTicks,waveSliceFor,renderTlStrip,ensureWavePeaks,waveSigOf,extractRuns:()=>wvExtractRuns,state:()=>({sig:ed.waveSig,state:ed.waveState,n:ed.wavePeaks?ed.wavePeaks.length:0})};
  /* --- draggable subtitle position (the reference studio's draggable texts):
-    drag the live subtitle band up/down on the frame. The position is a
-    fraction of the frame height, remembered on the editor + settings, used
-    by the combined preview (same overlay) and mapped to the burned-export
-    subtitle band in exportOne (subPosCustom). --- */
- function applySubPos(){if(!overlayEl)return;overlayEl.style.top=((ed.subPosY||0.81)*100).toFixed(1)+'%';overlayEl.style.bottom='auto'}
+    drag the live subtitle band up/down on the frame. The position is the
+    BAND's TOP as a fraction of the frame height, remembered on the editor
+    + settings, and mapped into both exports by the shared subBandGeom
+    (subPosCustom). V233: applySubPos renders the band BOX (top AND height
+    from subBandGeom, text centred inside via the .sub-inner flex layout),
+    so the stage shows the exported band exactly — before V233 it placed
+    the bare text block at the fraction while the export placed the band
+    there, and on wide canvases the exported text fell off the bottom. --- */
+ function applySubPos(){if(!overlayEl)return;const g=subBandGeom(ed,canvasGeom(ed));overlayEl.style.top=(g.subYFrac*100).toFixed(2)+'%';overlayEl.style.height=(g.bandHFrac*100).toFixed(2)+'%';overlayEl.style.bottom='auto'}
+ /* the largest band-top fraction that still keeps the whole band inside
+    THIS aspect's frame (the geometry clamps to the same bound, so the
+    slider/drag never promise a position the frame cannot hold) */
+ function subPosCap(){const G=canvasGeom(ed);if(!G.H)return 0.88;return Math.max(0.04,Math.min(0.88,1-subBandGeom(ed,G).bandH/G.H))}
  function updateSubPosLabel(){const s=E('subPosVal');if(s)s.textContent=Math.round((ed.subPosY||0.81)*100)+'%'}
  (function(){
   let drag=null;const wrap=overlayEl.parentElement;
-  overlayEl.addEventListener('pointerdown',e=>{drag={y:e.clientY,frac:(ed.subPosY||0.81)};try{overlayEl.setPointerCapture(e.pointerId)}catch(err){}e.preventDefault()});
-  overlayEl.addEventListener('pointermove',e=>{if(!drag||!wrap)return;const r=wrap.getBoundingClientRect();if(!r.height)return;let f=drag.frac+(e.clientY-drag.y)/r.height;f=clampSubPos(f);ed.subPosY=f;applySubPos();updateSubPosLabel()});
+  overlayEl.addEventListener('pointerdown',e=>{drag={y:e.clientY,frac:subBandGeom(ed,canvasGeom(ed)).subYFrac};try{overlayEl.setPointerCapture(e.pointerId)}catch(err){}e.preventDefault()}); /* V233: grab from the EFFECTIVE band top (post-clamp), so the band never jumps on grab */
+  overlayEl.addEventListener('pointermove',e=>{if(!drag||!wrap)return;const r=wrap.getBoundingClientRect();if(!r.height)return;let f=drag.frac+(e.clientY-drag.y)/r.height;f=Math.min(clampSubPos(f),subPosCap());ed.subPosY=f;applySubPos();updateSubPosLabel()});
   const endDrag=()=>{if(!drag)return;drag=null;ed.subPosCustom=true;SETTINGS.subPosY=ed.subPosY;SETTINGS.subPosCustom=true;saveSettings()};
   overlayEl.addEventListener('pointerup',endDrag);
   overlayEl.addEventListener('pointercancel',endDrag);
@@ -3715,7 +4026,7 @@ function cueSigFor(ed){
  }
  /* subtitle position slider in the စာတန်း sheet (the on-frame drag still works) */
  const spEl=E('subPos');
- if(spEl){spEl.value=Math.round(clampSubPos(ed.subPosY)*100);spEl.addEventListener('input',()=>{const pv=parseFloat(spEl.value);ed.subPosY=clampSubPos((isNaN(pv)?81:pv)/100);applySubPos();updateSubPosLabel()});spEl.addEventListener('change',()=>{ed.subPosCustom=true;SETTINGS.subPosY=ed.subPosY;SETTINGS.subPosCustom=true;saveSettings()})}
+ if(spEl){spEl.value=Math.round(clampSubPos(ed.subPosY)*100);spEl.addEventListener('input',()=>{const pv=parseFloat(spEl.value);ed.subPosY=Math.min(clampSubPos((isNaN(pv)?81:pv)/100),subPosCap());applySubPos();updateSubPosLabel()});spEl.addEventListener('change',()=>{ed.subPosCustom=true;SETTINGS.subPosY=ed.subPosY;SETTINGS.subPosCustom=true;saveSettings()})}
  ed.subPosY=clampSubPos(ed.subPosY);
  /* V217 Subs completion: body COLOUR chips + background BAND toggle +
     page Reset. Colour/band feed subPngOpts (export PNGs) and

@@ -99,6 +99,7 @@ body.locked{overflow:hidden}
 .opt{width:100%;text-align:left;padding:14px;border-radius:14px;border:1.5px solid #2C2C35;background:#1B1B21;margin-bottom:9px;cursor:pointer;font-family:inherit;color:#F2F2F5}
 .opt b{display:block;font-size:14px;color:#F2F2F5}.opt span{font-size:12.5px;color:#9A9AA5}
 .opt.sel{border-color:#F59E0B;background:rgba(245,158,11,.14)}
+.opt.dim{opacity:.45;cursor:not-allowed}.opt.dim b{color:#9A9AA5}
 /* notices */
 #notice{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:200;width:min(520px,calc(100% - 28px));display:none;padding:13px 16px;border-radius:15px;font-size:13.5px;font-weight:600;box-shadow:0 14px 34px rgba(0,0,0,.5)}
 #notice.show{display:block}#notice.ok{background:#e6f7ee;color:#0a5c36;border:1px solid #7fd6a8}#notice.err{background:#fdecea;color:#8c1d18;border:1px solid #f0a49e}#notice.info{background:#FFF3CF;color:#7A5200;border:1px solid #F3CD72}
@@ -311,6 +312,12 @@ input[type=range].vs-range::-moz-range-track{height:9px}
 const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
 const FF_CORE='https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm/ffmpeg-core.js';
 const FF_WASM='https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm/ffmpeg-core.wasm';
+/* V221: the multi-thread core, same 0.12.x line as the ffmpeg build —
+   loaded only when the Export chooser's Multi-thread engine runs on a
+   cross-origin-isolated page (see getFFmpeg / coiSetup / coi-sw.js) */
+const FF_CORE_MT='https://unpkg.com/@ffmpeg/core-mt@0.12.6/dist/esm/ffmpeg-core-mt.js';
+const FF_WASM_MT='https://unpkg.com/@ffmpeg/core-mt@0.12.6/dist/esm/ffmpeg-core-mt.wasm';
+const FF_WORKER_MT='https://unpkg.com/@ffmpeg/core-mt@0.12.6/dist/esm/ffmpeg-core-mt.worker.js';
 /* V216 aspect model (user order 2026-11-14): the set is the complete
    standard set of OUTPUT canvases — the four keys ARE the titles:
    '9:16' (1080×1920), '16:9' (1920×1080), '1:1' (1080×1080) and
@@ -333,6 +340,15 @@ function canvasGeom(ed){const vw=(ed&&ed.videoW)||1280;const ev=n=>Math.max(2,Ma
  if(ed&&ed.aspect==='1:1')return{W:1080,H:1080};
  if(ed&&ed.aspect==='Original'){const sc=Math.min(1,1920/vw);return{W:ev(vw*sc),H:ev(((ed&&ed.videoH)||720)*sc)}}
  return{W:1080,H:1920}}
+/* V221: export resolution — the chooser's 640/720/1080 is the canvas
+   SHORT side in px. canvasGeom stays the AUTHORING geometry (preview
+   stage, cue wrap width — unchanged); exportGeom scales it for ONE
+   export: never upscale (a small Original source keeps its own size),
+   even-rounded exactly like canvasGeom. At 1080, the default, every
+   canvas comes back identical, so default exports keep today's
+   geometry byte-for-byte. */
+function scaledGeom(W,H,res){const ev=n=>Math.max(2,Math.round(n/2)*2);const s=Math.min(1,(res||1080)/Math.min(W,H));if(s>=1)return{W:W,H:H};return{W:ev(W*s),H:ev(H*s)}}
+function exportGeom(ed){const G=canvasGeom(ed);const res=(ed&&ed._expOpts&&ed._expOpts.res)||1080;return scaledGeom(G.W,G.H,res)}
 /* the standing special case: 9:16 canvas + landscape source */
 function aspectSpecial916(ed){if(ed&&ed.aspect&&ed.aspect!=='9:16')return false;return((ed&&ed.videoW)||1280)>((ed&&ed.videoH)||720)}
 /* V215: the full Gemini studio-voice catalogue (same 30 names as the
@@ -537,7 +553,19 @@ const toolbarInner='<nav class="toolbar" id="'+p+'-toolbar">'
 +tb('Subs','🎨','စာတန်း')+tb('Voice','🎙️','Voice Create')+tb('Mixer','🔊','Mixer')+tb('Trim','✂️','Trim')+tb('Aspect','🌫️','Aspect')+tb('Title','📝','Title')+tb('Text','➕','Text')+tb('Logo','🛡️','Logo')+tb('Border','📐','Border')+tb('Blur','🫥','Blur')
 +'<button class="tool-btn" id="'+p+'-toolKey"><span class="tic">🔑</span>Key</button>'
 +'</nav>';
-const exportInner='<div class="exp-prog" id="'+p+'-expProg" style="display:none"><div class="exp-prog-head"><span class="wave"><i></i><i></i><i></i><i></i><i></i></span><span class="exp-pct" id="'+p+'-expPct">0%</span></div><div class="exp-bar"><div class="exp-bar-fill" id="'+p+'-expBar"></div></div><div class="exp-meta"><span id="'+p+'-expStage">ပြင်ဆင်နေပါတယ်…</span><span class="exp-eta" id="'+p+'-expEta"></span><span class="exp-elapsed" id="'+p+'-expElapsed">0s</span></div></div><button class="btn danger" id="'+p+'-expCancel" style="display:none;width:100%;margin-top:10px">⛔ Export ရပ်မယ်</button><button class="btn light small" id="'+p+'-logToggle" style="margin-top:10px">📄 Log ပြရန်</button><div class="logbox" id="'+p+'-log"></div><div id="'+p+'-result" style="margin-top:12px"></div>';
+const exportInner='<div id="'+p+'-expSetup">'
++'<div class="field"><label>⚙️ Export Engine</label><div id="'+p+'-expEngines"></div></div>'
++'<div class="field"><label>📐 Resolution — အတိုဆုံး ဘေး (px)</label><div class="scroll-row aspect-opts" id="'+p+'-expResRow">'
++'<button class="opt" data-res="640"><b>640</b><span>⚡ အမြန်ဆုံး — ဖိုင် အသေးဆုံး</span></button>'
++'<button class="opt" data-res="720"><b>720</b><span>HD — အလယ် အလတ်</span></button>'
++'<button class="opt" data-res="1080"><b>1080</b><span>အကောင်းဆုံး — မူလ အရည်အသွေး</span></button>'
++'</div></div>'
++'<div class="switch-row" id="'+p+'-expIncTitleRow"><div><b style="font-size:14px">ခေါင်းစဉ် ထည့်မယ်</b><div style="font-size:12px;color:#527884">ဒီ Export တစ်ခုအတွက်သာ — Title setting မပြောင်းပါ</div></div><div class="tgl on" id="'+p+'-expIncTitle"></div></div>'
++'<div class="switch-row" id="'+p+'-expIncLogoRow"><div><b style="font-size:14px">Logo ထည့်မယ်</b><div style="font-size:12px;color:#527884">ဒီ Export တစ်ခုအတွက်သာ — Logo setting မပြောင်းပါ</div></div><div class="tgl on" id="'+p+'-expIncLogo"></div></div>'
++'<button class="btn" id="'+p+'-expStart" style="width:100%;margin-top:10px">🎬 Export စတင်</button>'
++'<button class="btn light" id="'+p+'-expSetupReset" style="width:100%;margin-top:8px">↺ Export ရွေးချယ်မှု မူလ ပြန်ထား</button>'
++'</div>'
++'<div class="exp-prog" id="'+p+'-expProg" style="display:none"><div class="exp-prog-head"><span class="wave"><i></i><i></i><i></i><i></i><i></i></span><span class="exp-pct" id="'+p+'-expPct">0%</span></div><div class="exp-bar"><div class="exp-bar-fill" id="'+p+'-expBar"></div></div><div class="exp-meta"><span id="'+p+'-expStage">ပြင်ဆင်နေပါတယ်…</span><span class="exp-eta" id="'+p+'-expEta"></span><span class="exp-elapsed" id="'+p+'-expElapsed">0s</span></div></div><button class="btn danger" id="'+p+'-expCancel" style="display:none;width:100%;margin-top:10px">⛔ Export ရပ်မယ်</button><button class="btn light small" id="'+p+'-logToggle" style="margin-top:10px">📄 Log ပြရန်</button><div class="logbox" id="'+p+'-log"></div><div id="'+p+'-result" style="margin-top:12px"></div>';
 /* V214: the 🔑 Key pop-up content — the old slide-in drawer's innards
    (Gemini key card + ⚙️ settings reset), now parked in #homeKey and
    mounted into the bottom sheet by openKeySheet like every other tool.
@@ -877,8 +905,27 @@ async function geminiTTSLong(key,text,voice){ /* chunk long narration, concat PC
  return pcmBytesToWav(pcm,sr)}
 </script>
 <script>
-/* ================= Export engine — ffmpeg.wasm single-thread ================= */
+/* ================= Export engine — ffmpeg.wasm (V221: two cores) ================= */
 let ffInstance=null,ffLoading=null,ffLogSink=null,ffProgSink=null;
+/* V221: TWO ffmpeg cores behind ONE loader — the standard single-thread
+   core (@ffmpeg/core, the path everything used until now) and the
+   multi-thread core (@ffmpeg/core-mt), chosen in the Export chooser
+   and persisted as SETTINGS.expEngine. The MT core needs cross-origin
+   isolation (SharedArrayBuffer); coiSetup() below registers coi-sw.js
+   to obtain it on this static host. Everything downstream of the
+   loader — ffExecP progress events, cancel/terminate, the IDB
+   resilience — is engine-agnostic and shared: whichever instance is
+   loaded sits in ffInstance. If the MT load fails for any reason the
+   loader marks MT dead for the session and transparently loads the
+   standard core instead, so an export never dies with the choice. */
+let ffInstanceEngine=null,_mtDead='';
+function expMtStatus(){
+ if(_mtDead)return{ok:false,reason:_mtDead};
+ if(!(typeof window!=='undefined'&&window.crossOriginIsolated))return{ok:false,reason:'ဒီ browser မှာ cross-origin isolation မရှိသေးပါ — app ကို ပြန် refresh လုပ်ကြည့်ပါ'};
+ if(typeof SharedArrayBuffer==='undefined')return{ok:false,reason:'ဒီ browser က SharedArrayBuffer မရပါ'};
+ return{ok:true,reason:''};
+}
+function desiredEngine(){return (typeof SETTINGS!=='undefined'&&SETTINGS&&SETTINGS.expEngine==='mt'&&expMtStatus().ok)?'mt':'st'}
 /* V220: export cancellation — exportEditor arms expCancelRace for the
    duration of an export; ffExecP races every exec against it, so a
    cancel rejects the in-flight exec at once (the cancel handler then
@@ -897,20 +944,92 @@ function expCancelError(){const e=new Error('Export ကို ရပ်လို
 function humanErr(e){const m=(e&&e.message)||String(e||'');if(/Aborted\(\)/.test(m))return 'ffmpeg အလုပ် ရပ်သွားပါတယ် — ပြန် ကြိုးစားပါ';if(/detached|postMessage/i.test(m))return 'အသံ အချက်အလက် ပျက်သွားပါတယ် — 🎙️ Voice Create မှာ "📣 အသံ ထုတ်မယ်" ကို ပြန်နှိပ်ပြီး အသံ ပြန်ထုတ်ပါ';return m}
 async function getFFmpeg(logFn){
  if(logFn)ffLogSink=logFn;
- if(ffInstance)return ffInstance;
+ const want=desiredEngine();
+ if(ffInstance&&ffInstanceEngine===want)return ffInstance;
+ if(ffInstance){/* engine switched in the chooser: retire the old core */
+  try{const tp=ffInstance.terminate();if(tp&&tp.catch)tp.catch(()=>{})}catch(e){}
+  ffInstance=null;ffLoading=null;ffInstanceEngine=null}
  if(ffLoading)return ffLoading;
  ffLoading=(async()=>{const FFmpegWASM=window.FFmpegWASM;if(!FFmpegWASM)throw new Error('ffmpeg library မတင်ရသေးပါ — internet စစ်ပြီး ပြန်ကြိုးစားပါ');
-  const ff=new FFmpegWASM.FFmpeg();ff.on('log',({message})=>{if(!message||/Aborted\(\)/.test(message))return;if(ffLogSink)ffLogSink(message)});
-  ff.on('progress',e=>{if(ffProgSink)ffProgSink(e)});
   /* Browsers block cross-origin classic Workers, so fetch the ffmpeg worker,
      core and wasm as blobs and pass same-origin blob URLs (fixes the live-site
-     "Failed to construct 'Worker'" error from the unpkg URLs). */
+     "Failed to construct 'Worker'" error from the unpkg URLs). The MT core
+     additionally passes its own workerURL, blobbed the same way. */
   const toBlobURL=window.FFmpegUtil&&window.FFmpegUtil.toBlobURL;
   const FF_WORKER='https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/814.ffmpeg.js';
-  let loadCfg={coreURL:FF_CORE,wasmURL:FF_WASM};
-  if(toBlobURL){loadCfg={classWorkerURL:await toBlobURL(FF_WORKER,'text/javascript'),coreURL:await toBlobURL(FF_CORE,'text/javascript'),wasmURL:await toBlobURL(FF_WASM,'application/wasm')}}
-  await ff.load(loadCfg);ffInstance=ff;return ff})();
+  const makeInst=async eng=>{
+   const ff=new FFmpegWASM.FFmpeg();ff.on('log',({message})=>{if(!message||/Aborted\(\)/.test(message))return;if(ffLogSink)ffLogSink(message)});
+   ff.on('progress',e=>{if(ffProgSink)ffProgSink(e)});
+   let loadCfg;
+   if(eng==='mt'){loadCfg={coreURL:FF_CORE_MT,wasmURL:FF_WASM_MT,workerURL:FF_WORKER_MT};
+    if(toBlobURL)loadCfg={classWorkerURL:await toBlobURL(FF_WORKER,'text/javascript'),coreURL:await toBlobURL(FF_CORE_MT,'text/javascript'),wasmURL:await toBlobURL(FF_WASM_MT,'application/wasm'),workerURL:await toBlobURL(FF_WORKER_MT,'text/javascript')};
+   }else{loadCfg={coreURL:FF_CORE,wasmURL:FF_WASM};
+    if(toBlobURL)loadCfg={classWorkerURL:await toBlobURL(FF_WORKER,'text/javascript'),coreURL:await toBlobURL(FF_CORE,'text/javascript'),wasmURL:await toBlobURL(FF_WASM,'application/wasm')};
+   }
+   await ff.load(loadCfg);return ff};
+  let eng=want,ff;
+  try{ff=await makeInst(eng)}
+  catch(e){if(eng!=='mt')throw e;
+   _mtDead='Multi-thread core တင် မရပါ — ပုံမှန် engine ပဲ ရပါမည်';
+   if(logFn)logFn('⚠️ Multi-thread engine တင် မရပါ — ပုံမှန် engine ဖြင့် ဆက်လုပ်ပါတယ်');
+   eng='st';ff=await makeInst('st')}
+  ffInstance=ff;ffInstanceEngine=eng;return ff})();
  try{return await ffLoading}catch(e){ffLoading=null;throw e}}
+/* V221: cross-origin isolation on a static host (GitHub Pages cannot
+   set COOP/COEP headers): coi-sw.js — a coi-serviceworker-style
+   service worker shipped beside index.html — rewrites response
+   headers so the page becomes crossOriginIsolated and the MT core's
+   SharedArrayBuffer works. Registered ONCE at startup; on the very
+   first visit the worker only controls the NEXT load, so the page
+   reloads itself exactly once (quiet notice, sessionStorage
+   loop-guard). If any of this fails, nothing else changes — the
+   standard engine never needed isolation. */
+function coiSetup(){
+ try{
+  if(typeof window==='undefined'||window.crossOriginIsolated)return;
+  if(typeof navigator==='undefined'||!('serviceWorker' in navigator)||!window.isSecureContext)return;
+  let reloaded=false;try{reloaded=!!sessionStorage.getItem('recaps_coi_reload')}catch(e){}
+  navigator.serviceWorker.register('coi-sw.js').then(reg=>{
+   const arm=()=>{const sw=reg.active||reg.waiting||reg.installing;if(!sw)return;
+    const tryReload=()=>{if(window.crossOriginIsolated||reloaded)return;if(navigator.serviceWorker.controller)return;try{sessionStorage.setItem('recaps_coi_reload','1')}catch(e){}try{showNotice('⚡ Multi-thread engine အတွက် app ကို ပြန်ဖွင့်နေပါတယ်…','info')}catch(e){}setTimeout(()=>{try{location.reload()}catch(e){}},700)};
+    if(sw.state==='activated')tryReload();else sw.addEventListener('statechange',()=>{if(sw.state==='activated')tryReload()})};
+   arm();if(reg.addEventListener)reg.addEventListener('updatefound',arm);
+  }).catch(()=>{});
+ }catch(e){}
+}
+coiSetup();
+/* V221 ETA — per-RUN throughput, replacing the V218/V220 whole-export
+   elapsed÷fraction estimate, which CLIMBED mid-encode (live test:
+   1:43 → 2:33 → 3:47) because slow later phases diluted the global
+   rate. While ONE ffmpeg run encodes, its remaining time is
+   (expected media seconds − processed media seconds) ÷ the run's own
+   rolling throughput (media seconds per wall second over the last
+   ~1.5s of progress events — short enough that the rate is honest
+   again within a second or two after the encoder changes speed). Outside encode runs no numeric ETA is
+   shown (stage label only). The displayed value tracks the raw
+   estimate with increases clamped to +2s per display tick —
+   decreases are free — so in a steady encode it counts down and can
+   never run away upward the way the global estimate did. */
+const etaSt={active:false,expect:0,samples:[],rate:0,disp:null};
+function etaRunBegin(expectSec){etaSt.active=true;etaSt.expect=expectSec||0;etaSt.samples=[];etaSt.rate=0;etaSt.disp=null}
+function etaRunSample(timeUs){
+ if(!etaSt.active||!isFinite(timeUs))return;
+ const m=timeUs/1000000,now=Date.now(),last=etaSt.samples[etaSt.samples.length-1];
+ if(last&&m<last[1]-0.5){etaSt.samples=[];etaSt.rate=0;etaSt.disp=null} /* a retry restarted the run — forget the old stream */
+ etaSt.samples.push([now,m]);
+ while(etaSt.samples.length>2&&now-etaSt.samples[0][0]>1500)etaSt.samples.shift();
+ if(etaSt.samples.length>=2){const a=etaSt.samples[0],b=etaSt.samples[etaSt.samples.length-1],dw=(b[0]-a[0])/1000;
+  if(dw>=0.5&&b[1]>a[1])etaSt.rate=(b[1]-a[1])/dw}
+}
+function etaRunEnd(){etaSt.active=false;etaSt.disp=null}
+function etaRunText(){
+ if(!etaSt.active||!etaSt.rate||etaSt.samples.length<2)return'';
+ if(etaSt.samples[etaSt.samples.length-1][0]-etaSt.samples[0][0]<1000)return''; /* under a second of signal — no estimate yet */
+ const doneM=etaSt.samples[etaSt.samples.length-1][1],rem=(etaSt.expect-doneM)/etaSt.rate;
+ if(!isFinite(rem)||rem<2)return'';
+ const disp=(etaSt.disp==null)?rem:(rem<etaSt.disp?rem:Math.min(rem,etaSt.disp+2));
+ etaSt.disp=disp;
+ return 'နောက်ထပ် ~'+(disp<60?Math.round(disp)+' စက္ကန့်':fmtDur(Math.round(disp)))+' လောက်'}
 async function ffReadU8(ff,name){const d=await ff.readFile(name);if(d instanceof Uint8Array)return d;if(typeof d==='string'){const u=new Uint8Array(d.length);for(let i=0;i<d.length;i++)u[i]=d.charCodeAt(i)&0xff;return u}return new Uint8Array(d.buffer||d)}
 /* V218: run one ffmpeg exec under a progress context. The loaded build is
    @ffmpeg/ffmpeg 0.12, whose 'progress' events carry {progress:0..1 ratio,
@@ -930,7 +1049,7 @@ async function ffExecP(ff,args,timeout,expectSec,onProg){
    if(!isFinite(f))return;
    f=Math.max(0,Math.min(1,f));
    if(Math.abs(f-last)<0.002&&f<1)return;
-   last=f;try{onProg(f)}catch(_){}
+   last=f;try{onProg(f,{timeUs:(e&&isFinite(e.time))?e.time:NaN,expectSec:expectSec||0})}catch(_){}
   };
   try{return await ff.exec(args,timeout)}finally{ffProgSink=null}
  };
@@ -992,8 +1111,15 @@ async function exportOne(ff,ed,seg,idx,total,log,progs){
     match the pre-V216 720-wide renders at any canvas size. Fit: the
     picture is shown WHOLE (contain) over a blurred cover fill, except
     the 9:16 + landscape special case (centred 1:1 region at the
-    established picY fraction 280/1280, subtitles BELOW it). */
- const G=canvasGeom(ed);const W=G.W,H=G.H,S=W/720;
+    established picY fraction 280/1280, subtitles BELOW it).
+    V221: the ONE read is now exportGeom(ed) — canvasGeom scaled to
+    the chooser's resolution (short side 640/720/1080). Every export
+    pixel value below (subtitle PNG size via S and subPngOpts, logo
+    via buildLogoPNG(ed,W), title/text PNG sizes, border width, blur
+    strengths, overlay positions, region fractions) already derives
+    from W/H/S, so the scaled geometry propagates everywhere; at the
+    default 1080 exportGeom == canvasGeom and the graph is unchanged. */
+ const G=exportGeom(ed);const W=G.W,H=G.H,S=W/720;
  const special=aspectSpecial916(ed);
  let picY=0,subY;
  if(special){picY=Math.round(H*0.21875);subY=Math.round(H*(1035/1280))}
@@ -1002,9 +1128,14 @@ async function exportOne(ff,ed,seg,idx,total,log,progs){
  /* dragged subtitle position: % of frame height -> top of the export subtitle band */
  if(ed.subPosCustom)subY=Math.round(clampSubPos(ed.subPosY)*H); /* V210: same 4%–88% containment as the preview slider/drag */
  const useSub=$('#'+ed.p+'-subTgl').classList.contains('on')&&seg.cues.length;
- const useTitle=$('#'+ed.p+'-titleTgl').classList.contains('on')&&($('#'+ed.p+'-title').value||'').trim();
+ /* V221: the chooser's per-export include toggles — off excludes the
+    element from THIS export only; the Title/Logo settings themselves
+    are untouched. No _expOpts (programmatic callers) = include all. */
+ const incT=!ed._expOpts||ed._expOpts.incTitle!==false,incL=!ed._expOpts||ed._expOpts.incLogo!==false;
+ const useTitle=incT&&$('#'+ed.p+'-titleTgl').classList.contains('on')&&($('#'+ed.p+'-title').value||'').trim();
+ const useLogo=!!ed.logoOn&&incL;
  const fetchFile=window.FFmpegUtil&&window.FFmpegUtil.fetchFile;
- const prepItems=1+(ed.audioMode==='voice'?1:0)+(useTitle?1:0)+(useSub?seg.cues.length:0)+(ed.logoOn?1:0)+((ed.textOn&&(ed.textStr||'').trim())?1:0);
+ const prepItems=1+(ed.audioMode==='voice'?1:0)+(useTitle?1:0)+(useSub?seg.cues.length:0)+(useLogo?1:0)+((ed.textOn&&(ed.textStr||'').trim())?1:0);
  let prepN=0;const prepStep=st=>{if(ed._expCancel&&ed._expCancel.hit)throw expCancelError();prepN++;if(prep)prep(Math.min(1,prepN/Math.max(1,prepItems)),st)};
  await ff.writeFile('in.mp4',fetchFile?await fetchFile(ed.file):new Uint8Array(await ed.file.arrayBuffer()));prepStep('📥 ဖိုင် ပြင်နေပါတယ်…');
  let voiceArr=null,voiceFile='voice.wav';
@@ -1014,7 +1145,7 @@ async function exportOne(ff,ed,seg,idx,total,log,progs){
  if(useSub){for(let i=0;i<seg.cues.length;i++){const fn='sub'+i+'.png';await ff.writeFile(fn,await textPNG(seg.cues[i].text,W,Math.round(170*S),subPngOpts(ed,S)));prepStep('🖼️ စာတန်း ပုံများ ပြင်နေပါတယ်… ('+(i+1)+'/'+seg.cues.length+')');overlays.push({file:fn,y:subY,from:seg.cues[i].start-seg.start,to:seg.cues[i].end-seg.start})}}
  /* player-block overlays (🛡️ Logo watermark + ➕ free Text): same canvas-PNG pipeline,
     positions mapped from the dragged frame fractions just like the subtitle band */
- if(ed.logoOn){const lp=await buildLogoPNG(ed,W);await ff.writeFile('logo.png',lp.bytes);const lx=Math.max(0,Math.min(W-lp.w,Math.round(((ed.logoX==null?0.10:ed.logoX))*W-lp.w/2)));const ly=Math.max(0,Math.min(H-lp.h,Math.round(((ed.logoY==null?0.08:ed.logoY))*H-lp.h/2)));prepStep('🖼️ Logo ပုံ ပြင်နေပါတယ်…');overlays.push({file:'logo.png',x:lx,y:ly,from:0,to:dur})}
+ if(useLogo){const lp=await buildLogoPNG(ed,W);await ff.writeFile('logo.png',lp.bytes);const lx=Math.max(0,Math.min(W-lp.w,Math.round(((ed.logoX==null?0.10:ed.logoX))*W-lp.w/2)));const ly=Math.max(0,Math.min(H-lp.h,Math.round(((ed.logoY==null?0.08:ed.logoY))*H-lp.h/2)));prepStep('🖼️ Logo ပုံ ပြင်နေပါတယ်…');overlays.push({file:'logo.png',x:lx,y:ly,from:0,to:dur})}
  if(ed.textOn&&(ed.textStr||'').trim()){const bh=Math.round(170*S);const ty=Math.max(0,Math.min(H-bh,Math.round((ed.textY||0.16)*H-bh/2)));await ff.writeFile('freetext.png',await textPNG(ed.textStr.trim(),W,bh,{size:Math.round((ed.textSize||44)*S),cx:(ed.textX==null?0.5:ed.textX)}));prepStep('🖼️ စာသား ပုံ ပြင်နေပါတယ်…');overlays.push({file:'freetext.png',y:ty,from:0,to:dur})}
  /* build filter graph */
  const blur=Math.max(2,Math.round(ed.blur/2*S));
@@ -1106,7 +1237,11 @@ async function exportEditor(ed){
  const subOn=E('subTgl').classList.contains('on');
  const lines=(E('subs').value||'').split('\n').map(s=>s.trim()).filter(Boolean);
  if(subOn&&!lines.length){fieldErr(p,'subs','စာတန်း ဖွင့်ထားသော်လည်း စာသား မရှိပါ — စာတန်း တစ်ကြောင်းစီ ရိုက်ထည့်ပါ၊ သို့မဟုတ် စာတန်း ပိတ်ပါ');showNotice('⚠️ စာတန်း စာသား လိုပါတယ်','err');return}
- if(E('titleTgl').classList.contains('on')&&!(E('title').value||'').trim()){fieldErr(p,'title','ခေါင်းစဉ် ဖွင့်ထားသော်လည်း စာသား မရှိပါ — ခေါင်းစဉ် ရိုက်ထည့်ပါ၊ သို့မဟုတ် ပိတ်ပါ');showNotice('⚠️ ခေါင်းစဉ် စာသား လိုပါတယ်','err');return}
+ /* V221 (user order): the title is OPTIONAL now — the old gate that
+    blocked export with "⚠️ ခေါင်းစဉ် စာသား လိုပါတယ်" when the Title
+    toggle was on but empty is GONE. No title text → the export simply
+    proceeds with no title drawn (useTitle in exportOne already
+    requires non-empty text). The logo was never gated. */
  if(ed.audioMode==='voice'){
    if(ed.ttsEngine!=='edge'&&!getApiKey()){showNotice('⚠️ အသံအသစ် (Gemini) အတွက် Gemini API Key လိုပါတယ် — အောက်ခြေ toolbar က 🔑 Key မှာ သင့် key ထည့်ပါ (Edge TTS ဆိုရင် key မလိုပါ)','err');const ki=$('#recap-apiKey');ki.focus();ki.scrollIntoView({behavior:'smooth',block:'center'});return}
    if(!lines.length){fieldErr(p,'subs','အသံအသစ် အတွက် ဇာတ်ကြောင်း စာသား လိုပါတယ် — စာတန်း အကွက်ထဲမှာ တစ်ကြောင်းစီ ရိုက်ထည့်ပါ');showNotice('⚠️ ဇာတ်ကြောင်း စာသား လိုပါတယ်','err');return}
@@ -1115,6 +1250,19 @@ async function exportEditor(ed){
  if(dur>600)showNotice('⚠️ ဖြတ်ထားသော အပိုင်း 10 မိနစ်ထက် ရှည်နေပါတယ် ('+fmtDur(dur)+') — browser ထဲတွင် အလွန် ကြာနိုင် / memory မလောက်နိုင် ပါတယ်။ ဆက်လုပ်ပါမည်။','info');
  /* record source dims */
  const v=E('video');ed.videoW=v.videoWidth||1280;ed.videoH=v.videoHeight||720;
+ /* V221: validation passed — open the Export CHOOSER (engine /
+    resolution / include toggles + a Start button) instead of
+    starting the render immediately. runExport() below is the render
+    itself, entered from the chooser's 🎬 Export စတင် button with
+    the choices snapshotted into ed._expOpts. */
+ if(window.__recapShowExport)window.__recapShowExport(); /* V210: the Export view is a bottom panel now */
+ if(window.__recapExpSetup)window.__recapExpSetup(ed);
+}
+async function runExport(ed){
+ if(ed.busy)return;const p=ed.p,E=id=>$('#'+p+'-'+id);
+ const start=parseFloat(E('start').value),end=parseFloat(E('end').value);
+ const lines=(E('subs').value||'').split('\n').map(s=>s.trim()).filter(Boolean);
+ const dur=end-start;
  /* segments */
  const segments=[{start,end}];
  /* cues: the SAME cue list the SRT editor/SRT download use (unifiedCues —
@@ -1148,14 +1296,18 @@ async function exportEditor(ed){
     position toward the CURRENT PHASE's ceiling (never past it), so the
     bar never looks frozen and never overshoots. The displayed % is
     monotonic, capped at 99 until expDone() sets exactly 100 on success.
-    The ETA next to the elapsed timer is an EMA-smoothed estimate from
-    elapsed ÷ fraction, shown only once there is signal (>=10% or 5s). */
- const expProgEl=E('expProg'),expPctEl=E('expPct'),expBarEl=E('expBar'),expStageEl=E('expStage'),expElapsedEl=E('expElapsed'),expEtaEl=E('expEta'),expCancelBtn=E('expCancel');
+    V221: the ETA beside the elapsed timer is no longer the global
+    elapsed÷fraction estimate (it climbed mid-encode in live testing):
+    mkRun feeds each ffmpeg run's own progress stream into the
+    per-run throughput tracker (etaRunBegin/Sample/Text above), so a
+    numeric ETA exists only DURING an encode run and is computed from
+    that run's own media-µs-per-wall-second rate. */
+ const expProgEl=E('expProg'),expPctEl=E('expPct'),expBarEl=E('expBar'),expStageEl=E('expStage'),expElapsedEl=E('expElapsed'),expEtaEl=E('expEta'),expCancelBtn=E('expCancel'),expSetupEl=E('expSetup');
  const expT0=Date.now();
  const LOAD_W=2,FIN_W=1;
  const prepWOf=sg=>Math.max(1,Math.min(6,0.08*Math.max(1,sg.end-sg.start)));
  let expTotal=LOAD_W+FIN_W+segments.reduce((a,sg)=>a+prepWOf(sg)+(sg.end-sg.start),0);
- const expS={pos:0,ceil:0,fracMax:0,lastReal:Date.now(),etaSec:null,done:false};
+ const expS={pos:0,ceil:0,fracMax:0,lastReal:Date.now(),done:false};
  const expRender=()=>{
   const fr=expS.done?1:Math.min(0.995,expS.pos/Math.max(1,expTotal));
   if(fr>expS.fracMax)expS.fracMax=fr;
@@ -1166,14 +1318,18 @@ async function exportEditor(ed){
  const expSet=(u,stage)=>{const nu=Math.max(expS.pos,Math.min(u,expTotal));if(nu>expS.pos){expS.pos=nu;expS.lastReal=Date.now()}if(expS.pos>expS.ceil)expS.ceil=expS.pos;if(stage&&expStageEl)expStageEl.textContent=stage;expRender()};
  const expCeil=(u,stage)=>{expS.ceil=Math.max(expS.ceil,Math.min(u,expTotal));if(stage&&expStageEl)expStageEl.textContent=stage};
  const phProg=(base,weight,stage)=>(f,st)=>{expCeil(base+weight);expSet(base+Math.max(0,Math.min(1,f||0))*weight,st||stage)};
- const expDone=()=>{expS.done=true;if(expStageEl)expStageEl.textContent='✅ ပြီးပါပြီ';if(expEtaEl)expEtaEl.textContent='';expRender()};
+ /* V221: an encode-run progress callback — phProg for the bar, plus
+    the run's raw media-µs stream into the per-run ETA tracker */
+ const mkRun=(base,weight,stage,expectSec)=>{const inner=phProg(base,weight,stage);let begun=false;return(f,info)=>{inner(f);if(!begun){begun=true;etaRunBegin(expectSec)}if(info&&isFinite(info.timeUs))etaRunSample(info.timeUs);if(f>=1)etaRunEnd()}};
+ const expDone=()=>{expS.done=true;etaRunEnd();if(expStageEl)expStageEl.textContent='✅ ပြီးပါပြီ';if(expEtaEl)expEtaEl.textContent='';expRender()};
  let expTimer=null,voiceW=0,GEN_W=0;
  if(expProgEl)expProgEl.style.display='block';
+ if(expSetupEl)expSetupEl.style.display='none'; /* V221: the chooser steps aside while the render runs */
  /* V220 cancel: arm the token + race for this export and show the
     ⛔ button; fire() rejects the race, terminates the worker and
     nulls the cached instance so the next export loads ffmpeg fresh */
  const expTok={hit:false,fire:null};ed._expCancel=expTok;
- const expCancelP=new Promise((_,rej)=>{expTok.fire=()=>{if(expTok.hit)return;expTok.hit=true;ffProgSink=null;if(ffInstance){try{const tp=ffInstance.terminate();if(tp&&tp.catch)tp.catch(()=>{})}catch(e){}ffInstance=null;ffLoading=null}rej(expCancelError())}});
+ const expCancelP=new Promise((_,rej)=>{expTok.fire=()=>{if(expTok.hit)return;expTok.hit=true;ffProgSink=null;if(ffInstance){try{const tp=ffInstance.terminate();if(tp&&tp.catch)tp.catch(()=>{})}catch(e){}ffInstance=null;ffLoading=null;ffInstanceEngine=null}rej(expCancelError())}});
  expCancelP.catch(()=>{});
  expCancelRace=expCancelP;
  if(expCancelBtn)expCancelBtn.style.display='';
@@ -1182,7 +1338,7 @@ async function exportEditor(ed){
   const elSec=(Date.now()-expT0)/1000;
   if(expElapsedEl)expElapsedEl.textContent=Math.round(elSec)+'s';
   if(!expS.done&&Date.now()-expS.lastReal>2000&&expS.pos<expS.ceil){expS.pos+=(expS.ceil-expS.pos)*0.02;expRender()}
-  if(expEtaEl){let t='';const fr=expS.fracMax;if(!expS.done&&(fr>=0.10||elSec>=5)&&fr>0.02){const raw=elSec*(1-fr)/fr;expS.etaSec=(expS.etaSec==null)?raw:expS.etaSec+0.25*(raw-expS.etaSec);if(expS.etaSec>=2)t='နောက်ထပ် ~'+(expS.etaSec<60?Math.round(expS.etaSec)+' စက္ကန့်':fmtDur(Math.round(expS.etaSec)))+' လောက်'}expEtaEl.textContent=t}
+  if(expEtaEl)expEtaEl.textContent=expS.done?'':etaRunText();
  },250);
  const baseName=(ed.file.name||'recap').replace(/\.[^.]+$/,'').replace(/[^\w\- ]+/g,'').trim()||'recap';
  try{
@@ -1209,7 +1365,7 @@ async function exportEditor(ed){
    }
    voiceW=(Math.abs(eff-1)>=0.001&&effDur>0)?Math.max(1,effDur):0;
    if(voiceW)expTotal+=voiceW;
-   const rv=await effectiveVoiceBytes(ed,pristine,pext,log,voiceW?phProg(LOAD_W+GEN_W,voiceW,'🎙️ အသံ အမြန် ပြင်နေပါတယ်…'):undefined);
+   const rv=await effectiveVoiceBytes(ed,pristine,pext,log,voiceW?mkRun(LOAD_W+GEN_W,voiceW,'🎙️ အသံ အမြန် ပြင်နေပါတယ်…',effDur):undefined);
    ed._cachedVoice=rv.bytes;ed._cachedVoiceExt=rv.ext;
    if(effDur)log('🎙️ အသံ အမြန် '+eff.toFixed(2)+'× — အသံ '+effDur.toFixed(1)+' စက္ကန့် / video '+dur.toFixed(1)+' စက္ကန့်');
   }
@@ -1218,7 +1374,7 @@ async function exportEditor(ed){
      timeline so the burned subtitles match the speech exactly. */
   if(ed.audioMode==='voice'&&ed.voiceCache&&ed.voiceCache.chunkDurs&&!ed.cuesManual){cues=unifiedCues(ed);ed.cues=cues;ed.cuesSig=cueSigFor(ed);assignCues(cues)}
   let segBase=LOAD_W+GEN_W+voiceW;
-  for(let i=0;i<segments.length;i++){if(expTok.hit)throw expCancelError();const segDurI=segments[i].end-segments[i].start;const pwI=prepWOf(segments[i]);const blob=await exportOne(ff,ed,segments[i],i,segments.length,log,{prep:phProg(segBase,pwI),run:phProg(segBase+pwI,segDurI,'🎬 Video ထုတ်နေပါတယ် ('+(i+1)+'/'+segments.length+')')});segBase+=pwI+segDurI;
+  for(let i=0;i<segments.length;i++){if(expTok.hit)throw expCancelError();const segDurI=segments[i].end-segments[i].start;const pwI=prepWOf(segments[i]);const blob=await exportOne(ff,ed,segments[i],i,segments.length,log,{prep:phProg(segBase,pwI),run:mkRun(segBase+pwI,segDurI,'🎬 Video ထုတ်နေပါတယ် ('+(i+1)+'/'+segments.length+')',segDurI)});segBase+=pwI+segDurI;
    const name=baseName+(segments.length>1?'_part'+(i+1):'')+'.mp4';
    const segSrt=segments[i].cues.length?buildSRT(segments[i].cues,segments[i].start,segments[i].end):'';try{await idbAdd({name,date:Date.now(),size:blob.size,blob,srt:segSrt})}catch(e){log('⚠️ နောက်ခံ သိမ်းဆည်းမှု မအောင်မြင်ပါ — ဒေါင်း link မှ ယူပါ')}made.push({name,blob});log('✅ '+name+' — '+fmtSize(blob.size))}
   expSet(expTotal-FIN_W,'💾 ဖိုင် ပြင်ဆင်နေပါတယ်…');
@@ -1228,10 +1384,10 @@ async function exportEditor(ed){
   if(window.__recapDone)window.__recapDone(3);
   showDone('✅ အသံ ရပါပြီ — Export ပြီးပါပြီ','Video '+made.length+' ပိုင်း ထုတ်ပြီးပါပြီ — အောက်က ဒေါင်း link များမှ ယူပါ။');
  }catch(err){
-  if(err&&err.cancelled){expS.pos=0;expS.ceil=0;expS.fracMax=0;expS.etaSec=null;expRender();if(expStageEl)expStageEl.textContent='⛔ ရပ်လိုက်ပါပြီ';if(expEtaEl)expEtaEl.textContent='';log('⛔ Export ကို ရပ်လိုက်ပါပြီ');showNotice('⛔ Export ကို ရပ်လိုက်ပါပြီ','info')}
-  else{console.error(err);log('❌ '+humanErr(err));if(expStageEl)expStageEl.textContent='❌ မအောင်မြင်ပါ';logBox.style.display='block';if(logTgl)logTgl.textContent='📄 Log ဖျောက်ရန်';showNotice('❌ Export မအောင်မြင်ပါ: '+humanErr(err),'err')}
+  if(err&&err.cancelled){expS.pos=0;expS.ceil=0;expS.fracMax=0;etaRunEnd();expRender();if(expStageEl)expStageEl.textContent='⛔ ရပ်လိုက်ပါပြီ';if(expEtaEl)expEtaEl.textContent='';log('⛔ Export ကို ရပ်လိုက်ပါပြီ');showNotice('⛔ Export ကို ရပ်လိုက်ပါပြီ','info')}
+  else{etaRunEnd();console.error(err);log('❌ '+humanErr(err));if(expStageEl)expStageEl.textContent='❌ မအောင်မြင်ပါ';logBox.style.display='block';if(logTgl)logTgl.textContent='📄 Log ဖျောက်ရန်';showNotice('❌ Export မအောင်မြင်ပါ: '+humanErr(err),'err')}
  }
- finally{if(expTimer)clearInterval(expTimer);expCancelRace=null;ed._expCancel=null;if(expCancelBtn)expCancelBtn.style.display='none';if(expEtaEl)expEtaEl.textContent='';ed.busy=false;ed._cachedVoice=null;ed._cachedVoiceExt=null;btn.classList.remove('loading');btn.disabled=false;btn.querySelector('.btn-label').textContent='🎬 Export';if(window.__refreshFeatureSummaries)window.__refreshFeatureSummaries()}
+ finally{if(expTimer)clearInterval(expTimer);expCancelRace=null;ed._expCancel=null;etaRunEnd();if(expCancelBtn)expCancelBtn.style.display='none';if(expEtaEl)expEtaEl.textContent='';if(expSetupEl)expSetupEl.style.display='';ed.busy=false;ed._cachedVoice=null;ed._cachedVoiceExt=null;btn.classList.remove('loading');btn.disabled=false;btn.querySelector('.btn-label').textContent='🎬 Export';if(window.__refreshFeatureSummaries)window.__refreshFeatureSummaries()}
 }
 </script>
 <script>
@@ -2405,6 +2561,7 @@ function cueSigFor(ed){
      wordmark span is what the Logo text field drives, in brand mode) */
   if(o.dataset.mode!==mode){o.dataset.mode=mode;o.innerHTML='<img alt=""><span class="logo-word"></span>'}
   const img=o.querySelector('img'),word=o.querySelector('.logo-word');
+  if(img&&!img._syncHook){img._syncHook=1;img.onload=()=>{try{syncLogoOvl()}catch(e){}}} /* V221: re-measure/re-clamp once the badge's real height lands */
   if(img)img.src=(mode==='image')?ed.logoImgData:BRAND_LOGO_SRC;
   if(word){word.textContent=(mode==='brand')?(ed.logoText||''):'';word.style.display=(mode==='brand'&&(ed.logoText||'').trim())?'':'none';word.style.fontSize=Math.max(10,Math.round((ed.logoSize||14)*1.05))+'px'}
   o.style.width=(ed.logoSize||14)+'%';
@@ -2413,7 +2570,21 @@ function cueSigFor(ed){
   const show=!!ed.logoOn;
   o.style.display=show?'block':'none';
   const wrap=o.parentElement;
-  if(wrap&&o.offsetWidth&&o.offsetHeight){const r=wrap.getBoundingClientRect();if(r.width>0&&r.height>0){const hw=o.offsetWidth/2/r.width,hh=o.offsetHeight/2/r.height;let cx=(typeof ed.logoX==='number')?ed.logoX:0.10,cy=(typeof ed.logoY==='number')?ed.logoY:0.08;if(hw<0.5)cx=Math.max(hw,Math.min(1-hw,cx));if(hh<0.5)cy=Math.max(hh,Math.min(1-hh,cy));ed.logoX=cx;ed.logoY=cy}}
+  if(wrap&&(o.offsetWidth||o.offsetHeight)){const r=wrap.getBoundingClientRect();if(r.width>0&&r.height>0){
+   /* V221: clamp by the RENDERED lockup, not just the CSS box — the
+      wordmark (.logo-word, white-space:nowrap) can be WIDER than the
+      badge box, so the old offsetWidth-only measurement understated
+      the half-width and the badge could slide partly OUT of the
+      frame, its text clipped at the edge (live test on bc58797).
+      The wordmark's true extent comes from a text Range rect measured
+      against the overlay's own centre; if Range is unavailable the
+      scroll size is the fallback. */
+   let hw=o.offsetWidth/2/r.width,hh=o.offsetHeight/2/r.height;
+   try{const orc=o.getBoundingClientRect();const word=o.querySelector('.logo-word');
+    if(word&&word.textContent){const rg=document.createRange();rg.selectNodeContents(word);const wr=rg.getBoundingClientRect();
+     if(wr.width>0){const ccx=orc.left+orc.width/2,ccy=orc.top+orc.height/2;hw=Math.max(hw,Math.max(Math.abs(wr.left-ccx),Math.abs(wr.right-ccx))/r.width);hh=Math.max(hh,Math.max(Math.abs(wr.top-ccy),Math.abs(wr.bottom-ccy))/r.height)}}}
+   catch(e){const sw=Math.max(o.offsetWidth,o.scrollWidth||0);if(sw)hw=sw/2/r.width}
+   let cx=(typeof ed.logoX==='number')?ed.logoX:0.10,cy=(typeof ed.logoY==='number')?ed.logoY:0.08;if(hw<0.5)cx=Math.max(hw,Math.min(1-hw,cx));if(hh<0.5)cy=Math.max(hh,Math.min(1-hh,cy));ed.logoX=cx;ed.logoY=cy}}
   o.style.left=(((typeof ed.logoX==='number')?ed.logoX:0.10)*100)+'%';o.style.top=(((typeof ed.logoY==='number')?ed.logoY:0.08)*100)+'%'}
  function syncBorderOvl(){const o=E('borderOvl');if(!o)return;o.style.display=ed.borderOn?'block':'none';o.style.borderWidth=Math.max(1,Math.round(((ed.borderW||6))*0.5))+'px';o.style.borderColor=ed.borderColor||'#FFE92E'}
  /* --- custom transport: drives the SAME video element the combined-preview
@@ -2593,11 +2764,45 @@ function cueSigFor(ed){
   const ret=sheetOnClose;sheetOnClose=()=>{if(ret)ret();markToolSel(null)};
   markToolSel('toolVoice');
  }
- window.__recapShowExport=()=>showPanel('homeExport','🎬 Export');
+ window.__recapShowExport=()=>{showPanel('homeExport','🎬 Export');renderExpSetup()};
  /* V218: the raw ffmpeg log in the Export view hides behind this toggle
     (collapsed by default; export failures open it automatically). */
  const logTglBtn=E('logToggle');if(logTglBtn)logTglBtn.onclick=()=>{const lb=E('log');if(!lb)return;const show=lb.style.display!=='block';lb.style.display=show?'block':'none';logTglBtn.textContent=show?'📄 Log ဖျောက်ရန်':'📄 Log ပြရန်'};
  const expCancelBtn0=E('expCancel');if(expCancelBtn0)expCancelBtn0.onclick=()=>{if(ed._expCancel&&ed._expCancel.fire)ed._expCancel.fire()};
+ /* ================= V221: Export chooser =================
+    The strip's Export segment validates (exportEditor) and lands
+    here in a SETUP state; 🎬 Export စတင် snapshots the choices into
+    ed._expOpts and calls runExport. Engine rows are built from the
+    EXP_ENGINES list so a third engine (Hardware, a later build)
+    slots in without new markup. Engine + resolution persist via
+    SETTINGS; the include toggles are per-export only and reset to
+    ON at every render (they appear only when the element exists). */
+ const EXP_ENGINES=[{id:'mt',label:'⚡ Multi-thread',desc:'ffmpeg core များ အားလုံး သုံးပြီး ပို မြန်သည်'},{id:'st',label:'🎬 ပုံမှန်',desc:'Single-thread core — အခု သုံးနေကျ engine'}];
+ function expChosenEngine(){const w=SETTINGS.expEngine;if(w==='mt')return expMtStatus().ok?'mt':'st';if(w==='st')return 'st';return expMtStatus().ok?'mt':'st'}
+ function expChosenRes(){return (SETTINGS.expRes===640||SETTINGS.expRes===720)?SETTINGS.expRes:1080}
+ function renderExpSetup(){
+  const box=E('expEngines');if(!box)return;
+  const chosen=expChosenEngine(),mtSt=expMtStatus();
+  box.innerHTML=EXP_ENGINES.map(en=>{const un=en.id==='mt'&&!mtSt.ok;return '<button class="opt'+(chosen===en.id?' sel':'')+(un?' dim':'')+'" data-eng="'+en.id+'"><b>'+en.label+'</b><span>'+(un?mtSt.reason:en.desc)+'</span></button>'}).join('');
+  box.querySelectorAll('.opt').forEach(b=>{b.onclick=()=>{const id=b.dataset.eng;if(id==='mt'&&!expMtStatus().ok){showNotice('⚠️ Multi-thread မရပါ — '+expMtStatus().reason,'err');return}SETTINGS.expEngine=id;saveSettings();renderExpSetup()}});
+  const res=expChosenRes();
+  $$('#'+p+'-expResRow .opt').forEach(b=>{b.classList.toggle('sel',parseInt(b.dataset.res,10)===res);b.onclick=()=>{SETTINGS.expRes=parseInt(b.dataset.res,10)||1080;saveSettings();renderExpSetup()}});
+  const hasTitle=E('titleTgl').classList.contains('on')&&!!(E('title').value||'').trim();
+  const tRow=E('expIncTitleRow'),lRow=E('expIncLogoRow'),tTgl=E('expIncTitle'),lTgl=E('expIncLogo');
+  if(tRow)tRow.style.display=hasTitle?'':'none';
+  if(lRow)lRow.style.display=ed.logoOn?'':'none';
+  if(tTgl){tTgl.classList.add('on');tTgl.onclick=()=>tTgl.classList.toggle('on')}
+  if(lTgl){lTgl.classList.add('on');lTgl.onclick=()=>lTgl.classList.toggle('on')}
+  const ep=E('expProg');if(ep&&!ed.busy)ep.style.display='none';
+ }
+ window.__recapExpSetup=()=>renderExpSetup();
+ const expStartBtn=E('expStart');if(expStartBtn)expStartBtn.onclick=()=>{
+  ed._expOpts={res:expChosenRes(),incTitle:!(E('expIncTitle')&&!E('expIncTitle').classList.contains('on')),incLogo:!(E('expIncLogo')&&!E('expIncLogo').classList.contains('on'))};
+  runExport(ed)};
+ const expSetupResetBtn=E('expSetupReset');if(expSetupResetBtn)expSetupResetBtn.onclick=()=>{
+  SETTINGS.expEngine=expMtStatus().ok?'mt':'st';SETTINGS.expRes=1080;saveSettings();
+  const tTgl=E('expIncTitle'),lTgl=E('expIncLogo');if(tTgl)tTgl.classList.add('on');if(lTgl)lTgl.classList.add('on');
+  renderExpSetup();showNotice('↺ Export ရွေးချယ်မှု မူလ ပြန်ထားပါပြီ','info')};
  const panelDoneBtn=E('panelDone');if(panelDoneBtn)panelDoneBtn.onclick=()=>showPanel('homeHome');
  function refreshSummaries(){
   /* V216 dead-code removal: the per-feature sum* summary lines went away

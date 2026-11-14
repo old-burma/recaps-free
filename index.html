@@ -114,6 +114,7 @@ body.locked{overflow:hidden}
 .exp-bar-fill{height:100%;width:0%;background:linear-gradient(90deg,#F59E0B,#F97316);border-radius:5px;transition:width .2s ease}
 .exp-meta{display:flex;justify-content:space-between;gap:10px;margin-top:8px;font-size:12px;color:#9FB4C0}
 .exp-meta .exp-elapsed{font-variant-numeric:tabular-nums;white-space:nowrap}
+.exp-meta .exp-eta{white-space:nowrap;color:#FFD88A;font-variant-numeric:tabular-nums}
 /* ===== preview zone (large, centred, top) + placeholder + overlays ===== */
 .vid-sticky{flex:0 0 auto;background:#000;padding:8px 10px 6px}
 .pick-row{display:flex;align-items:center;gap:10px;margin-bottom:10px}
@@ -536,7 +537,7 @@ const toolbarInner='<nav class="toolbar" id="'+p+'-toolbar">'
 +tb('Subs','🎨','စာတန်း')+tb('Voice','🎙️','Voice Create')+tb('Mixer','🔊','Mixer')+tb('Trim','✂️','Trim')+tb('Aspect','🌫️','Aspect')+tb('Title','📝','Title')+tb('Text','➕','Text')+tb('Logo','🛡️','Logo')+tb('Border','📐','Border')+tb('Blur','🫥','Blur')
 +'<button class="tool-btn" id="'+p+'-toolKey"><span class="tic">🔑</span>Key</button>'
 +'</nav>';
-const exportInner='<div class="exp-prog" id="'+p+'-expProg" style="display:none"><div class="exp-prog-head"><span class="wave"><i></i><i></i><i></i><i></i><i></i></span><span class="exp-pct" id="'+p+'-expPct">0%</span></div><div class="exp-bar"><div class="exp-bar-fill" id="'+p+'-expBar"></div></div><div class="exp-meta"><span id="'+p+'-expStage">ပြင်ဆင်နေပါတယ်…</span><span class="exp-elapsed" id="'+p+'-expElapsed">0s</span></div></div><button class="btn light small" id="'+p+'-logToggle" style="margin-top:10px">📄 Log ပြရန်</button><div class="logbox" id="'+p+'-log"></div><div id="'+p+'-result" style="margin-top:12px"></div>';
+const exportInner='<div class="exp-prog" id="'+p+'-expProg" style="display:none"><div class="exp-prog-head"><span class="wave"><i></i><i></i><i></i><i></i><i></i></span><span class="exp-pct" id="'+p+'-expPct">0%</span></div><div class="exp-bar"><div class="exp-bar-fill" id="'+p+'-expBar"></div></div><div class="exp-meta"><span id="'+p+'-expStage">ပြင်ဆင်နေပါတယ်…</span><span class="exp-eta" id="'+p+'-expEta"></span><span class="exp-elapsed" id="'+p+'-expElapsed">0s</span></div></div><button class="btn danger" id="'+p+'-expCancel" style="display:none;width:100%;margin-top:10px">⛔ Export ရပ်မယ်</button><button class="btn light small" id="'+p+'-logToggle" style="margin-top:10px">📄 Log ပြရန်</button><div class="logbox" id="'+p+'-log"></div><div id="'+p+'-result" style="margin-top:12px"></div>';
 /* V214: the 🔑 Key pop-up content — the old slide-in drawer's innards
    (Gemini key card + ⚙️ settings reset), now parked in #homeKey and
    mounted into the bottom sheet by openKeySheet like every other tool.
@@ -832,15 +833,19 @@ async function assembleLineChunks(raws){
   return{bytes:out,ext:raws[0].ext,chunkDurs:durs.every(d=>d>0)?durs:null,pause:0};
  }
 }
-async function generateVoiceLines(ed,lines,statusFn){
+async function generateVoiceLines(ed,lines,statusFn,progFn){
  if(!lines||!lines.length)throw new Error('အသံ ထုတ်ရန် စာသား မရှိပါ');
  const raws=[];
  for(let i=0;i<lines.length;i++){
+  if(ed._expCancel&&ed._expCancel.hit)throw expCancelError();
   const key=ttsLineKey(ed,lines[i]);
   let hit=ttsLineCache.get(key);
   if(!hit){hit=await synthLine(ed,lines[i],statusFn);ttsLineCache.set(key,hit);if(ttsLineCache.size>300)ttsLineCache.delete(ttsLineCache.keys().next().value)}
   raws.push(hit);
   if(statusFn&&lines.length>1)statusFn('🎙️ အသံ ထုတ်နေပါတယ်… အပိုင်း '+(i+1)+'/'+lines.length);
+  /* V220: per-line progress for callers that show a bar (export) —
+     fires for cached lines too, so the count always reaches n */
+  if(progFn)try{progFn(i+1,lines.length)}catch(e){}
  }
  return assembleLineChunks(raws);
 }
@@ -874,6 +879,15 @@ async function geminiTTSLong(key,text,voice){ /* chunk long narration, concat PC
 <script>
 /* ================= Export engine — ffmpeg.wasm single-thread ================= */
 let ffInstance=null,ffLoading=null,ffLogSink=null,ffProgSink=null;
+/* V220: export cancellation — exportEditor arms expCancelRace for the
+   duration of an export; ffExecP races every exec against it, so a
+   cancel rejects the in-flight exec at once (the cancel handler then
+   terminates the worker, so the dead exec's promise never settling is
+   harmless) and getFFmpeg reloads a FRESH instance for the next export
+   because ffInstance/ffLoading are nulled. Non-ffmpeg phases (PNG
+   builds, voice lines) poll ed._expCancel.hit between items. */
+let expCancelRace=null;
+function expCancelError(){const e=new Error('Export ကို ရပ်လိုက်ပါပြီ');e.cancelled=true;return e}
 /* Raw ffmpeg.wasm log lines must never reach status elements: the wasm runtime
    prints a bare "Aborted()" line when an exec finishes/aborts, and streaming the
    log into the voice-step status made that text appear under the Create Voice
@@ -906,18 +920,22 @@ async function ffReadU8(ff,name){const d=await ff.readFile(name);if(d instanceof
    0..1 and de-duped so the UI doesn't churn. Without onProg this is a
    plain exec — the shared ffProgSink simply stays unset. */
 async function ffExecP(ff,args,timeout,expectSec,onProg){
- if(!onProg)return ff.exec(args,timeout);
- let last=-1;
- ffProgSink=e=>{
-  let f=NaN;
-  if(e&&isFinite(e.time)&&expectSec>0)f=(e.time/1000000)/expectSec;
-  else if(e&&isFinite(e.progress))f=e.progress;
-  if(!isFinite(f))return;
-  f=Math.max(0,Math.min(1,f));
-  if(Math.abs(f-last)<0.002&&f<1)return;
-  last=f;try{onProg(f)}catch(_){}
+ const run=async()=>{
+  if(!onProg)return ff.exec(args,timeout);
+  let last=-1;
+  ffProgSink=e=>{
+   let f=NaN;
+   if(e&&isFinite(e.time)&&expectSec>0)f=(e.time/1000000)/expectSec;
+   else if(e&&isFinite(e.progress))f=e.progress;
+   if(!isFinite(f))return;
+   f=Math.max(0,Math.min(1,f));
+   if(Math.abs(f-last)<0.002&&f<1)return;
+   last=f;try{onProg(f)}catch(_){}
+  };
+  try{return await ff.exec(args,timeout)}finally{ffProgSink=null}
  };
- try{return await ff.exec(args,timeout)}finally{ffProgSink=null}
+ if(expCancelRace)return Promise.race([run(),expCancelRace]);
+ return run();
 }
 /* atempo only accepts 0.5–2.0 per filter instance in the wasm ffmpeg build, so
    chain instances for wider factors. Product of the chain == requested speed. */
@@ -959,7 +977,13 @@ async function effectiveVoiceBytes(ed,pristine,ext,logFn,progFn){
  ed._effVoice={key,bytes:r.bytes,ext:r.ext};
  return ed._effVoice;
 }
-async function exportOne(ff,ed,seg,idx,total,log,prog){
+async function exportOne(ff,ed,seg,idx,total,log,progs){
+ /* V220: progress is split — progs.prep(f,stage) covers everything BEFORE
+    the encode (input write, voice write, title/subtitle/logo/text PNG
+    builds, counted per finished item) and progs.run(f,stage) covers the
+    ffmpeg encode itself (ffExecP events). Before V220 the prep work
+    reported nothing, so the % sat frozen until the encode started. */
+ const prep=progs&&progs.prep,runP=progs&&progs.run;
  /* seg = {start,end,cues:[{text,start,end}]} times absolute; output times relative */
  const dur=seg.end-seg.start;
  /* V216 canvas geometry: ONE geometry (canvasGeom) for every canvas —
@@ -980,16 +1004,18 @@ async function exportOne(ff,ed,seg,idx,total,log,prog){
  const useSub=$('#'+ed.p+'-subTgl').classList.contains('on')&&seg.cues.length;
  const useTitle=$('#'+ed.p+'-titleTgl').classList.contains('on')&&($('#'+ed.p+'-title').value||'').trim();
  const fetchFile=window.FFmpegUtil&&window.FFmpegUtil.fetchFile;
- await ff.writeFile('in.mp4',fetchFile?await fetchFile(ed.file):new Uint8Array(await ed.file.arrayBuffer()));
+ const prepItems=1+(ed.audioMode==='voice'?1:0)+(useTitle?1:0)+(useSub?seg.cues.length:0)+(ed.logoOn?1:0)+((ed.textOn&&(ed.textStr||'').trim())?1:0);
+ let prepN=0;const prepStep=st=>{if(ed._expCancel&&ed._expCancel.hit)throw expCancelError();prepN++;if(prep)prep(Math.min(1,prepN/Math.max(1,prepItems)),st)};
+ await ff.writeFile('in.mp4',fetchFile?await fetchFile(ed.file):new Uint8Array(await ed.file.arrayBuffer()));prepStep('📥 ဖိုင် ပြင်နေပါတယ်…');
  let voiceArr=null,voiceFile='voice.wav';
- if(ed.audioMode==='voice'){if(ed._cachedVoice){log('✅ အသံ အပိုင်းမှာ ထုတ်ထားသော အသံကို ပြန်သုံးပါတယ်');voiceArr=ed._cachedVoice;voiceFile='voice.'+(ed._cachedVoiceExt||'wav')}else{log('အသံ ထုတ်နေပါတယ်…');const gv=await generateVoiceLines(ed,seg.cues.map(c=>c.text),log);voiceArr=gv.bytes;voiceFile='voice.'+gv.ext}await ff.writeFile(voiceFile,ffCopy(voiceArr))}
+ if(ed.audioMode==='voice'){if(ed._cachedVoice){log('✅ အသံ အပိုင်းမှာ ထုတ်ထားသော အသံကို ပြန်သုံးပါတယ်');voiceArr=ed._cachedVoice;voiceFile='voice.'+(ed._cachedVoiceExt||'wav')}else{log('အသံ ထုတ်နေပါတယ်…');const gv=await generateVoiceLines(ed,seg.cues.map(c=>c.text),log,(i,n)=>{if(prep)prep(Math.min(1,(prepN+(n?i/n:1))/Math.max(1,prepItems)),'🎙️ အသံ ထုတ်နေပါတယ်… ('+i+'/'+n+')')});voiceArr=gv.bytes;voiceFile='voice.'+gv.ext}await ff.writeFile(voiceFile,ffCopy(voiceArr))}prepStep('🎙️ အသံ ပြင်နေပါတယ်…');
  const overlays=[]; /* {file,y} */
- if(useTitle){const tbh=Math.round(170*S);const tty=Math.max(0,Math.min(H-tbh,Math.round(((ed.titleY==null?0.15:ed.titleY))*H-tbh/2)));await ff.writeFile('title.png',await textPNG($('#'+ed.p+'-title').value.trim(),W,tbh,{size:Math.round(((ed.titleSize||52))*S),color:'#FFE92E',cx:(ed.titleX==null?0.5:ed.titleX)}));overlays.push({file:'title.png',x:0,y:tty,from:0,to:dur})}
- if(useSub){for(let i=0;i<seg.cues.length;i++){const fn='sub'+i+'.png';await ff.writeFile(fn,await textPNG(seg.cues[i].text,W,Math.round(170*S),subPngOpts(ed,S)));overlays.push({file:fn,y:subY,from:seg.cues[i].start-seg.start,to:seg.cues[i].end-seg.start})}}
+ if(useTitle){const tbh=Math.round(170*S);const tty=Math.max(0,Math.min(H-tbh,Math.round(((ed.titleY==null?0.15:ed.titleY))*H-tbh/2)));await ff.writeFile('title.png',await textPNG($('#'+ed.p+'-title').value.trim(),W,tbh,{size:Math.round(((ed.titleSize||52))*S),color:'#FFE92E',cx:(ed.titleX==null?0.5:ed.titleX)}));prepStep('🖼️ ခေါင်းစဉ် ပုံ ပြင်နေပါတယ်…');overlays.push({file:'title.png',x:0,y:tty,from:0,to:dur})}
+ if(useSub){for(let i=0;i<seg.cues.length;i++){const fn='sub'+i+'.png';await ff.writeFile(fn,await textPNG(seg.cues[i].text,W,Math.round(170*S),subPngOpts(ed,S)));prepStep('🖼️ စာတန်း ပုံများ ပြင်နေပါတယ်… ('+(i+1)+'/'+seg.cues.length+')');overlays.push({file:fn,y:subY,from:seg.cues[i].start-seg.start,to:seg.cues[i].end-seg.start})}}
  /* player-block overlays (🛡️ Logo watermark + ➕ free Text): same canvas-PNG pipeline,
     positions mapped from the dragged frame fractions just like the subtitle band */
- if(ed.logoOn){const lp=await buildLogoPNG(ed,W);await ff.writeFile('logo.png',lp.bytes);const lx=Math.max(0,Math.min(W-lp.w,Math.round(((ed.logoX==null?0.10:ed.logoX))*W-lp.w/2)));const ly=Math.max(0,Math.min(H-lp.h,Math.round(((ed.logoY==null?0.08:ed.logoY))*H-lp.h/2)));overlays.push({file:'logo.png',x:lx,y:ly,from:0,to:dur})}
- if(ed.textOn&&(ed.textStr||'').trim()){const bh=Math.round(170*S);const ty=Math.max(0,Math.min(H-bh,Math.round((ed.textY||0.16)*H-bh/2)));await ff.writeFile('freetext.png',await textPNG(ed.textStr.trim(),W,bh,{size:Math.round((ed.textSize||44)*S),cx:(ed.textX==null?0.5:ed.textX)}));overlays.push({file:'freetext.png',y:ty,from:0,to:dur})}
+ if(ed.logoOn){const lp=await buildLogoPNG(ed,W);await ff.writeFile('logo.png',lp.bytes);const lx=Math.max(0,Math.min(W-lp.w,Math.round(((ed.logoX==null?0.10:ed.logoX))*W-lp.w/2)));const ly=Math.max(0,Math.min(H-lp.h,Math.round(((ed.logoY==null?0.08:ed.logoY))*H-lp.h/2)));prepStep('🖼️ Logo ပုံ ပြင်နေပါတယ်…');overlays.push({file:'logo.png',x:lx,y:ly,from:0,to:dur})}
+ if(ed.textOn&&(ed.textStr||'').trim()){const bh=Math.round(170*S);const ty=Math.max(0,Math.min(H-bh,Math.round((ed.textY||0.16)*H-bh/2)));await ff.writeFile('freetext.png',await textPNG(ed.textStr.trim(),W,bh,{size:Math.round((ed.textSize||44)*S),cx:(ed.textX==null?0.5:ed.textX)}));prepStep('🖼️ စာသား ပုံ ပြင်နေပါတယ်…');overlays.push({file:'freetext.png',y:ty,from:0,to:dur})}
  /* build filter graph */
  const blur=Math.max(2,Math.round(ed.blur/2*S));
  let fc='',base;
@@ -1054,15 +1080,17 @@ async function exportOne(ff,ed,seg,idx,total,log,prog){
  }
  log('Video ထုတ်နေပါတယ် ('+(idx+1)+'/'+total+') — '+dur.toFixed(1)+' စက္ကန့်…');
  const wantMix=ed.audioMode==='voice'&&bgmF>0;
+ if(runP)runP(0,'🎬 Video ထုတ်နေပါတယ် ('+(idx+1)+'/'+total+')');
  let code;
  if(ed.audioMode!=='voice'){
-  code=await ffExecP(ff,buildArgs(false,true),3600000,dur,prog);
-  if(code!==0){log('ℹ️ မူရင်းအသံကို copy မရပါ (codec မကိုက်နိုင်ပါ) — AAC ဖြင့် ပြန်ထုတ်နေပါတယ်…');code=await ffExecP(ff,buildArgs(false,false),3600000,dur,prog)}
+  code=await ffExecP(ff,buildArgs(false,true),3600000,dur,runP);
+  if(code!==0){log('ℹ️ မူရင်းအသံကို copy မရပါ (codec မကိုက်နိုင်ပါ) — AAC ဖြင့် ပြန်ထုတ်နေပါတယ်…');code=await ffExecP(ff,buildArgs(false,false),3600000,dur,runP)}
  }else{
-  code=await ffExecP(ff,buildArgs(wantMix),3600000,dur,prog);
-  if(code!==0&&wantMix){log('ℹ️ မူရင်းအသံ ရောမရပါ (အသံ မပါသော video ဖြစ်နိုင်ပါတယ်) — voice သီးသန့်ဖြင့် ပြန်ထုတ်နေပါတယ်…');code=await ffExecP(ff,buildArgs(false),3600000,dur,prog)}
+  code=await ffExecP(ff,buildArgs(wantMix),3600000,dur,runP);
+  if(code!==0&&wantMix){log('ℹ️ မူရင်းအသံ ရောမရပါ (အသံ မပါသော video ဖြစ်နိုင်ပါတယ်) — voice သီးသန့်ဖြင့် ပြန်ထုတ်နေပါတယ်…');code=await ffExecP(ff,buildArgs(false),3600000,dur,runP)}
  }
  if(code!==0)throw new Error('ffmpeg exit code '+code+' — အသေးစိတ်ကို log တွင် ကြည့်ပါ');
+ if(runP)runP(1);
  const data=await ff.readFile('out'+idx+'.mp4');
  const blob=new Blob([data.buffer||data],{type:'video/mp4'});
  try{await ff.deleteFile('in.mp4')}catch(e){}
@@ -1106,28 +1134,61 @@ async function exportEditor(ed){
  E('result').innerHTML='';showNotice('▶️ Export စတင်ပါပြီ — အပိုင်း '+segments.length+' ပိုင်း','info');
  /* V218: REAL progress UI (big %, bar, waveform, stage, elapsed) instead
     of streaming raw ffmpeg log lines at the user — the log now sits
-    behind the 📄 Log toggle above (hidden by default). Aggregation
-    across the sequential ffmpeg runs is weighted by each run's expected
-    OUTPUT DURATION: the voice speed-render (when it runs) weighs its
-    resulting voice seconds; each segment weighs its trim seconds. The
-    displayed % never runs backwards. */
- const expProgEl=E('expProg'),expPctEl=E('expPct'),expBarEl=E('expBar'),expStageEl=E('expStage'),expElapsedEl=E('expElapsed');
+    behind the 📄 Log toggle above (hidden by default).
+    V220: the % is now REAL across the WHOLE pipeline, not just the
+    ffmpeg runs. Progress is tracked in abstract UNITS with a phase
+    plan: ffmpeg load = 2 units (no events exist — creep-covered);
+    export-triggered voice generation = 3 units per line, cap 30 (added
+    when it actually runs, like voiceW below); the voice speed-render
+    keeps its resulting-seconds weight; each segment = a prep share for
+    the PNG/input work (8% of its seconds, clamped to 1..6 units,
+    advanced per finished item inside exportOne) + its trim seconds for
+    the encode (the V218 duration weighting); finalize = 1 unit. Real
+    events set the position; between events the ticker creeps the
+    position toward the CURRENT PHASE's ceiling (never past it), so the
+    bar never looks frozen and never overshoots. The displayed % is
+    monotonic, capped at 99 until expDone() sets exactly 100 on success.
+    The ETA next to the elapsed timer is an EMA-smoothed estimate from
+    elapsed ÷ fraction, shown only once there is signal (>=10% or 5s). */
+ const expProgEl=E('expProg'),expPctEl=E('expPct'),expBarEl=E('expBar'),expStageEl=E('expStage'),expElapsedEl=E('expElapsed'),expEtaEl=E('expEta'),expCancelBtn=E('expCancel');
  const expT0=Date.now();
- const expW={total:Math.max(1,dur),max:0};
- const setExpProg=(frac,stage)=>{
-  const pct=Math.max(expW.max,Math.min(100,Math.round((frac||0)*100)));expW.max=pct;
+ const LOAD_W=2,FIN_W=1;
+ const prepWOf=sg=>Math.max(1,Math.min(6,0.08*Math.max(1,sg.end-sg.start)));
+ let expTotal=LOAD_W+FIN_W+segments.reduce((a,sg)=>a+prepWOf(sg)+(sg.end-sg.start),0);
+ const expS={pos:0,ceil:0,fracMax:0,lastReal:Date.now(),etaSec:null,done:false};
+ const expRender=()=>{
+  const fr=expS.done?1:Math.min(0.995,expS.pos/Math.max(1,expTotal));
+  if(fr>expS.fracMax)expS.fracMax=fr;
+  const pct=expS.done?100:Math.min(99,Math.round(expS.fracMax*100));
   if(expPctEl)expPctEl.textContent=pct+'%';
   if(expBarEl)expBarEl.style.width=pct+'%';
-  if(stage&&expStageEl)expStageEl.textContent=stage;
  };
- const stepProg=(base,weight,stage)=>f=>setExpProg((base+f*Math.max(0,weight))/expW.total,stage);
- let expTimer=null,voiceW=0;
+ const expSet=(u,stage)=>{const nu=Math.max(expS.pos,Math.min(u,expTotal));if(nu>expS.pos){expS.pos=nu;expS.lastReal=Date.now()}if(expS.pos>expS.ceil)expS.ceil=expS.pos;if(stage&&expStageEl)expStageEl.textContent=stage;expRender()};
+ const expCeil=(u,stage)=>{expS.ceil=Math.max(expS.ceil,Math.min(u,expTotal));if(stage&&expStageEl)expStageEl.textContent=stage};
+ const phProg=(base,weight,stage)=>(f,st)=>{expCeil(base+weight);expSet(base+Math.max(0,Math.min(1,f||0))*weight,st||stage)};
+ const expDone=()=>{expS.done=true;if(expStageEl)expStageEl.textContent='✅ ပြီးပါပြီ';if(expEtaEl)expEtaEl.textContent='';expRender()};
+ let expTimer=null,voiceW=0,GEN_W=0;
  if(expProgEl)expProgEl.style.display='block';
- setExpProg(0,ed.audioMode==='voice'?'🎙️ အသံ ပြင်ဆင်နေပါတယ်…':'🎬 Video ထုတ်နေပါတယ်…');
- expTimer=setInterval(()=>{if(expElapsedEl)expElapsedEl.textContent=Math.round((Date.now()-expT0)/1000)+'s'},250);
+ /* V220 cancel: arm the token + race for this export and show the
+    ⛔ button; fire() rejects the race, terminates the worker and
+    nulls the cached instance so the next export loads ffmpeg fresh */
+ const expTok={hit:false,fire:null};ed._expCancel=expTok;
+ const expCancelP=new Promise((_,rej)=>{expTok.fire=()=>{if(expTok.hit)return;expTok.hit=true;ffProgSink=null;if(ffInstance){try{const tp=ffInstance.terminate();if(tp&&tp.catch)tp.catch(()=>{})}catch(e){}ffInstance=null;ffLoading=null}rej(expCancelError())}});
+ expCancelP.catch(()=>{});
+ expCancelRace=expCancelP;
+ if(expCancelBtn)expCancelBtn.style.display='';
+ expCeil(LOAD_W,ed.audioMode==='voice'?'🎙️ အသံ ပြင်ဆင်နေပါတယ်…':'⚙️ ပြင်ဆင်နေပါတယ်…');expRender();
+ expTimer=setInterval(()=>{
+  const elSec=(Date.now()-expT0)/1000;
+  if(expElapsedEl)expElapsedEl.textContent=Math.round(elSec)+'s';
+  if(!expS.done&&Date.now()-expS.lastReal>2000&&expS.pos<expS.ceil){expS.pos+=(expS.ceil-expS.pos)*0.02;expRender()}
+  if(expEtaEl){let t='';const fr=expS.fracMax;if(!expS.done&&(fr>=0.10||elSec>=5)&&fr>0.02){const raw=elSec*(1-fr)/fr;expS.etaSec=(expS.etaSec==null)?raw:expS.etaSec+0.25*(raw-expS.etaSec);if(expS.etaSec>=2)t='နောက်ထပ် ~'+(expS.etaSec<60?Math.round(expS.etaSec)+' စက္ကန့်':fmtDur(Math.round(expS.etaSec)))+' လောက်'}expEtaEl.textContent=t}
+ },250);
  const baseName=(ed.file.name||'recap').replace(/\.[^.]+$/,'').replace(/[^\w\- ]+/g,'').trim()||'recap';
  try{
   const ff=await getFFmpeg(log);
+  if(expTok.hit)throw expCancelError();
+  expSet(LOAD_W);
   const made=[];
   ed._cachedVoice=null;ed._cachedVoiceExt=null;
   if(ed.audioMode==='voice'){
@@ -1139,7 +1200,7 @@ async function exportEditor(ed){
    let vc=(ed.voiceCache&&ed.voiceCache.engine===ed.ttsEngine&&ed.voiceCache.voice===vid&&(ed.voiceCache.linesSig!=null?ed.voiceCache.linesSig===canon.join('\n'):ed.voiceCache.text===lines.join(' ')))?ed.voiceCache:null;
    let pristine,pext;
    if(vc){pristine=vc.bytes;pext=vc.ext;log('✅ အသံ အပိုင်းမှာ ထုတ်ထားသော အသံကို ပြန်သုံးပါတယ်')}
-   else{log('အသံ ထုတ်နေပါတယ်…');const gv=await generateVoiceLines(ed,canon,log);pristine=gv.bytes;pext=gv.ext;vc={text:lines.join(' '),lines:canon.slice(),linesSig:canon.join('\n'),engine:ed.ttsEngine,voice:vid,bytes:pristine,ext:pext,genSpeed:genSpeedFactor(p),chunkDurs:gv.chunkDurs,pause:gv.pause||0,dur:0};ed.voiceCache=vc}
+   else{log('အသံ ထုတ်နေပါတယ်…');GEN_W=Math.min(30,3*Math.max(1,canon.length));expTotal+=GEN_W;expCeil(LOAD_W+GEN_W,'🎙️ အသံ ထုတ်နေပါတယ်…');const gv=await generateVoiceLines(ed,canon,log,(i,n)=>expSet(LOAD_W+GEN_W*(n?i/n:1),'🎙️ အသံ ထုတ်နေပါတယ်… ('+i+'/'+n+')'));pristine=gv.bytes;pext=gv.ext;vc={text:lines.join(' '),lines:canon.slice(),linesSig:canon.join('\n'),engine:ed.ttsEngine,voice:vid,bytes:pristine,ext:pext,genSpeed:genSpeedFactor(p),chunkDurs:gv.chunkDurs,pause:gv.pause||0,dur:0};ed.voiceCache=vc}
    if(!vc.dur)vc.dur=(vc.chunkDurs&&vc.chunkDurs.length)?vc.chunkDurs.reduce((a,b)=>a+b,0)+(vc.pause||0)*Math.max(0,vc.chunkDurs.length-1):await probeAudioDur(pristine,pext);
    const eff=effSpeedOf(ed),effDur=vc.dur?vc.dur/eff:0;
    if(vc.dur&&effDur>dur+0.05){
@@ -1147,8 +1208,8 @@ async function exportEditor(ed){
     log('⚠️ '+msg);showNotice('⚠️ '+msg,'err');return;
    }
    voiceW=(Math.abs(eff-1)>=0.001&&effDur>0)?Math.max(1,effDur):0;
-   if(voiceW)expW.total+=voiceW;
-   const rv=await effectiveVoiceBytes(ed,pristine,pext,log,voiceW?stepProg(0,voiceW,'🎙️ အသံ အမြန် ပြင်နေပါတယ်…'):undefined);
+   if(voiceW)expTotal+=voiceW;
+   const rv=await effectiveVoiceBytes(ed,pristine,pext,log,voiceW?phProg(LOAD_W+GEN_W,voiceW,'🎙️ အသံ အမြန် ပြင်နေပါတယ်…'):undefined);
    ed._cachedVoice=rv.bytes;ed._cachedVoiceExt=rv.ext;
    if(effDur)log('🎙️ အသံ အမြန် '+eff.toFixed(2)+'× — အသံ '+effDur.toFixed(1)+' စက္ကန့် / video '+dur.toFixed(1)+' စက္ကန့်');
   }
@@ -1156,17 +1217,21 @@ async function exportEditor(ed){
      cues were not hand-timed, re-derive them from the voice's own chunk
      timeline so the burned subtitles match the speech exactly. */
   if(ed.audioMode==='voice'&&ed.voiceCache&&ed.voiceCache.chunkDurs&&!ed.cuesManual){cues=unifiedCues(ed);ed.cues=cues;ed.cuesSig=cueSigFor(ed);assignCues(cues)}
-  let segBase=voiceW;
-  for(let i=0;i<segments.length;i++){const segDurI=segments[i].end-segments[i].start;const blob=await exportOne(ff,ed,segments[i],i,segments.length,log,stepProg(segBase,Math.max(1,segDurI),'🎬 Video ထုတ်နေပါတယ် ('+(i+1)+'/'+segments.length+')'));segBase+=segDurI;
+  let segBase=LOAD_W+GEN_W+voiceW;
+  for(let i=0;i<segments.length;i++){if(expTok.hit)throw expCancelError();const segDurI=segments[i].end-segments[i].start;const pwI=prepWOf(segments[i]);const blob=await exportOne(ff,ed,segments[i],i,segments.length,log,{prep:phProg(segBase,pwI),run:phProg(segBase+pwI,segDurI,'🎬 Video ထုတ်နေပါတယ် ('+(i+1)+'/'+segments.length+')')});segBase+=pwI+segDurI;
    const name=baseName+(segments.length>1?'_part'+(i+1):'')+'.mp4';
    const segSrt=segments[i].cues.length?buildSRT(segments[i].cues,segments[i].start,segments[i].end):'';try{await idbAdd({name,date:Date.now(),size:blob.size,blob,srt:segSrt})}catch(e){log('⚠️ နောက်ခံ သိမ်းဆည်းမှု မအောင်မြင်ပါ — ဒေါင်း link မှ ယူပါ')}made.push({name,blob});log('✅ '+name+' — '+fmtSize(blob.size))}
-  setExpProg(1,'✅ ပြီးပါပြီ');
+  expSet(expTotal-FIN_W,'💾 ဖိုင် ပြင်ဆင်နေပါတယ်…');
   const res=E('result');res.innerHTML='<b style="font-size:14px">✅ ပြီးပါပြီ — အောက်မှာ တန်းစီ ဒေါင်းနိုင်ပါတယ်</b>';
   made.forEach(m=>{const url=URL.createObjectURL(m.blob);const a=document.createElement('a');a.href=url;a.download=m.name;a.className='btn light small';a.style.margin='8px 8px 0 0';a.textContent='⬇️ '+m.name;res.appendChild(a)});
+  expDone();
   if(window.__recapDone)window.__recapDone(3);
   showDone('✅ အသံ ရပါပြီ — Export ပြီးပါပြီ','Video '+made.length+' ပိုင်း ထုတ်ပြီးပါပြီ — အောက်က ဒေါင်း link များမှ ယူပါ။');
- }catch(err){console.error(err);log('❌ '+humanErr(err));if(expStageEl)expStageEl.textContent='❌ မအောင်မြင်ပါ';logBox.style.display='block';if(logTgl)logTgl.textContent='📄 Log ဖျောက်ရန်';showNotice('❌ Export မအောင်မြင်ပါ: '+humanErr(err),'err')}
- finally{if(expTimer)clearInterval(expTimer);ed.busy=false;ed._cachedVoice=null;ed._cachedVoiceExt=null;btn.classList.remove('loading');btn.disabled=false;btn.querySelector('.btn-label').textContent='🎬 Export';if(window.__refreshFeatureSummaries)window.__refreshFeatureSummaries()}
+ }catch(err){
+  if(err&&err.cancelled){expS.pos=0;expS.ceil=0;expS.fracMax=0;expS.etaSec=null;expRender();if(expStageEl)expStageEl.textContent='⛔ ရပ်လိုက်ပါပြီ';if(expEtaEl)expEtaEl.textContent='';log('⛔ Export ကို ရပ်လိုက်ပါပြီ');showNotice('⛔ Export ကို ရပ်လိုက်ပါပြီ','info')}
+  else{console.error(err);log('❌ '+humanErr(err));if(expStageEl)expStageEl.textContent='❌ မအောင်မြင်ပါ';logBox.style.display='block';if(logTgl)logTgl.textContent='📄 Log ဖျောက်ရန်';showNotice('❌ Export မအောင်မြင်ပါ: '+humanErr(err),'err')}
+ }
+ finally{if(expTimer)clearInterval(expTimer);expCancelRace=null;ed._expCancel=null;if(expCancelBtn)expCancelBtn.style.display='none';if(expEtaEl)expEtaEl.textContent='';ed.busy=false;ed._cachedVoice=null;ed._cachedVoiceExt=null;btn.classList.remove('loading');btn.disabled=false;btn.querySelector('.btn-label').textContent='🎬 Export';if(window.__refreshFeatureSummaries)window.__refreshFeatureSummaries()}
 }
 </script>
 <script>
@@ -2448,23 +2513,35 @@ function cueSigFor(ed){
   el.addEventListener('pointerup',endDrag);
   el.addEventListener('pointercancel',endDrag);
  })();
- /* V217: 📝 Title + 🛡️ Logo drags — same pattern as the text overlay:
-    drag the overlay itself to place it; fractions are clamped so the
-    overlay never leaves the frame; positions persist with the other
-    overlay settings and map to export identically (centre fractions). */
+ /* V217 added 📝 Title + 🛡️ Logo drags, but with a DIFFERENT pattern
+    from the working text/subtitle drags — and it snapped back on touch
+    (user report 2026-11-14). Two defects: (1) move() mapped the
+    finger's ABSOLUTE position onto the overlay centre and start()
+    called move() on pointerdown, so the overlay teleported its centre
+    to wherever the finger landed; (2) move/up lived on window with NO
+    pointercancel handler — when a touch drag was cancelled mid-gesture
+    (routine on Android), `drag` stayed latched true, and the NEXT tap
+    anywhere (typically mid-frame, e.g. tapping the video) teleported
+    the overlay to that tap — the observed "returns to the centre".
+    V220 rewrites both to the proven text-overlay pattern: element-level
+    handlers, pointer capture in try/catch, DELTA from the drag-start
+    fractions (grab offset preserved, no teleport), pointerup AND
+    pointercancel both end + persist. Positions are centre fractions,
+    clamped by the sync functions' measured whole-overlay clamp, persist
+    with the other overlay settings and map to export identically. */
  (function(){
-  const tO=E('titleOvl');if(!tO)return;const wrap=tO.parentElement;if(!wrap)return;let drag=false;
-  function start(e){if(tO.style.display==='none')return;drag=true;tO.setPointerCapture&&e.pointerId!=null&&tO.setPointerCapture(e.pointerId);move(e);e.preventDefault()}
-  function move(e){if(!drag)return;const r=wrap.getBoundingClientRect();if(!r.width||!r.height)return;let cx=(e.clientX-r.left)/r.width,cy=(e.clientY-r.top)/r.height;const hw=(tO.offsetWidth||0)/2/r.width,hh=(tO.offsetHeight||0)/2/r.height;if(hw<0.5)cx=Math.max(hw,Math.min(1-hw,cx));if(hh<0.5)cy=Math.max(hh,Math.min(1-hh,cy));ed.titleX=Math.round(cx*10000)/10000;ed.titleY=Math.round(cy*10000)/10000;syncTitleOvl()}
-  function end(){if(!drag)return;drag=false;persistOvl()}
-  tO.addEventListener('pointerdown',start);window.addEventListener('pointermove',move);window.addEventListener('pointerup',end);
+  const tO=E('titleOvl');if(!tO)return;const wrap=tO.parentElement;if(!wrap)return;let drag=null;
+  function start(e){if(tO.style.display==='none')return;drag={x:e.clientX,y:e.clientY,fx:(typeof ed.titleX==='number')?ed.titleX:0.5,fy:(typeof ed.titleY==='number')?ed.titleY:0.15};try{tO.setPointerCapture(e.pointerId)}catch(err){}e.preventDefault();e.stopPropagation()}
+  function move(e){if(!drag)return;const r=wrap.getBoundingClientRect();if(!r.width||!r.height)return;ed.titleX=Math.max(-0.5,Math.min(1.5,drag.fx+(e.clientX-drag.x)/r.width));ed.titleY=Math.max(-0.5,Math.min(1.5,drag.fy+(e.clientY-drag.y)/r.height));syncTitleOvl()}
+  function end(){if(!drag)return;drag=null;persistOvl()}
+  tO.addEventListener('pointerdown',start);tO.addEventListener('pointermove',move);tO.addEventListener('pointerup',end);tO.addEventListener('pointercancel',end);
  })();
  (function(){
-  const lO=E('logoOvl');if(!lO)return;const wrap=lO.parentElement;if(!wrap)return;let drag=false;
-  function start(e){if(lO.style.display==='none')return;drag=true;lO.setPointerCapture&&e.pointerId!=null&&lO.setPointerCapture(e.pointerId);move(e);e.preventDefault()}
-  function move(e){if(!drag)return;const r=wrap.getBoundingClientRect();if(!r.width||!r.height)return;let cx=(e.clientX-r.left)/r.width,cy=(e.clientY-r.top)/r.height;const hw=(lO.offsetWidth||0)/2/r.width,hh=(lO.offsetHeight||0)/2/r.height;if(hw<0.5)cx=Math.max(hw,Math.min(1-hw,cx));if(hh<0.5)cy=Math.max(hh,Math.min(1-hh,cy));ed.logoX=Math.round(cx*10000)/10000;ed.logoY=Math.round(cy*10000)/10000;syncLogoOvl()}
-  function end(){if(!drag)return;drag=false;persistOvl()}
-  lO.addEventListener('pointerdown',start);window.addEventListener('pointermove',move);window.addEventListener('pointerup',end);
+  const lO=E('logoOvl');if(!lO)return;const wrap=lO.parentElement;if(!wrap)return;let drag=null;
+  function start(e){if(lO.style.display==='none')return;drag={x:e.clientX,y:e.clientY,fx:(typeof ed.logoX==='number')?ed.logoX:0.10,fy:(typeof ed.logoY==='number')?ed.logoY:0.08};try{lO.setPointerCapture(e.pointerId)}catch(err){}e.preventDefault();e.stopPropagation()}
+  function move(e){if(!drag)return;const r=wrap.getBoundingClientRect();if(!r.width||!r.height)return;ed.logoX=Math.max(-0.5,Math.min(1.5,drag.fx+(e.clientX-drag.x)/r.width));ed.logoY=Math.max(-0.5,Math.min(1.5,drag.fy+(e.clientY-drag.y)/r.height));syncLogoOvl()}
+  function end(){if(!drag)return;drag=null;persistOvl()}
+  lO.addEventListener('pointerdown',start);lO.addEventListener('pointermove',move);lO.addEventListener('pointerup',end);lO.addEventListener('pointercancel',end);
  })();
  /* script edits drive the cue count, the stale warning and the voice gate */
  E('subs').addEventListener('input',()=>{updateCueCount();checkVoiceStale();refreshVoiceGate();renderSteps()});
@@ -2520,6 +2597,7 @@ function cueSigFor(ed){
  /* V218: the raw ffmpeg log in the Export view hides behind this toggle
     (collapsed by default; export failures open it automatically). */
  const logTglBtn=E('logToggle');if(logTglBtn)logTglBtn.onclick=()=>{const lb=E('log');if(!lb)return;const show=lb.style.display!=='block';lb.style.display=show?'block':'none';logTglBtn.textContent=show?'📄 Log ဖျောက်ရန်':'📄 Log ပြရန်'};
+ const expCancelBtn0=E('expCancel');if(expCancelBtn0)expCancelBtn0.onclick=()=>{if(ed._expCancel&&ed._expCancel.fire)ed._expCancel.fire()};
  const panelDoneBtn=E('panelDone');if(panelDoneBtn)panelDoneBtn.onclick=()=>showPanel('homeHome');
  function refreshSummaries(){
   /* V216 dead-code removal: the per-feature sum* summary lines went away

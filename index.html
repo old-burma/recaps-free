@@ -243,12 +243,12 @@ body.locked{overflow:hidden}
 .vp-bar{height:100%;width:0%;background:#F59E0B;border-radius:99px;transition:width .2s linear}
 .vp-time{font-size:12px;color:#9A9AA5;font-weight:600;white-space:nowrap}
 /* ===== V210 status strip (under the preview frame) ===== */
-.status-strip{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;font-size:11.5px;font-weight:700;color:#9A9AA5;max-width:600px;margin-left:auto;margin-right:auto}
-.status-strip span{background:#17171C;border:1px solid #26262E;border-radius:999px;padding:3px 9px;white-space:nowrap}
+.status-strip{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;font-size:11px;font-weight:700;color:#9A9AA5;max-width:600px;margin-left:auto;margin-right:auto}
+.status-strip span{background:#17171C;border:1px solid #26262E;border-radius:999px;padding:2px 8px;white-space:nowrap}
 .status-strip span b{color:#34D399}
 /* V212: the Export segment IS the export button — same pill look as the
    other segments, an inviting orange pill once export-ready */
-.status-strip .strip-btn{font:inherit;color:inherit;background:#17171C;border:1px solid #26262E;border-radius:999px;padding:3px 9px;white-space:nowrap;cursor:pointer;display:inline-flex;align-items:center;gap:5px}
+.status-strip .strip-btn{font:inherit;color:inherit;background:#17171C;border:1px solid #26262E;border-radius:999px;padding:2px 8px;white-space:nowrap;cursor:pointer;display:inline-flex;align-items:center;gap:5px}
 .status-strip .strip-btn b{color:#34D399}
 .status-strip .strip-btn.ready{background:linear-gradient(90deg,#F59E0B,#F97316);color:#fff;border-color:transparent;box-shadow:0 3px 10px rgba(245,130,20,.35)}
 .status-strip .strip-btn.ready b{color:#fff}
@@ -257,16 +257,16 @@ body.locked{overflow:hidden}
 .deck-sec{margin-top:14px}
 .deck-sec:first-child{margin-top:2px}
 .deck-ttl{font-size:13.5px;font-weight:800;color:#F2F2F5;margin-bottom:8px}
-.mode-btns{display:grid;grid-template-columns:1fr 1fr;gap:9px}
-.mode-btn{padding:12px 10px;border-radius:15px;border:1.5px solid #2C2C35;background:#1B1B21;font-family:inherit;cursor:pointer;text-align:center;width:100%}
-.mode-btn b{display:block;font-size:15px;color:#F2F2F5}
-.mode-btn span{display:block;font-size:11.5px;color:#9A9AA5;margin-top:2px;font-weight:600}
+.mode-btns{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.mode-btn{padding:8px 8px;border-radius:13px;border:1.5px solid #2C2C35;background:#1B1B21;font-family:inherit;cursor:pointer;text-align:center;width:100%}
+.mode-btn b{display:block;font-size:13.5px;color:#F2F2F5}
+.mode-btn span{display:block;font-size:10.5px;color:#9A9AA5;margin-top:1px;font-weight:600}
 .mode-btn.sel{border-color:#F59E0B;background:rgba(245,158,11,.14)}
 .mode-btn.sel b{color:#FBBF24}
 .mode-btn:disabled{opacity:.55;cursor:default}
 .style-row{display:flex;gap:7px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin-top:9px;padding:2px 2px 4px;-webkit-overflow-scrolling:touch}
 .style-row::-webkit-scrollbar{display:none}
-.style-row .style-chip{padding:8px 11px;border-radius:999px;font-size:12.5px;flex:0 0 auto}
+.style-row .style-chip{padding:6px 9px;border-radius:999px;font-size:12px;flex:0 0 auto}
 /* ===== V211 horizontal scroll rows (chips / pickers / options) ===== */
 .scroll-row{display:flex;gap:7px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding:2px 2px 4px;-webkit-overflow-scrolling:touch}
 .scroll-row::-webkit-scrollbar{display:none}
@@ -299,10 +299,28 @@ input[type=range].vs-range::-moz-range-track{height:9px}
 .panel-title{font-size:15px;font-weight:800;color:#F2F2F5}
 .panel-done{padding:7px 16px;border-radius:999px;border:none;background:linear-gradient(90deg,#F59E0B,#F97316);color:#fff;font-weight:800;font-family:inherit;cursor:pointer;font-size:13px;flex:0 0 auto}
 .panel-body{flex:1;min-height:0;overflow-y:auto;padding:12px 14px 18px}
-.toolbar{flex:0 0 auto;display:flex;gap:2px;overflow-x:auto;background:#101014;border-top:1px solid #26262E;padding:8px 6px calc(8px + env(safe-area-inset-bottom))}
-.tool-btn{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:3px;min-width:56px;padding:7px 4px;border:none;background:transparent;color:#C9C9D2;font-family:inherit;font-size:10.5px;font-weight:600;cursor:pointer;border-radius:10px}
-.tool-btn .tic{font-size:19px;line-height:1}
+.toolbar{flex:0 0 auto;display:flex;gap:2px;overflow-x:auto;background:#101014;border-top:1px solid #26262E;padding:5px 6px calc(5px + env(safe-area-inset-bottom))}
+.tool-btn{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:2px;min-width:48px;padding:4px 3px;border:none;background:transparent;color:#C9C9D2;font-family:inherit;font-size:10px;font-weight:600;cursor:pointer;border-radius:10px}
+.tool-btn .tic{font-size:16px;line-height:1}
 .tool-btn.sel{color:#FBBF24;background:rgba(245,158,11,.12)}
+/* ===== V230: Main row (mode/style + quick toggles) + column spacer =====
+   The app column fills 100dvh and the toolbar is its LAST element: a
+   flexible spacer above the toolbar absorbs every leftover pixel, so
+   the toolbar always sits at the very bottom (it floated mid-screen
+   whenever the old flex:1 panel was hidden). The Main row sits between
+   the pinned frame and the timeline: the Original/New mode buttons +
+   style chips (moved out of the Script sheet) and the SRT / Voice
+   quick toggles, all in the slim compact chrome. */
+.col-spacer{flex:1 1 auto;min-height:0}
+.main-row{flex:0 0 auto;background:#101014;border-top:1px solid #26262E;padding:7px 10px 8px}
+.main-row .style-row{margin-top:6px}
+.quick-row{display:flex;align-items:center;gap:7px;margin-top:7px}
+.qtgl{flex:0 0 auto;padding:5px 12px;border-radius:999px;border:1.5px solid #2C2C35;background:#1B1B21;color:#9A9AA5;font-family:inherit;font-size:11.5px;font-weight:700;cursor:pointer;white-space:nowrap}
+.qtgl.on{border-color:#F59E0B;background:rgba(245,158,11,.14);color:#FBBF24}
+.create-mini{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;color:#C9C9D2;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.create-mini .dot{width:8px;height:8px;border-radius:50%;background:#22C55E;flex:0 0 8px;box-shadow:0 0 0 3px rgba(34,197,94,.18)}
+/* V230 custom colour pickers (Subs / Title / Text sheets) */
+.clr-inp{width:100%;height:38px;padding:3px;border-radius:11px;border:1.5px solid #2C2C35;background:#1B1B21;cursor:pointer}
 </style>
 </head>
 <body>
@@ -447,7 +465,7 @@ const pickRow='<div class="pick-row"><button class="btn light small" id="'+p+'-p
 const trimInner='<div class="row2"><div class="field" id="'+p+'-f-start"><label>စချိန် (စက္ကန့်)</label><input type="number" id="'+p+'-start" value="0" min="0" step="0.1"><div class="err-text" id="'+p+'-e-start"></div></div><div class="field" id="'+p+'-f-end"><label>ဆုံးချိန် (စက္ကန့်)</label><input type="number" id="'+p+'-end" value="0" min="0" step="0.1"><div class="err-text" id="'+p+'-e-end"></div></div></div>'
 +'<div class="field"><label>စချိန် slider</label><input type="range" id="'+p+'-rstart" value="0" min="0" max="100" step="0.1"></div><div class="field"><label>ဆုံးချိန် slider</label><input type="range" id="'+p+'-rend" value="0" min="0" max="100" step="0.1"></div><p class="hint" style="font-size:12px;color:#527884">ကြာချိန်: <b id="'+p+'-durinfo">—</b></p><button class="btn light" id="'+p+'-trimReset" style="width:100%">↺ အပြည့် ပြန်ထား (Video တစ်ခုလုံး)</button>';
 const aspectField='<div class="field"><label>Aspect</label><div class="scroll-row aspect-opts" id="'+p+'-aspectOpts">'+Object.keys(ASPECTS).map(k=>'<button class="opt'+(k===SETTINGS.aspect?' sel':'')+'" data-v="'+k+'"><b>'+ASPECTS[k].label+'</b><span>'+ASPECTS[k].desc+'</span></button>').join('')+'</div></div><div class="field"><label>Blur အား — <span id="'+p+'-blurVal"></span></label><input type="range" id="'+p+'-blur" min="5" max="60" step="1"><p class="hint">Blur pad သုံးသော ပုံစံတွင်သာ သက်ရောက်ပါတယ်</p></div><button class="btn light" id="'+p+'-aspectReset" style="width:100%">↺ Aspect မူလ (9:16) ပြန်ထား</button>';
-const titleField='<div class="switch-row"><div><b style="font-size:14px">ခေါင်းစဉ် (Title)</b><div style="font-size:12px;color:#527884">Video ပေါ်တွင် ပြပြီး လက်ဖြင့် ရွှေ့နိုင်သည်</div></div><div class="tgl on" id="'+p+'-titleTgl"></div></div><div class="field" id="'+p+'-f-title"><label>ခေါင်းစဉ် စာသား</label><input type="text" id="'+p+'-title" placeholder="ဥပမာ — အံ့ဩဖွယ် ဖြစ်ရပ်"><div class="err-text" id="'+p+'-e-title"></div></div><div class="field"><label>စာလုံး အရွယ် — <span id="'+p+'-titleSizeVal">52</span></label><input type="range" id="'+p+'-titleSize" min="30" max="80" step="2" value="52"></div><button class="btn light" id="'+p+'-titleReset" style="width:100%">↺ Title Setting မူလ ပြန်ထား</button>';
+const titleField='<div class="switch-row"><div><b style="font-size:14px">ခေါင်းစဉ် (Title)</b><div style="font-size:12px;color:#527884">Video ပေါ်တွင် ပြပြီး လက်ဖြင့် ရွှေ့နိုင်သည်</div></div><div class="tgl on" id="'+p+'-titleTgl"></div></div><div class="field" id="'+p+'-f-title"><label>ခေါင်းစဉ် စာသား</label><input type="text" id="'+p+'-title" placeholder="ဥပမာ — အံ့ဩဖွယ် ဖြစ်ရပ်"><div class="err-text" id="'+p+'-e-title"></div></div><div class="field"><label>စာလုံး အရွယ် — <span id="'+p+'-titleSizeVal">52</span></label><input type="range" id="'+p+'-titleSize" min="30" max="80" step="2" value="52"></div><div class="field"><label>ခေါင်းစဉ် အရောင်</label><input type="color" class="clr-inp" id="'+p+'-titleColor" value="#FFE92E"></div><button class="btn light" id="'+p+'-titleReset" style="width:100%">↺ Title Setting မူလ ပြန်ထား</button>';
 const subsFieldRecap='<div class="field" id="'+p+'-f-subs"><label>မြန်မာ Script (ပြင်နိုင်ပါတယ်)</label><textarea id="'+p+'-subs" placeholder="ပထမ ကြောင်း&#10;ဒုတိယ ကြောင်း&#10;တတိယ ကြောင်း"></textarea><div class="err-text" id="'+p+'-e-subs"></div><p class="hint">တစ်ကြောင်း = စာတန်း cue တစ်ခု — ပြင်ပြီးရင် "↻ Script မှ အချိန် ပြန်ခွဲ" နှိပ်ပြီး cue အချိန် ပြန်ခွဲနိုင်ပါတယ်။ 🗣️ အသံ ထုတ်ရာမှာလည်း ဒီစာသားကိုပဲ သုံးပါမယ်</p></div>';
 const subToggleRow='<div class="switch-row"><div><b style="font-size:14px">စာတန်း ဖွင့်ရန်</b><div style="font-size:12px;color:#527884">တစ်ကြောင်း = စာတန်း တစ်ခု၊ အချိန် အလိုအလျောက် ခွဲပေးမည်</div></div><div class="tgl on" id="'+p+'-subTgl"></div></div>';
 const srtRow='<button class="btn light small" id="'+p+'-srtBtn">📄 SRT ဒေါင်း</button><span style="font-size:12px;color:#527884;margin-left:8px">စာတန်း အချိန်ဇယား (.srt) ဖိုင် သီးခြား ဒေါင်းရန်</span>';
@@ -477,7 +495,8 @@ const subsHome=subToggleRow
 +'<p style="margin:8px 0 10px">Cue တစ်ကြောင်းကို နှိပ်ရင် ပြင်/Save လုပ်နိုင်သော pop-up ပွင့်ပါမယ် (Timeline ပေါ်က cue block ကို နှိပ်ရင်လည်း အတူတူပါပဲ)။ ▶ ကို နှိပ်ရင် video က အဲဒီ နေရာသို့ ရောက်သွားပါမယ်။</p>'
 +'<div class="field"><label>စာတန်း နေရာ (အပေါ်/အောက်) — <span id="'+p+'-subPosVal">81%</span></label><input type="range" id="'+p+'-subPos" min="4" max="88" step="1" value="81"><p class="hint">စာတန်း band တစ်ခုလုံး frame အထဲမှာ ဝင်အောင် 4%–88% အတွင်းသာ ရွှေ့လို့ရပါတယ်။ Video ပေါ်က စာတန်းကို ဖိဆွဲပြီးလည်း ရွှေ့နိုင်ပါတယ် (Export မှာပါ ဒီ နေရာ သုံးပါမယ်)</p></div>'
 +'<div class="field vs-field"><div class="vs-head"><label>စာတန်း အရွယ်အစား (Size)</label><span class="vs-val" id="'+p+'-subSizeVal">100%</span></div><input type="range" class="vs-range" id="'+p+'-subSize" min="50" max="200" step="5" value="100"><p class="hint">စာတန်း စာလုံး အရွယ် — 100% = မူရင်း အရွယ်။ အရွယ် ပြောင်းရင် cue များ အလိုအလျောက် ပြန်ခွဲပါမည် (အသံ ထုတ်ထားပြီးသား ဖြစ်ရင် အသံ အသစ် ပြန်ထုတ်ရပါမည်)</p></div>'
-+'<div class="field"><label>စာတန်း အရောင်</label><div class="style-row" id="'+p+'-subColors"><button class="style-chip" data-v="white">🤍 အဖြူ</button><button class="style-chip" data-v="gold">💛 ရွှေ</button></div><p class="hint">«» ဖြင့် မှတ်ထားသော အဓိက စာလုံးများသည် ဆန့်ကျင်ဘက် အရောင် ဖြစ်ပါမည် (အဖြူ ဆိုရင် ရွှေ၊ ရွှေ ဆိုရင် အဖြူ)</p></div>'
++'<div class="field"><label>စာတန်း အရောင်</label><div class="style-row" id="'+p+'-subColors"><button class="style-chip" data-v="white">🤍 အဖြူ</button><button class="style-chip" data-v="gold">💛 ရွှေ</button></div><p class="hint">«» ဖြင့် မှတ်ထားသော အဓိက စာလုံးများသည် ဆန့်ကျင်ဘက် အရောင် ဖြစ်ပါမည် (အဖြူ ဆိုရင် ရွှေ၊ ရွှေ ဆိုရင် အဖြူ) — ဒါမှမဟုတ် အောက်မှာ အရောင် စိတ်ကြိုက် ရွေးနိုင်ပါတယ်</p></div>'
++'<div class="row2"><div class="field"><label>အဓိက အရောင်</label><input type="color" class="clr-inp" id="'+p+'-subColMain" value="#FFFFFF"></div><div class="field"><label>«» အရောင်</label><input type="color" class="clr-inp" id="'+p+'-subColHi" value="#FFD740"></div></div>'
 +'<div class="switch-row"><div><b style="font-size:14px">နောက်ခံ Band</b><div style="font-size:12px;color:#527884">စာတန်း နောက်တွင် အမည်း ပြား ခံပေးမည် — ဖတ်ရ ပိုလွယ်သည်</div></div><div class="tgl" id="'+p+'-subBandTgl"></div></div>'
 +'<div class="picker-row" style="margin-bottom:10px;align-items:center"><button class="btn light small" id="'+p+'-subPosReset">↺ အလယ် ပြန်ထား</button><button class="btn light small" id="'+p+'-cueRebuild">↻ Script မှ အချိန် ပြန်ခွဲ</button><button class="btn light small" id="'+p+'-cueAdd">➕ Cue ထည့်</button></div>'
 +'<div class="file-info" id="'+p+'-cueCount" style="margin-bottom:10px">စာတန်း ၀ ကြောင်း</div><div id="'+p+'-cueList"></div><div class="warnbox" id="'+p+'-cueWarn" style="display:none"></div>'
@@ -499,19 +518,18 @@ const voiceHome=voiceFieldBlock+audioInner
 +'<div id="'+p+'-voiceStale" style="display:none" class="warnbox">⚠️ စာသား ပြင်ထားပါတယ် — အသံ ပြန်ထုတ်ရန် လိုပါတယ်</div>'
 +'<button class="btn light off" id="'+p+'-audioDl" style="width:100%;margin-top:10px" aria-disabled="true">🎵 Audio ဒေါင်း</button>';
 
-/* V213: the deck is the Script page ONLY — the mode buttons + style
-   chips + Create status (the deck's old ① section) followed by the
-   Script controls themselves (scriptHome: စာသား box, transcript,
-   recreate, 🗑️ clear-all). Voice has left the deck entirely: it is
-   the toolbar's 🎙️ Voice Create pop-up now. V229: the deck itself
-   also left the main page — it parks in #homeScript and opens as the
-   toolbar's FIRST tool (📝 Script) bottom sheet, exactly like every
-   other tool; the nodes are MOVED, never duplicated, so every id and
-   handler below works unchanged from inside the sheet. */
-const deckInner='<div class="deck-sec"><div class="deck-ttl">📝 Script</div><div class="mode-btns"><button class="mode-btn" id="'+p+'-modeOrig"><b>🎧 Original</b><span>မူရင်း အသံအတိုင်း</span></button><button class="mode-btn" id="'+p+'-modeNew"><b>✨ New</b><span>ဇာတ်ကြောင်းပြော အသစ်</span></button></div>'
-+'<div class="style-row" id="'+p+'-styleChips"><button class="style-chip sel" data-v="standard">🎙️ စံပြ</button><button class="style-chip" data-v="exciting">🔥 စိတ်လှုပ်ရှား</button><button class="style-chip" data-v="funny">😂 ဟာသ</button><button class="style-chip" data-v="natural">🌿 သဘာဝ</button><button class="style-chip" data-v="horror">👻 သရဲ</button></div><p class="hint" style="margin:6px 0 0">🎭 ဇာတ်ကြောင်းပြော ပုံစံသည် ✨ New အတွက်သာ သက်ရောက်ပါတယ်</p>'
-+'<div class="studio-status" style="margin:8px 0 0"><span class="dot"></span><span id="'+p+'-createStatus">အသင့်ဖြစ်ပါပြီ</span></div></div>'
-+scriptHome;
+/* V213: the deck is the Script page ONLY. V229: the deck parks in
+   #homeScript and opens as the toolbar's FIRST tool (📝 Script)
+   bottom sheet. V230 (user order): the Script sheet keeps ONLY
+   script-centric content — the mode buttons + style chips + Create
+   status LEFT the deck for the Main page (modeInner + the quick row
+   in mainRowInner below); the deck is now scriptHome alone (စာသား
+   box, transcript, 🎬 Recaps ပြန်လုပ်, 🗑️ clear-all). The nodes are
+   MOVED, never duplicated, so every id and handler works unchanged
+   wherever the node currently lives. */
+const modeInner='<div class="mode-btns"><button class="mode-btn" id="'+p+'-modeOrig"><b>🎧 Original</b><span>မူရင်း အသံအတိုင်း</span></button><button class="mode-btn" id="'+p+'-modeNew"><b>✨ New</b><span>ဇာတ်ကြောင်းပြော အသစ်</span></button></div>'
++'<div class="style-row" id="'+p+'-styleChips"><button class="style-chip sel" data-v="standard">🎙️ စံပြ</button><button class="style-chip" data-v="exciting">🔥 စိတ်လှုပ်ရှား</button><button class="style-chip" data-v="funny">😂 ဟာသ</button><button class="style-chip" data-v="natural">🌿 သဘာဝ</button><button class="style-chip" data-v="horror">👻 သရဲ</button></div><p class="hint" style="margin:4px 0 0">🎭 ဇာတ်ကြောင်းပြော ပုံစံသည် ✨ New အတွက်သာ သက်ရောက်ပါတယ်</p>';
+const deckInner=scriptHome;
 /* V212/V213: the FULL voice controls in ONE pop-up box — the toolbar's
    🎙️ Voice Create item opens it as a bottom sheet (openSheetNodes,
    single-instance); it parks in the hidden #homeVoice between opens.
@@ -524,7 +542,7 @@ const voiceBoxInner='<div id="'+p+'-voiceBox">'
 const bgmMuteRow='<div class="switch-row"><div><b style="font-size:14px">မူရင်းအသံ (BGM) ပိတ် — Mute</b><div style="font-size:12px;color:#527884">ဖွင့်ရင် BGM အသံ လုံးဝ မပါတော့ပါ (Volume ဘယ်လောက် ဖြစ်ဖြစ်)</div></div><div class="tgl" id="'+p+'-bgmMute"></div></div>';
 const voiceMuteRow='<div class="switch-row"><div><b style="font-size:14px">Voice ပိတ် — Mute</b><div style="font-size:12px;color:#527884">ဖွင့်ရင် စကားပြောသံ လုံးဝ မပါတော့ပါ</div></div><div class="tgl" id="'+p+'-voiceMute"></div></div>';
 const mixerHome=duckField+bgmField+bgmMuteRow+voiceVolField+voiceMuteRow+syncField+'<button class="btn light" id="'+p+'-mixReset" style="width:100%;margin-top:14px">↺ အသံ Setting မူလ ပြန်ထား</button>';
-const textHome='<div class="switch-row"><div><b style="font-size:14px">Text ပြရန်</b><div style="font-size:12px;color:#527884">Video ပေါ်တွင် ပြပြီး လက်ဖြင့် ရွှေ့နိုင်သည် — Export တွင်လည်း ပါမည်</div></div><div class="tgl" id="'+p+'-textTgl"></div></div><div class="field"><label>စာသား</label><input type="text" id="'+p+'-textStr" placeholder="ဥပမာ — ဆက်ကြည့်ပါ"></div><div class="field" style="margin-bottom:0"><label>စာလုံး အရွယ် — <span id="'+p+'-textSizeVal">44</span></label><input type="range" id="'+p+'-textSize" min="24" max="72" step="2" value="44"></div><button class="btn light" id="'+p+'-textReset" style="width:100%;margin-top:14px">↺ Text Setting မူလ ပြန်ထား</button>';
+const textHome='<div class="switch-row"><div><b style="font-size:14px">Text ပြရန်</b><div style="font-size:12px;color:#527884">Video ပေါ်တွင် ပြပြီး လက်ဖြင့် ရွှေ့နိုင်သည် — Export တွင်လည်း ပါမည်</div></div><div class="tgl" id="'+p+'-textTgl"></div></div><div class="field"><label>စာသား</label><input type="text" id="'+p+'-textStr" placeholder="ဥပမာ — ဆက်ကြည့်ပါ"></div><div class="field"><label>စာလုံး အရွယ် — <span id="'+p+'-textSizeVal">44</span></label><input type="range" id="'+p+'-textSize" min="24" max="72" step="2" value="44"></div><div class="field" style="margin-bottom:0"><label>စာသား အရောင်</label><input type="color" class="clr-inp" id="'+p+'-textColor" value="#FFFFFF"></div><button class="btn light" id="'+p+'-textReset" style="width:100%;margin-top:14px">↺ Text Setting မူလ ပြန်ထား</button>';
 const logoHome='<div class="switch-row"><div><b style="font-size:14px">Logo ပြရန်</b><div style="font-size:12px;color:#527884">Video ပေါ်တွင် ပြပြီး လက်ဖြင့် ရွှေ့နိုင်သည် — Export တွင်လည်း ပါမည်</div></div><div class="tgl" id="'+p+'-logoTgl"></div></div>'
 +'<div class="field"><label>Logo ရင်းမြစ်</label><div class="style-row" id="'+p+'-logoSrcs"><button class="style-chip" data-v="brand">🏷️ မူရင်း Logo</button><button class="style-chip" data-v="image">📁 ကိုယ်ပိုင် ပုံ</button></div><p class="hint">မူရင်း Logo = old.burma.com ရွှေ badge ပုံ။ ကိုယ်ပိုင် ပုံ ဆိုရင် အောက်မှာ ပုံ ရွေးပါ (ပုံ မရွေးရသေးရင် မူရင်း Logo ပဲ ပြပါမည်)</p></div>'
 +'<div class="field"><button class="btn light small" id="'+p+'-logoPick">📁 ကိုယ်ပိုင် Logo ပုံ ရွေးရန်</button><span class="file-info" id="'+p+'-logoInfo" style="margin-left:8px">ပုံ မရွေးရသေးပါ</span><input type="file" id="'+p+'-logoFile" accept="image/*" style="display:none"></div>'
@@ -566,7 +584,17 @@ const timelineInner='<div class="tl-wrap" id="'+p+'-timeline"><div class="tl-scr
 +'<div class="tl-track"><div class="tl-block tl-voblock" id="'+p+'-tlVoBlock" style="display:none"></div></div>'
 +'<div class="tl-playhead" id="'+p+'-tlPlay" style="left:0"></div>'
 +'</div></div></div>';
-const panelInner='<div class="panel" id="'+p+'-panel"><div class="panel-head" id="'+p+'-panelHead" style="display:none"><span class="panel-title" id="'+p+'-panelTitle"></span><button class="panel-done" id="'+p+'-panelDone">✓ ပြီး</button></div><div class="panel-body" id="'+p+'-panelBody"></div></div>';
+/* V230: the Main row — the mode buttons + style chips (moved out of
+   the Script sheet) and the quick row: SRT / Voice quick toggles +
+   the Create status (the deck's old studio-status, moved with the
+   mode section it reports on). Sits between the pinned frame and the
+   timeline. The column spacer absorbs all leftover height so the
+   toolbar below it is pinned to the very bottom of the viewport. */
+const mainRowInner='<div class="main-row" id="'+p+'-mainRow">'
++modeInner
++'<div class="quick-row"><button type="button" class="qtgl on" id="'+p+'-qtSrt">🎨 SRT</button><button type="button" class="qtgl" id="'+p+'-qtVoice">🎙️ Voice</button><span class="create-mini"><span class="dot"></span><span id="'+p+'-createStatus">အသင့်ဖြစ်ပါပြီ</span></span></div>'
++'</div>';
+const spacerInner='<div class="col-spacer" aria-hidden="true"></div>';
 function tb(id,ic,t){return '<button class="tool-btn" id="'+p+'-tool'+id+'"><span class="tic">'+ic+'</span>'+t+'</button>'}
 const toolbarInner='<nav class="toolbar" id="'+p+'-toolbar">'
 +tb('Script','📝','Script')+tb('Subs','🎨','စာတန်း')+tb('Voice','🎙️','Voice Create')+tb('Mixer','🔊','Mixer')+tb('Trim','✂️','Trim')+tb('Aspect','🌫️','Aspect')+tb('Title','📝','Title')+tb('Text','➕','Text')+tb('Logo','🛡️','Logo')+tb('Border','📐','Border')+tb('Blur','🫥','Blur')
@@ -611,25 +639,30 @@ const homes='<div id="'+p+'-sheetHomes" style="display:none">'
 +'<div id="'+p+'-homeKey">'+keyHome+'</div>'
 +'<div id="'+p+'-homeExport">'+exportInner+'</div>'
 +'</div>';
-/* ---- Layout (V213, CapCut-style; V229 Script sheet): dark editor that
-   fills the viewport — the page itself never scrolls. NO top bar —
-   first comes the large preview frame (transparent icon transport +
-   slim seek line overlaid on its bottom edge) + the status strip (the
-   Script segment opens the Script sheet; the Export segment IS the
-   Export button), then the TIMELINE (TWO tracks: subtitle cues +
-   voice, + playhead), the bottom PANEL — which now hosts ONLY the
-   Export view and stays hidden until it opens — and the TOOLBAR fixed
-   at the very bottom. EVERY toolbar tool (📝 Script FIRST) opens its
-   controls as a BOTTOM-SHEET POP-UP (Burmese Voice app style): the
-   control blocks park in the hidden #sheetHomes and are mounted into
-   the sheet one at a time (single-instance); 🔑 Key at the toolbar's
-   end opens the Gemini-key pop-up sheet. The daily flow stays short:
-   video -> 📝 Script sheet mode button -> 🎙️ Voice Create pop-up ->
-   📣 အသံ ထုတ်မယ် -> Export (status strip). ---- */
+/* ---- Layout (V213, CapCut-style; V229 Script sheet; V230 Main row +
+   Export sheet): dark editor that fills the viewport — the page
+   itself never scrolls. NO top bar — first comes the large preview
+   frame (transparent icon transport + slim seek line overlaid on its
+   bottom edge) + the status strip (the Script segment opens the
+   Script sheet; the Export segment IS the Export button), then the
+   MAIN ROW (Original/New mode buttons + style chips + SRT/Voice
+   quick toggles + Create status — the mode section that used to live
+   in the Script sheet), then the TIMELINE (TWO tracks: subtitle cues
+   + voice, + playhead), a flexible SPACER, and the TOOLBAR pinned at
+   the very bottom (the spacer absorbs every leftover pixel — the old
+   in-flow panel is GONE, the Export view is a bottom-sheet pop-up
+   like every other tool now). EVERY toolbar tool (📝 Script FIRST)
+   opens its controls as a BOTTOM-SHEET POP-UP (Burmese Voice app
+   style): the control blocks park in the hidden #sheetHomes and are
+   mounted into the sheet one at a time (single-instance); 🔑 Key at
+   the toolbar's end opens the Gemini-key pop-up sheet. The daily
+   flow stays short: video -> Main mode button -> 🎙️ Voice Create
+   pop-up -> 📣 အသံ ထုတ်မယ် -> Export (status strip). ---- */
 return ''
 +'<div class="vid-sticky" id="'+p+'-framePin">'+frameInner+'</div>'
++mainRowInner
 +timelineInner
-+panelInner
++spacerInner
 +toolbarInner
 +homes;
 }
@@ -786,7 +819,7 @@ return new Promise(res=>c.toBlob(b=>b.arrayBuffer().then(ab=>res(new Uint8Array(
    value is exactly the pre-V224 number, so untouched projects render
    byte-identical subtitle PNGs and export graphs. */
 function subSizeFactor(ed){const v=ed?ed.subSize:null;return (typeof v==='number'&&isFinite(v)&&v>=50&&v<=200)?v/100:1}
-function subPngOpts(ed,S){const gold=!!ed&&ed.subColor==='gold';return{size:Math.round(46*S*subSizeFactor(ed)),color:gold?'#FFD740':'#FFFFFF',kw:gold?'#FFFFFF':'#FFD740',band:!!(ed&&ed.subBand)}}
+function subPngOpts(ed,S){const gold=!!ed&&ed.subColor==='gold';/* V230: the custom hexes are the source of truth; the white/gold preset derivation remains only as the fallback for a state that predates them (identical values at the defaults) */const main=(ed&&ed.subColMain)||(gold?'#FFD740':'#FFFFFF');const hi=(ed&&ed.subColHi)||(gold?'#FFFFFF':'#FFD740');return{size:Math.round(46*S*subSizeFactor(ed)),color:main,kw:hi,band:!!(ed&&ed.subBand)}}
 /* V217: effective mixer gains WITH the per-track mutes applied — one
    derivation shared by exportOne and the insert render */
 function mixGains(ed){return{bgm:(ed&&ed.bgmMute)?0:Math.max(0,Math.min(100,(ed&&ed.bgmVol)||0))/100,voice:(ed&&ed.voiceMute)?0:Math.max(0,Math.min(300,(ed&&ed.voiceVol==null?100:ed.voiceVol)))/100}}
@@ -1256,12 +1289,12 @@ async function exportOne(ff,ed,seg,idx,total,log,progs){
  let voiceArr=null,voiceFile='voice.wav';
  if(ed.audioMode==='voice'){if(ed._cachedVoice){log('✅ အသံ အပိုင်းမှာ ထုတ်ထားသော အသံကို ပြန်သုံးပါတယ်');voiceArr=ed._cachedVoice;voiceFile='voice.'+(ed._cachedVoiceExt||'wav')}else{log('အသံ ထုတ်နေပါတယ်…');const gv=await generateVoiceLines(ed,seg.cues.map(c=>c.text),log,(i,n)=>{if(prep)prep(Math.min(1,(prepN+(n?i/n:1))/Math.max(1,prepItems)),'🎙️ အသံ ထုတ်နေပါတယ်… ('+i+'/'+n+')')});voiceArr=gv.bytes;voiceFile='voice.'+gv.ext}await ff.writeFile(voiceFile,ffCopy(voiceArr))}prepStep('🎙️ အသံ ပြင်နေပါတယ်…');
  const overlays=[]; /* {file,y} */
- if(useTitle){const tbh=Math.round(170*S);const tty=Math.max(0,Math.min(H-tbh,Math.round(((ed.titleY==null?0.15:ed.titleY))*H-tbh/2)));await ff.writeFile('title.png',await textPNG($('#'+ed.p+'-title').value.trim(),W,tbh,{size:Math.round(((ed.titleSize||52))*S),color:'#FFE92E',cx:(ed.titleX==null?0.5:ed.titleX)}));prepStep('🖼️ ခေါင်းစဉ် ပုံ ပြင်နေပါတယ်…');overlays.push({file:'title.png',x:0,y:tty,from:0,to:dur})}
+ if(useTitle){const tbh=Math.round(170*S);const tty=Math.max(0,Math.min(H-tbh,Math.round(((ed.titleY==null?0.15:ed.titleY))*H-tbh/2)));await ff.writeFile('title.png',await textPNG($('#'+ed.p+'-title').value.trim(),W,tbh,{size:Math.round(((ed.titleSize||52))*S),color:(ed.titleColor||'#FFE92E'),cx:(ed.titleX==null?0.5:ed.titleX)}));prepStep('🖼️ ခေါင်းစဉ် ပုံ ပြင်နေပါတယ်…');overlays.push({file:'title.png',x:0,y:tty,from:0,to:dur})}
  if(useSub){for(let i=0;i<seg.cues.length;i++){const fn='sub'+i+'.png';await ff.writeFile(fn,await textPNG(seg.cues[i].text,W,Math.round(170*S),subPngOpts(ed,S)));prepStep('🖼️ စာတန်း ပုံများ ပြင်နေပါတယ်… ('+(i+1)+'/'+seg.cues.length+')');overlays.push({file:fn,y:subY,from:seg.cues[i].start-seg.start,to:seg.cues[i].end-seg.start})}}
  /* player-block overlays (🛡️ Logo watermark + ➕ free Text): same canvas-PNG pipeline,
     positions mapped from the dragged frame fractions just like the subtitle band */
  if(useLogo){const lp=await buildLogoPNG(ed,W);await ff.writeFile('logo.png',lp.bytes);const lx=Math.max(0,Math.min(W-lp.w,Math.round(((ed.logoX==null?0.10:ed.logoX))*W-lp.w/2)));const ly=Math.max(0,Math.min(H-lp.h,Math.round(((ed.logoY==null?0.08:ed.logoY))*H-lp.h/2)));prepStep('🖼️ Logo ပုံ ပြင်နေပါတယ်…');overlays.push({file:'logo.png',x:lx,y:ly,from:0,to:dur})}
- if(ed.textOn&&(ed.textStr||'').trim()){const bh=Math.round(170*S);const ty=Math.max(0,Math.min(H-bh,Math.round((ed.textY||0.16)*H-bh/2)));await ff.writeFile('freetext.png',await textPNG(ed.textStr.trim(),W,bh,{size:Math.round((ed.textSize||44)*S),cx:(ed.textX==null?0.5:ed.textX)}));prepStep('🖼️ စာသား ပုံ ပြင်နေပါတယ်…');overlays.push({file:'freetext.png',y:ty,from:0,to:dur})}
+ if(ed.textOn&&(ed.textStr||'').trim()){const bh=Math.round(170*S);const ty=Math.max(0,Math.min(H-bh,Math.round((ed.textY||0.16)*H-bh/2)));await ff.writeFile('freetext.png',await textPNG(ed.textStr.trim(),W,bh,{size:Math.round((ed.textSize||44)*S),color:(ed.textColor||'#FFFFFF'),cx:(ed.textX==null?0.5:ed.textX)}));prepStep('🖼️ စာသား ပုံ ပြင်နေပါတယ်…');overlays.push({file:'freetext.png',y:ty,from:0,to:dur})}
  /* build filter graph */
  const blur=Math.max(2,Math.round(ed.blur/2*S));
  let fc='',base;
@@ -1572,10 +1605,10 @@ async function exportOneHw(ff,ed,seg,idx,total,log,progs){
  /* overlay images: the SAME PNG bytes exportOne would overlay,
    decoded to drawables instead of written to MEMFS */
  const layers={title:null,subs:[],logo:null,text:null};
- if(useTitle){const tbh=Math.round(170*S);const tty=Math.max(0,Math.min(H-tbh,Math.round(((ed.titleY==null?0.15:ed.titleY))*H-tbh/2)));const img=await hwImgFromBytes(await textPNG($('#'+ed.p+'-title').value.trim(),W,tbh,{size:Math.round(((ed.titleSize||52))*S),color:'#FFE92E',cx:(ed.titleX==null?0.5:ed.titleX)}));if(!img)throw new Error('ခေါင်းစဉ် ပုံ ဖွင့် မရပါ');layers.title={img:img,x:0,y:tty};prepStep('🖼️ ခေါင်းစဉ် ပုံ ပြင်နေပါတယ်…')}
+ if(useTitle){const tbh=Math.round(170*S);const tty=Math.max(0,Math.min(H-tbh,Math.round(((ed.titleY==null?0.15:ed.titleY))*H-tbh/2)));const img=await hwImgFromBytes(await textPNG($('#'+ed.p+'-title').value.trim(),W,tbh,{size:Math.round(((ed.titleSize||52))*S),color:(ed.titleColor||'#FFE92E'),cx:(ed.titleX==null?0.5:ed.titleX)}));if(!img)throw new Error('ခေါင်းစဉ် ပုံ ဖွင့် မရပါ');layers.title={img:img,x:0,y:tty};prepStep('🖼️ ခေါင်းစဉ် ပုံ ပြင်နေပါတယ်…')}
  if(useSub){for(let i=0;i<seg.cues.length;i++){const img=await hwImgFromBytes(await textPNG(seg.cues[i].text,W,Math.round(170*S),subPngOpts(ed,S)));if(!img)throw new Error('စာတန်း ပုံ ဖွင့် မရပါ');layers.subs.push({img:img,from:seg.cues[i].start-seg.start,to:seg.cues[i].end-seg.start});prepStep('🖼️ စာတန်း ပုံများ ပြင်နေပါတယ်… ('+(i+1)+'/'+seg.cues.length+')')}}
  if(useLogo){const lp=await buildLogoPNG(ed,W);const img=await hwImgFromBytes(lp.bytes);if(!img)throw new Error('Logo ပုံ ဖွင့် မရပါ');const lx=Math.max(0,Math.min(W-lp.w,Math.round(((ed.logoX==null?0.10:ed.logoX))*W-lp.w/2)));const ly=Math.max(0,Math.min(H-lp.h,Math.round(((ed.logoY==null?0.08:ed.logoY))*H-lp.h/2)));layers.logo={img:img,x:lx,y:ly};prepStep('🖼️ Logo ပုံ ပြင်နေပါတယ်…')}
- if(useText){const bh=Math.round(170*S);const ty=Math.max(0,Math.min(H-bh,Math.round((ed.textY||0.16)*H-bh/2)));const img=await hwImgFromBytes(await textPNG(ed.textStr.trim(),W,bh,{size:Math.round((ed.textSize||44)*S),cx:(ed.textX==null?0.5:ed.textX)}));if(!img)throw new Error('စာသား ပုံ ဖွင့် မရပါ');layers.text={img:img,x:0,y:ty};prepStep('🖼️ စာသား ပုံ ပြင်နေပါတယ်…')}
+ if(useText){const bh=Math.round(170*S);const ty=Math.max(0,Math.min(H-bh,Math.round((ed.textY||0.16)*H-bh/2)));const img=await hwImgFromBytes(await textPNG(ed.textStr.trim(),W,bh,{size:Math.round((ed.textSize||44)*S),color:(ed.textColor||'#FFFFFF'),cx:(ed.textX==null?0.5:ed.textX)}));if(!img)throw new Error('စာသား ပုံ ဖွင့် မရပါ');layers.text={img:img,x:0,y:ty};prepStep('🖼️ စာသား ပုံ ပြင်နေပါတယ်…')}
  const mixFile=await hwMixedAudio(ff,ed,seg,voiceFile,idx,f=>{if(prep)prep(Math.min(1,(prepN+f)/Math.max(1,prepItems)),'🎙️ အသံ ရောနေပါတယ်…')});
  if(!mixFile)log('ℹ️ အသံ မပါသော video — အသံ မပါဘဲ ထုတ်ပါတယ်');
  prepStep('🎙️ အသံ ပြင်နေပါတယ်…');
@@ -1620,7 +1653,7 @@ async function exportEditor(ed){
     starting the render immediately. runExport() below is the render
     itself, entered from the chooser's 🎬 Export စတင် button with
     the choices snapshotted into ed._expOpts. */
- if(window.__recapShowExport)window.__recapShowExport(); /* V210: the Export view is a bottom panel now */
+ if(window.__recapShowExport)window.__recapShowExport(); /* V230: the Export view is a bottom-sheet pop-up now */
  if(window.__recapExpSetup)window.__recapExpSetup(ed);
 }
 async function runExport(ed){
@@ -1642,7 +1675,7 @@ async function runExport(ed){
  ed.busy=true;const btn=E('stExport');btn.classList.add('loading');btn.disabled=true;btn.querySelector('.btn-label').textContent='လုပ်ဆောင်နေပါတယ်…';
  const logBox=E('log');logBox.style.display='none';logBox.textContent='';
  const logTgl=E('logToggle');if(logTgl)logTgl.textContent='📄 Log ပြရန်';
- if(window.__recapShowExport)window.__recapShowExport(); /* V210: the Export view is a bottom panel now */
+ if(window.__recapShowExport)window.__recapShowExport(); /* V230: the Export view is a bottom-sheet pop-up now */
  const log=m=>{logBox.textContent+=m+'\n';logBox.scrollTop=logBox.scrollHeight};
  E('result').innerHTML='';showNotice('▶️ Export စတင်ပါပြီ — အပိုင်း '+segments.length+' ပိုင်း','info');
  const expPrevEl=E('expPrev');if(expPrevEl)expPrevEl.style.display='none'; /* V229: the live preview belongs to Hardware encodes only — every export starts with it hidden; hwEncodeSegment shows it */
@@ -2098,15 +2131,16 @@ function cueSigFor(ed){
  function goStep(i){
   /* V213: 0 -> MAIN (any pop-up closes), 1 -> the 🎨 စာတန်း pop-up,
      2 -> the 🎙️ Voice Create pop-up, 3 -> the Export view.
-     V229: MAIN is just the stage + status strip + timeline now (the
-     Script page is the 📝 Script sheet), so 0 closes any sheet and
-     hides the panel instead of mounting a Script view into it. */
+     V229: MAIN is the stage + status strip + timeline (the Script
+     page is the 📝 Script sheet). V230: MAIN gains the Main row and
+     the Export view is a pop-up SHEET too — nothing mounts in-flow,
+     so 0 just closes any sheet and 3 opens the Export sheet. */
   i=Math.max(0,Math.min(3,i));
   if(previewMode&&i!==1&&i!==2)exitPreview(true);
   if(i===1){openFeatureSheet('homeSubs','🎨 စာတန်း')}
   else if(i===2){openVoiceSheet()}
-  else if(i===0){closeSheet();hidePanel()}
-  else if(i===3){showPanel('homeExport','🎬 Export')}
+  else if(i===0){closeSheet()}
+  else if(i===3){openExportSheet()}
   updateOverlay(true);
  }
  function doneStep(){}
@@ -2228,9 +2262,9 @@ function cueSigFor(ed){
  function renderSubOverlay(txt){
   /* V217: body colour + «keyword» accent spans + optional band — the
      preview twin of subPngOpts/textPNG, re-rendered only on change */
-  const key=txt+'|'+ed.subColor+'|'+(ed.subBand?1:0)+'|'+subSizeFactor(ed);
+  const key=txt+'|'+(ed.subColMain||'')+'|'+(ed.subColHi||'')+'|'+(ed.subBand?1:0)+'|'+subSizeFactor(ed);
   if(key===subRenderKey)return;subRenderKey=key;
-  const gold=ed.subColor==='gold',body=gold?'#FFD740':'#FFFFFF',kw=gold?'#FFFFFF':'#FFD740';
+  const body=ed.subColMain||'#FFFFFF',kw=ed.subColHi||'#FFD740';
   overlayEl.style.color=body;
   overlayEl.style.background=ed.subBand?'rgba(0,0,0,0.55)':'';
   overlayEl.style.padding=ed.subBand?'6px 12px':'';
@@ -2723,13 +2757,15 @@ function cueSigFor(ed){
  E('modeNew').onclick=()=>chooseModeAndRun('scene');
  /* deck style chips: select-only — the chosen style feeds ✨ New runs */
  $$('#'+p+'-styleChips .style-chip').forEach(c=>{c.onclick=()=>{ed.recapStyle=c.dataset.v;$$('#'+p+'-styleChips .style-chip').forEach(x=>x.classList.toggle('sel',x===c))}});
- const recreateBtn=E('recreate');if(recreateBtn)recreateBtn.onclick=()=>{const sb=$('#sheetBody');if(sb)sb.scrollTop=0;showNotice('🎬 အပေါ်က 🎧 Original / ✨ New ပြန်ရွေးပြီး Script အသစ် ထုတ်ပါ — လက်ရှိ Script နှင့် cue များကို အစားထိုးပါမယ်','info')};
- /* (the recreate handler above: V229 — the deck lives in the Script sheet, so "back to the modes" scrolls the sheet body to its top) */
+ const recreateBtn=E('recreate');if(recreateBtn)recreateBtn.onclick=()=>{const sb=$('#sheetBody');if(sb)sb.scrollTop=0;showNotice('🎬 Main စာမျက်နှာက 🎧 Original / ✨ New ပြန်ရွေးပြီး Script အသစ် ထုတ်ပါ — လက်ရှိ Script နှင့် cue များကို အစားထိုးပါမယ်','info')};
+ /* (the recreate handler above: V230 — the mode buttons live on the
+    Main page now, so the notice points there; the sheet scrolls to
+    its top so the script box is in view when the sheet closes) */
  const txTgl=E('aiTxTgl');if(txTgl)txTgl.onclick=()=>{const f=E('f-transcript');const hidden=f.style.display==='none';f.style.display=hidden?'':'none';txTgl.textContent=hidden?'ဖျောက်':'ပြ'};
  /* ================= 🗑️ clear-all (Script panel) =================
     Two-tap confirm: the first tap arms the button for 4 seconds, the
-    second tap executes; switching panels disarms it (showPanel calls
-    disarmClear) and so does the timeout. Executing wipes the script box,
+    second tap executes; switching sheets disarms it (openFeatureSheet /
+    openExportSheet call disarmClear) and so does the timeout. Executing wipes the script box,
     the cue list, the transcript view, the generated voice (it was made
     from that script) and the V209 per-chunk caches + whole-transcript
     signature for the CURRENT file, so the next Create re-requests every
@@ -3143,22 +3179,31 @@ function cueSigFor(ed){
  ed.titleSize=SETTINGS.titleSize||52;ed.titleX=(typeof SETTINGS.titleX==='number'?SETTINGS.titleX:0.5);ed.titleY=(typeof SETTINGS.titleY==='number'?SETTINGS.titleY:0.15);
  ed.logoSrc=(SETTINGS.logoSrc==='image')?'image':'brand';ed.logoSize=SETTINGS.logoSize||14;ed.logoOpacity=(typeof SETTINGS.logoOpacity==='number'?SETTINGS.logoOpacity:90);ed.logoX=(typeof SETTINGS.logoX==='number'?SETTINGS.logoX:0.10);ed.logoY=(typeof SETTINGS.logoY==='number'?SETTINGS.logoY:0.08);ed.logoImgData=null;try{ed.logoImgData=localStorage.getItem('recaps_logo_img')||null}catch(e){}
  ed.borderW=SETTINGS.borderW||6;ed.borderColor=SETTINGS.borderColor||'#FFE92E';
+ /* V230 custom colours: subtitle main + «» highlight, title, free
+    text — hex strings on the editor, persisted via persistOvl. The
+    subtitle pair seeds from the saved white/gold preset when no
+    custom hex was ever stored, so existing users keep their look. */
+ const hexOk=v=>typeof v==='string'&&/^#[0-9a-fA-F]{6}$/.test(v);
+ ed.subColMain=hexOk(SETTINGS.subColMain)?SETTINGS.subColMain:((ed.subColor==='gold')?'#FFD740':'#FFFFFF');
+ ed.subColHi=hexOk(SETTINGS.subColHi)?SETTINGS.subColHi:((ed.subColor==='gold')?'#FFFFFF':'#FFD740');
+ ed.titleColor=hexOk(SETTINGS.titleColor)?SETTINGS.titleColor:'#FFE92E';
+ ed.textColor=hexOk(SETTINGS.textColor)?SETTINGS.textColor:'#FFFFFF';
  ed.blurRegions=[];try{const _br=SETTINGS.blurRegions;if(Array.isArray(_br))ed.blurRegions=JSON.parse(JSON.stringify(_br)).filter(r=>r&&typeof r.x==='number'&&typeof r.y==='number')}catch(e){}
  ed.blurSel=ed.blurRegions.length?ed.blurRegions[0].id:null;
- function persistOvl(){SETTINGS.textOn=ed.textOn;SETTINGS.textStr=ed.textStr;SETTINGS.textSize=ed.textSize;SETTINGS.textX=ed.textX;SETTINGS.textY=ed.textY;SETTINGS.logoOn=ed.logoOn;SETTINGS.logoText=ed.logoText;SETTINGS.borderOn=ed.borderOn;SETTINGS.titleSize=ed.titleSize;SETTINGS.titleX=ed.titleX;SETTINGS.titleY=ed.titleY;SETTINGS.logoSrc=ed.logoSrc;SETTINGS.logoSize=ed.logoSize;SETTINGS.logoOpacity=ed.logoOpacity;SETTINGS.logoX=ed.logoX;SETTINGS.logoY=ed.logoY;SETTINGS.borderW=ed.borderW;SETTINGS.borderColor=ed.borderColor;SETTINGS.subColor=ed.subColor;SETTINGS.subBand=ed.subBand;SETTINGS.subSize=ed.subSize;saveSettings()}
+ function persistOvl(){SETTINGS.textOn=ed.textOn;SETTINGS.textStr=ed.textStr;SETTINGS.textSize=ed.textSize;SETTINGS.textX=ed.textX;SETTINGS.textY=ed.textY;SETTINGS.logoOn=ed.logoOn;SETTINGS.logoText=ed.logoText;SETTINGS.borderOn=ed.borderOn;SETTINGS.titleSize=ed.titleSize;SETTINGS.titleX=ed.titleX;SETTINGS.titleY=ed.titleY;SETTINGS.logoSrc=ed.logoSrc;SETTINGS.logoSize=ed.logoSize;SETTINGS.logoOpacity=ed.logoOpacity;SETTINGS.logoX=ed.logoX;SETTINGS.logoY=ed.logoY;SETTINGS.borderW=ed.borderW;SETTINGS.borderColor=ed.borderColor;SETTINGS.subColor=ed.subColor;SETTINGS.subBand=ed.subBand;SETTINGS.subSize=ed.subSize;SETTINGS.subColMain=ed.subColMain;SETTINGS.subColHi=ed.subColHi;SETTINGS.titleColor=ed.titleColor;SETTINGS.textColor=ed.textColor;saveSettings()}
  function persistBlur(){try{SETTINGS.blurRegions=JSON.parse(JSON.stringify(ed.blurRegions||[]))}catch(e){SETTINGS.blurRegions=ed.blurRegions||[]}saveSettings()}
  let pillTimer=null;
  function showModePill(){const mp=E('modePill');if(!mp)return;mp.classList.remove('hide');if(pillTimer)clearTimeout(pillTimer);pillTimer=setTimeout(()=>{mp.classList.add('hide')},3000)}
  vidEl.addEventListener('play',showModePill);
  vidEl.addEventListener('pause',showModePill);
  function updateModeUI(){const lbl=ed.modeChosen?modeLabel():'🎬 Movie Recap Mode';const mp=E('modePill');if(mp)mp.textContent=lbl;const bo=E('modeOrig'),bn=E('modeNew');if(bo)bo.classList.toggle('sel',!!(ed.modeChosen&&ed.aiMode==='faithful'));if(bn)bn.classList.toggle('sel',!!(ed.modeChosen&&ed.aiMode==='scene'));showModePill()}
- function syncTitleOvl(){const o=E('titleOvl');if(!o)return;const on=E('titleTgl').classList.contains('on');const txt=(E('title').value||'').trim();o.textContent=E('title').value||'';o.style.display=(on&&txt)?'block':'none';o.style.fontSize=Math.max(14,Math.round((ed.titleSize||52)*0.5))+'px';
+ function syncTitleOvl(){const o=E('titleOvl');if(!o)return;const on=E('titleTgl').classList.contains('on');const txt=(E('title').value||'').trim();o.textContent=E('title').value||'';o.style.display=(on&&txt)?'block':'none';o.style.fontSize=Math.max(14,Math.round((ed.titleSize||52)*0.5))+'px';o.style.color=ed.titleColor||'#FFE92E';
   /* V217: draggable — CENTRE fractions with the same measured
      whole-overlay clamp as the free-text overlay */
   const wrap=o.parentElement;
   if(wrap&&o.offsetWidth&&o.offsetHeight){const r=wrap.getBoundingClientRect();if(r.width>0&&r.height>0){const hw=o.offsetWidth/2/r.width,hh=o.offsetHeight/2/r.height;let cx=(typeof ed.titleX==='number')?ed.titleX:0.5,cy=(typeof ed.titleY==='number')?ed.titleY:0.15;if(hw<0.5)cx=Math.max(hw,Math.min(1-hw,cx));if(hh<0.5)cy=Math.max(hh,Math.min(1-hh,cy));ed.titleX=cx;ed.titleY=cy}}
   o.style.left=(((typeof ed.titleX==='number')?ed.titleX:0.5)*100)+'%';o.style.top=(((typeof ed.titleY==='number')?ed.titleY:0.15)*100)+'%';o.style.right='auto'}
- function syncTextOvl(){const o=E('textOvl');if(!o)return;const txt=(ed.textStr||'').trim();o.textContent=ed.textStr||'';o.style.display=(ed.textOn&&txt)?'block':'none';o.style.fontSize=Math.max(13,Math.round((ed.textSize||44)*0.5))+'px';
+ function syncTextOvl(){const o=E('textOvl');if(!o)return;const txt=(ed.textStr||'').trim();o.textContent=ed.textStr||'';o.style.display=(ed.textOn&&txt)?'block':'none';o.style.fontSize=Math.max(13,Math.round((ed.textSize||44)*0.5))+'px';o.style.color=ed.textColor||'#FFFFFF';
   /* V216: the position is the overlay's CENTRE — clamp it by the overlay's
      measured half-size so the WHOLE overlay stays inside the frame at every
      position (the old fixed 8%..92% drag clamp let a wide overlay spill past
@@ -3335,41 +3380,29 @@ function cueSigFor(ed){
  /* script edits drive the cue count, the stale warning and the voice gate */
  E('subs').addEventListener('input',()=>{updateCueCount();checkVoiceStale();refreshVoiceGate();renderSteps()});
  ['start','end'].forEach(id=>{E(id).addEventListener('input',()=>{updateVoiceWarn();refreshSummaries();renderTimeline()})});
- /* ================= V213 bottom panel + toolbar pop-ups =================
-    V229: the in-flow panel hosts ONLY the Export view now — the
-    Script page became the toolbar's first pop-up sheet like every
-    other tool. showPanel mounts the Export view and shows the panel;
-    hidePanel (the panel head's ✓ ပြီး, goStep(0)) returns it to its
-    parking home and hides the panel, leaving the main page as stage +
-    status strip + timeline + toolbar. EVERY toolbar tool opens its
-    controls as a BOTTOM-SHEET POP-UP (the Burmese Voice app pattern):
-    the control blocks park in the hidden #recap-sheetHomes and are
-    mounted into the sheet one at a time (single-instance,
-    openSheetNodes), returning on close via ✓ / backdrop. */
- let curPanel=''; /* the panel starts hidden + empty; the first showPanel('homeExport') mounts the Export view */
+ /* ================= V213 toolbar pop-ups · V230 Export sheet =================
+    V230: the in-flow bottom PANEL is retired — the Export view is a
+    BOTTOM-SHEET POP-UP now, exactly like every other tool (user
+    order: "Export button ကို pop up box page နဲ့လုပ်"). EVERY tool's
+    controls park in the hidden #recap-sheetHomes and are mounted
+    into the sheet one at a time (single-instance, openSheetNodes),
+    returning on close via ✓ / backdrop. The main page is: stage +
+    status strip + Main row + timeline + spacer + bottom-pinned
+    toolbar — nothing opens in-flow any more. */
  function markToolSel(tid){$$('#'+p+'-toolbar .tool-btn').forEach(b=>b.classList.toggle('sel',!!tid&&b.id===p+'-'+tid))}
- function showPanel(homeId,title){
+ /* 🎬 Export pop-up: render the chooser state, then mount the parked
+    Export home into the sheet (the same mount/return machinery as
+    every feature sheet; the sheet frame's ✕ / ✓ ပြီး / backdrop
+    close it). Export's progress, Cancel, log, live-preview canvas
+    and result area all live inside #homeExport, untouched. */
+ function openExportSheet(){
   disarmClear();
-  const home=E(homeId);if(!home)return;
-  const panel=E('panel');if(panel)panel.style.display='flex';
-  if(curPanel!==homeId){
-   const homesBox=E('sheetHomes');const cur=E(curPanel);
-   if(cur&&homesBox&&cur.parentElement!==homesBox)homesBox.appendChild(cur);
-   E('panelBody').appendChild(home);curPanel=homeId;
-  }
-  const head=E('panelHead');
-  if(head)head.style.display='flex';const t=E('panelTitle');if(t)t.textContent=title||'';
+  renderExpSetup();
+  const home=E('homeExport');if(!home)return;
+  openSheetNodes('🎬 Export',home);
+  const ret=sheetOnClose;sheetOnClose=()=>{if(ret)ret();markToolSel(null)};
   markToolSel(null);
   refreshSummaries();
- }
- function hidePanel(){
-  disarmClear();
-  const homesBox=E('sheetHomes');const cur=E(curPanel);
-  if(cur&&homesBox&&cur.parentElement!==homesBox)homesBox.appendChild(cur);
-  curPanel='';
-  const panel=E('panel');if(panel)panel.style.display='none';
-  const head=E('panelHead');if(head)head.style.display='none';
-  markToolSel(null);
  }
  /* one feature pop-up: mount the parked home into the sheet; the
     toolbar button stays .sel while its sheet is open (the wrapped
@@ -3394,7 +3427,7 @@ function cueSigFor(ed){
   const ret=sheetOnClose;sheetOnClose=()=>{if(ret)ret();markToolSel(null)};
   markToolSel('toolVoice');
  }
- window.__recapShowExport=()=>{showPanel('homeExport','🎬 Export');renderExpSetup()};
+ window.__recapShowExport=()=>{openExportSheet()};
  /* V218: the raw ffmpeg log in the Export view hides behind this toggle
     (collapsed by default; export failures open it automatically). */
  const logTglBtn=E('logToggle');if(logTglBtn)logTglBtn.onclick=()=>{const lb=E('log');if(!lb)return;const show=lb.style.display!=='block';lb.style.display=show?'block':'none';logTglBtn.textContent=show?'📄 Log ဖျောက်ရန်':'📄 Log ပြရန်'};
@@ -3442,7 +3475,32 @@ function cueSigFor(ed){
   SETTINGS.expEngine=expBestEngine();SETTINGS.expRes=1080;saveSettings();
   const tTgl=E('expIncTitle'),lTgl=E('expIncLogo');if(tTgl)tTgl.classList.add('on');if(lTgl)lTgl.classList.add('on');
   renderExpSetup();showNotice('↺ Export ရွေးချယ်မှု မူလ ပြန်ထားပါပြီ','info')};
- const panelDoneBtn=E('panelDone');if(panelDoneBtn)panelDoneBtn.onclick=()=>hidePanel();
+ /* ================= V230 Main-page quick toggles =================
+    SRT ↔ the 🎨 စာတန်း sheet's #subTgl — the very toggle export reads
+    (exportEditor checks its .on class): the Main pill simply CLICKS
+    that toggle, so there is one source of truth and the two can
+    never disagree; a click on the sheet-side toggle re-syncs Main
+    via the listener below. Voice ↔ ed.audioMode: ON arms narration
+    with the current engine/voice selection (the same state writes
+    selectVoicePick performs for a voice row, auto-duck included),
+    OFF is its 'original' row; the stage voice sync keeps keying off
+    audioMode, so OFF means the preview plays the original audio
+    only. syncMainToggles() re-derives both pills from the real state
+    and runs at the end of refreshSummaries(), so picker picks, sheet
+    toggles and generation all keep the Main pills honest. */
+ function qtSrtEl(){return E('qtSrt')} /* lazy lookups: refreshSummaries runs before this block during init */
+ function qtVoiceEl(){return E('qtVoice')}
+ function syncMainToggles(){
+  const qs=qtSrtEl();if(qs){const t=E('subTgl');qs.classList.toggle('on',!!(t&&t.classList.contains('on')))}
+  const qv=qtVoiceEl();if(qv)qv.classList.toggle('on',ed.audioMode==='voice');
+ }
+ const qtS=qtSrtEl();if(qtS)qtS.onclick=()=>{const t=E('subTgl');if(t)t.click();syncMainToggles();updateOverlay()};
+ const qtV=qtVoiceEl();if(qtV)qtV.onclick=()=>{
+  if(ed.audioMode==='voice'){ed.audioMode='original'}
+  else{ed.audioMode='voice';const dk=E('autoDuck');if(dk&&dk.checked)applyAutoDuck()}
+  if(ed.refresh)ed.refresh();checkVoiceStale();refreshVoiceGate();syncMainToggles();refreshSummaries();
+ };
+ const subTglSyncEl=E('subTgl');if(subTglSyncEl)subTglSyncEl.addEventListener('click',()=>syncMainToggles());
  function refreshSummaries(){
   /* V216 dead-code removal: the per-feature sum* summary lines went away
      with the V213 feature rows — their target elements no longer exist,
@@ -3457,6 +3515,7 @@ function cueSigFor(ed){
   const stS=E('stScript');if(stS)stS.innerHTML='📝 Script '+(sl>0?'<b>✓</b>':'—');
   const stV=E('stVoice');if(stV)stV.innerHTML='🎙️ အသံ '+(voiceFresh()?'<b>✓</b>':'—');
   const stX=E('stExport');if(stX){const xReady=!!(ed.file&&sl>0&&(ed.audioMode!=='voice'||voiceFresh()));const xlb=stX.querySelector('.btn-label');if(xlb)xlb.innerHTML='🎬 Export '+(xReady?'<b>အသင့်</b>':'—');stX.classList.toggle('ready',xReady)}
+  syncMainToggles(); /* V230: the Main quick toggles mirror the real state */
  }
  window.__refreshFeatureSummaries=refreshSummaries;
  /* V213 toolbar: EVERY tool opens its feature as a bottom pop-up.
@@ -3482,7 +3541,10 @@ function cueSigFor(ed){
   txtTgl.onclick=()=>{ed.textOn=!ed.textOn;txtTgl.classList.toggle('on',ed.textOn);persistOvl();syncTextOvl();refreshSummaries()};
   txtStr.addEventListener('input',()=>{ed.textStr=txtStr.value;persistOvl();syncTextOvl();refreshSummaries()});
   txtSize.addEventListener('input',()=>{ed.textSize=parseInt(txtSize.value,10)||44;E('textSizeVal').textContent=ed.textSize;persistOvl();syncTextOvl()});
-  const txR=E('textReset');if(txR)txR.onclick=()=>{ed.textOn=false;ed.textStr='';ed.textSize=44;ed.textX=0.5;ed.textY=0.16;txtTgl.classList.remove('on');txtStr.value='';txtSize.value=44;E('textSizeVal').textContent='44';persistOvl();syncTextOvl();refreshSummaries();showNotice('↺ Text Setting မူလ ပြန်ထားပါပြီ','info')};
+  /* V230 custom text colour: one picker -> ed.textColor, read by the
+     stage preview (syncTextOvl) and by BOTH engines' text PNG */
+  const txtCol=E('textColor');if(txtCol){txtCol.value=ed.textColor;txtCol.addEventListener('input',()=>{ed.textColor=txtCol.value;persistOvl();syncTextOvl();refreshSummaries()})}
+  const txR=E('textReset');if(txR)txR.onclick=()=>{ed.textOn=false;ed.textStr='';ed.textSize=44;ed.textX=0.5;ed.textY=0.16;ed.textColor='#FFFFFF';if(txtCol)txtCol.value='#FFFFFF';txtTgl.classList.remove('on');txtStr.value='';txtSize.value=44;E('textSizeVal').textContent='44';persistOvl();syncTextOvl();refreshSummaries();showNotice('↺ Text Setting မူလ ပြန်ထားပါပြီ','info')};
  }
  const lgTgl=E('logoTgl'),lgStr=E('logoStr');
  if(lgTgl&&lgStr){lgTgl.classList.toggle('on',!!ed.logoOn);lgStr.value=ed.logoText||'';
@@ -3522,7 +3584,19 @@ function cueSigFor(ed){
  const scWrap=E('subColors');
  const syncSubChips=()=>{if(scWrap)$$('#'+p+'-subColors .style-chip').forEach(c=>c.classList.toggle('sel',c.dataset.v===ed.subColor))};
  syncSubChips();
- if(scWrap)scWrap.addEventListener('click',e=>{const b=e.target.closest('.style-chip');if(!b)return;ed.subColor=b.dataset.v;SETTINGS.subColor=ed.subColor;saveSettings();syncSubChips();subRenderKey='';updateOverlay();refreshSummaries()});
+ if(scWrap)scWrap.addEventListener('click',e=>{const b=e.target.closest('.style-chip');if(!b)return;ed.subColor=b.dataset.v;if(b.dataset.v==='gold'){ed.subColMain='#FFD740';ed.subColHi='#FFFFFF'}else{ed.subColMain='#FFFFFF';ed.subColHi='#FFD740'}persistOvl();syncSubPickers();syncSubChips();subRenderKey='';updateOverlay();refreshSummaries()});
+ /* V230 custom subtitle colours: the two pickers write the single
+    source of truth (ed.subColMain / ed.subColHi, read by the preview
+    renderer and by subPngOpts for BOTH export engines). Colour never
+    touches cue splitting (subLineFs depends on size only), so a
+    colour change re-splits nothing and marks no voice stale — just
+    the overlay re-render. A custom pick marks the preset 'custom'
+    so neither preset chip stays selected. */
+ const scMain=E('subColMain'),scHi=E('subColHi');
+ const syncSubPickers=()=>{if(scMain)scMain.value=ed.subColMain;if(scHi)scHi.value=ed.subColHi};
+ syncSubPickers();
+ if(scMain)scMain.addEventListener('input',()=>{ed.subColMain=scMain.value;ed.subColor='custom';persistOvl();syncSubChips();subRenderKey='';updateOverlay();refreshSummaries()});
+ if(scHi)scHi.addEventListener('input',()=>{ed.subColHi=scHi.value;ed.subColor='custom';persistOvl();syncSubChips();subRenderKey='';updateOverlay();refreshSummaries()});
  const sbT=E('subBandTgl');if(sbT){sbT.classList.toggle('on',!!ed.subBand);sbT.onclick=()=>{ed.subBand=!ed.subBand;SETTINGS.subBand=ed.subBand;saveSettings();sbT.classList.toggle('on',ed.subBand);subRenderKey='';updateOverlay();refreshSummaries()}}
  /* V224: subtitle SIZE slider — 'input' scales the preview live and
     persists; 'change' (release) re-derives the cues from the new
@@ -3533,15 +3607,18 @@ function cueSigFor(ed){
  if(ssI){ssI.value=ed.subSize||100;if(ssV)ssV.textContent=(ed.subSize||100)+'%';
   ssI.addEventListener('input',()=>{ed.subSize=parseInt(ssI.value,10)||100;if(ssV)ssV.textContent=ed.subSize+'%';persistOvl();subRenderKey='';updateOverlay()});
   ssI.addEventListener('change',()=>{if(!ed.cuesManual&&scriptLines().length)rebuildCues();checkVoiceStale();refreshSummaries()})}
- const subR=E('subReset');if(subR)subR.onclick=()=>{ed.subColor='white';ed.subBand=false;ed.subSize=100;SETTINGS.subColor='white';SETTINGS.subBand=false;SETTINGS.subSize=100;saveSettings();syncSubChips();if(sbT)sbT.classList.remove('on');if(ssI){ssI.value=100;if(ssV)ssV.textContent='100%'}subRenderKey='';E('subPosReset').click();updateOverlay();if(!ed.cuesManual&&scriptLines().length)rebuildCues();checkVoiceStale();refreshSummaries();showNotice('↺ စာတန်း Setting မူလ ပြန်ထားပါပြီ','info')};
+ const subR=E('subReset');if(subR)subR.onclick=()=>{ed.subColor='white';ed.subBand=false;ed.subSize=100;ed.subColMain='#FFFFFF';ed.subColHi='#FFD740';SETTINGS.subColor='white';SETTINGS.subBand=false;SETTINGS.subSize=100;SETTINGS.subColMain='#FFFFFF';SETTINGS.subColHi='#FFD740';saveSettings();syncSubChips();syncSubPickers();if(sbT)sbT.classList.remove('on');if(ssI){ssI.value=100;if(ssV)ssV.textContent='100%'}subRenderKey='';E('subPosReset').click();updateOverlay();if(!ed.cuesManual&&scriptLines().length)rebuildCues();checkVoiceStale();refreshSummaries();showNotice('↺ စာတန်း Setting မူလ ပြန်ထားပါပြီ','info')};
  /* V217 Title completion: size slider + page Reset (the drag lives
     with the overlay drags above) */
  const tiSize=E('titleSize');if(tiSize){tiSize.value=ed.titleSize||52;E('titleSizeVal').textContent=ed.titleSize||52;tiSize.addEventListener('input',()=>{ed.titleSize=parseInt(tiSize.value,10)||52;E('titleSizeVal').textContent=ed.titleSize;persistOvl();syncTitleOvl()})}
- const tiR=E('titleReset');if(tiR)tiR.onclick=()=>{ed.titleSize=52;ed.titleX=0.5;ed.titleY=0.15;const ti=E('title');if(ti)ti.value='';const tg=E('titleTgl');if(tg)tg.classList.add('on');if(tiSize){tiSize.value=52;E('titleSizeVal').textContent='52'}persistOvl();syncTitleOvl();refreshSummaries();showNotice('↺ Title Setting မူလ ပြန်ထားပါပြီ','info')};
+ /* V230 custom title colour: one picker -> ed.titleColor, read by
+    the stage preview (syncTitleOvl) and by BOTH engines' title PNG */
+ const tiCol=E('titleColor');if(tiCol){tiCol.value=ed.titleColor;tiCol.addEventListener('input',()=>{ed.titleColor=tiCol.value;persistOvl();syncTitleOvl();refreshSummaries()})}
+ const tiR=E('titleReset');if(tiR)tiR.onclick=()=>{ed.titleSize=52;ed.titleX=0.5;ed.titleY=0.15;ed.titleColor='#FFE92E';if(tiCol)tiCol.value='#FFE92E';const ti=E('title');if(ti)ti.value='';const tg=E('titleTgl');if(tg)tg.classList.add('on');if(tiSize){tiSize.value=52;E('titleSizeVal').textContent='52'}persistOvl();syncTitleOvl();refreshSummaries();showNotice('↺ Title Setting မူလ ပြန်ထားပါပြီ','info')};
  /* V217 Trim page Reset: restore the full range through the same
     input events the sliders use, so every dependent view re-syncs */
  const trR=E('trimReset');if(trR)trR.onclick=()=>{const st=E('start'),en=E('end');if(!st||!en)return;st.value=0;en.value=(ed.duration||0).toFixed(1);st.dispatchEvent(new Event('input',{bubbles:true}));en.dispatchEvent(new Event('input',{bubbles:true}));showNotice('↺ Video တစ်ခုလုံး ပြန်ထား ပါပြီ','info')};
- hidePanel(); /* V229: the panel starts hidden — it appears only for the Export view */
+ /* V230: boot state — no sheet or panel open; every control block sits in its parking home */
  refreshSummaries();
  updateCueCount();refreshVoiceGate();updateVoiceWarn();applySubPos();updateSubPosLabel();setSyncDelay(0);updateModeUI();syncTitleOvl();syncTextOvl();syncLogoOvl();syncBorderOvl();tpSync();renderTimeline();syncBlurLayer();blurListRender();blurCtlSync();
 })();

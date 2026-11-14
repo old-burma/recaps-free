@@ -191,23 +191,23 @@ body.locked{overflow:hidden}
 .tp-seek::-moz-range-thumb{width:12px;height:12px;border-width:2px}
 .tp-seek::-moz-range-track{height:3px;background:rgba(255,255,255,.35)}
 /* ===== timeline — V213: TWO tracks only (subtitle cues + voice) ===== */
-.tl-wrap{flex:0 0 auto;background:#101014;border-top:1px solid #26262E;border-bottom:1px solid #26262E;padding:6px 0 8px}
+.tl-wrap{flex:0 0 auto;background:#101014;border-top:1px solid #26262E;border-bottom:1px solid #26262E;padding:2px 0 2px}
 .tl-scroll{overflow-x:auto;overflow-y:hidden}
 .tl-inner{position:relative;min-width:100%}
-.tl-track{position:relative;height:24px}
-.tl-track-subs{height:28px}
-.tl-block{position:absolute;top:3px;border-radius:4px;font-size:10px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:pointer;font-family:inherit;text-align:left}
-.tl-sblock{height:22px;line-height:22px;padding:0 5px;background:rgba(245,158,11,.22);border:1px solid #B97A0E;color:#FFD9A0}
+.tl-track{position:relative;height:15px}
+.tl-track-subs{height:18px}
+.tl-block{position:absolute;top:2px;border-radius:4px;font-size:9.5px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:pointer;font-family:inherit;text-align:left}
+.tl-sblock{height:14px;line-height:14px;padding:0 5px;background:rgba(245,158,11,.22);border:1px solid #B97A0E;color:#FFD9A0}
 .tl-sblock.cur{background:#F59E0B;border-color:#F59E0B;color:#1A1206;font-weight:700}
-.tl-voblock{height:18px;line-height:18px;padding:0 6px;background:#1F3D2B;border:1px solid #25B373;color:#A7E8C6}
+.tl-voblock{height:12px;line-height:12px;padding:0 6px;background:#1F3D2B;border:1px solid #25B373;color:#A7E8C6}
 .tl-voblock.stale{background:repeating-linear-gradient(45deg,#3A2329,#3A2329 6px,#2A1A1F 6px,#2A1A1F 12px);border-color:#8A4B52;color:#F0A49E}
 .tl-playhead{position:absolute;top:0;bottom:0;width:2px;background:#F97316;box-shadow:0 0 6px rgba(249,115,22,.8);z-index:4;pointer-events:none}
 /* ===== V222: time ruler + video waveform rows (above the cue track) ===== */
-.tl-ruler-row{position:relative;height:14px}
+.tl-ruler-row{position:relative;height:9px}
 .tl-ruler-row canvas{display:block}
-.tl-wave-row{position:relative;height:30px;border-bottom:1px solid #1D1D24;margin-bottom:2px}
+.tl-wave-row{position:relative;height:12px;border-bottom:1px solid #1D1D24;margin-bottom:0}
 .tl-wave-row canvas{display:block}
-.tl-wave-msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:600;color:#9A9AA5;pointer-events:none;letter-spacing:.02em}
+.tl-wave-msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:600;color:#9A9AA5;pointer-events:none;letter-spacing:.02em}
 /* ===== studio deck (HOME panel content) ===== */
 .studio-status{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:#C9C9D2;margin:2px 0 14px}
 .studio-status .dot{width:9px;height:9px;border-radius:50%;background:#22C55E;flex:0 0 9px;box-shadow:0 0 0 3px rgba(34,197,94,.18)}
@@ -1745,11 +1745,23 @@ async function runExport(ed){
 <script>
 /* ================= AI Script pipeline (Gemini, visitor's own key) =================
    Flow: video audio → transcript → Myanmar script (2 modes) → script box → voiceover/SRT */
-/* Model chains: gemini-3.5-flash-lite leads EVERY chain — it is the most
-   reliable model in production (2026-11-13); 3.8-flash is the 503-prone one
-   and must never lead. Both chains share this order now. */
-const GEM_MODELS=['gemini-3.5-flash-lite','gemini-3.8-flash','gemini-2.5-flash','gemini-2.5-flash-lite'];
-const GEM_MODELS_Q=['gemini-3.5-flash-lite','gemini-3.8-flash','gemini-2.5-flash','gemini-2.5-flash-lite'];
+/* Model chains (V227, probed live 2026-11-14 against the real API):
+   gemini-3.5-flash-lite leads EVERY chain — fastest confirmed model
+   (200 in ~1s) and the most reliable in production; gemini-3.5-flash
+   second (200, ~1-2s). gemini-3.8-flash still answers but is currently
+   very slow / 503-prone — the 45s attempt timeout treats it as busy and
+   moves on, so it stays as a mid fallback, never the lead.
+   gemini-4-hydrogen (new Gemini 4 series) returned 200 with real text
+   in testing but took ~36-88s per call — LAST resort only (the 45s
+   attempt timeout will cut off its slower runs). gemini-4-argon /
+   gemini-4-carbon are
+   deliberately NOT in the chain: they returned instant 429 on three
+   separate keys (no free-tier quota), and the 429 policy below would
+   burn a ~20s wait + retry on them in every run. gemini-2.5-flash and
+   gemini-2.5-flash-lite were dropped: the API now returns 404 for them
+   ("no longer available to new users"). Both chains share this order. */
+const GEM_MODELS=['gemini-3.5-flash-lite','gemini-3.5-flash','gemini-3.8-flash','gemini-4-hydrogen'];
+const GEM_MODELS_Q=['gemini-3.5-flash-lite','gemini-3.5-flash','gemini-3.8-flash','gemini-4-hydrogen'];
 async function geminiGen(key,parts,temp,statusFn,qFirst){
  const sleep=ms=>new Promise(r=>setTimeout(r,ms));
  let lastErr=null,quotaErr=null,busyErr=null;
@@ -2361,12 +2373,12 @@ function cueSigFor(ed){
   const sc=E('tlScroll');
   const Wpx=inner.clientWidth||Math.max(sc?sc.clientWidth:0,Math.ceil(dur*TL_PPS));
   const rc=E('tlRuler');
-  if(rc){const ctx=tlCanvasSetup(rc,Wpx,14);if(ctx&&dur>0){
-   ctx.strokeStyle='#3A3A44';ctx.fillStyle='#9A9AA5';ctx.font='9px sans-serif';ctx.lineWidth=1;ctx.beginPath();
+  if(rc){const ctx=tlCanvasSetup(rc,Wpx,9);if(ctx&&dur>0){
+   ctx.strokeStyle='#3A3A44';ctx.fillStyle='#9A9AA5';ctx.font='8px sans-serif';ctx.lineWidth=1;ctx.beginPath();
    const ticks=rulerTicks(dur,r.end-r.start);
-   for(const tk of ticks){const x=Math.round(tk.t*TL_PPS)+0.5;ctx.moveTo(x,5);ctx.lineTo(x,14)}
+   for(const tk of ticks){const x=Math.round(tk.t*TL_PPS)+0.5;ctx.moveTo(x,3);ctx.lineTo(x,9)}
    ctx.stroke();
-   for(const tk of ticks)ctx.fillText(tk.label,tk.t*TL_PPS+2,9);
+   for(const tk of ticks)ctx.fillText(tk.label,tk.t*TL_PPS+2,7);
   }}
   const msg=E('tlWaveMsg'),wc=E('tlWave');
   const st=ed.file?(ed.waveState||'idle'):'idle';
@@ -2375,8 +2387,8 @@ function cueSigFor(ed){
    else if(st==='fail'){msg.style.display='flex';msg.textContent='waveform မရပါ'}
    else{msg.style.display='flex';msg.textContent='waveform ပြင်ဆင်နေပါတယ်…'}
   }
-  if(wc){const ctx=tlCanvasSetup(wc,Wpx,30);if(ctx&&dur>0&&ed.wavePeaks&&ed.wavePeaks.length){
-   const pk=ed.wavePeaks,mid=15,maxH=13;
+  if(wc){const ctx=tlCanvasSetup(wc,Wpx,12);if(ctx&&dur>0&&ed.wavePeaks&&ed.wavePeaks.length){
+   const pk=ed.wavePeaks,mid=6,maxH=5;
    for(let x=0;x<Wpx;x++){
     const t0=x/TL_PPS,sl=waveSliceFor(pk.length,t0,(x+1)/TL_PPS);
     let v=0;for(let i=sl.from;i<sl.to;i++)if(pk[i]>v)v=pk[i];

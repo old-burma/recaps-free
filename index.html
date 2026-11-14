@@ -202,6 +202,12 @@ body.locked{overflow:hidden}
 .tl-voblock{height:18px;line-height:18px;padding:0 6px;background:#1F3D2B;border:1px solid #25B373;color:#A7E8C6}
 .tl-voblock.stale{background:repeating-linear-gradient(45deg,#3A2329,#3A2329 6px,#2A1A1F 6px,#2A1A1F 12px);border-color:#8A4B52;color:#F0A49E}
 .tl-playhead{position:absolute;top:0;bottom:0;width:2px;background:#F97316;box-shadow:0 0 6px rgba(249,115,22,.8);z-index:4;pointer-events:none}
+/* ===== V222: time ruler + video waveform rows (above the cue track) ===== */
+.tl-ruler-row{position:relative;height:14px}
+.tl-ruler-row canvas{display:block}
+.tl-wave-row{position:relative;height:30px;border-bottom:1px solid #1D1D24;margin-bottom:2px}
+.tl-wave-row canvas{display:block}
+.tl-wave-msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:600;color:#9A9AA5;pointer-events:none;letter-spacing:.02em}
 /* ===== studio deck (HOME panel content) ===== */
 .studio-status{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:#C9C9D2;margin:2px 0 14px}
 .studio-status .dot{width:9px;height:9px;border-radius:50%;background:#22C55E;flex:0 0 9px;box-shadow:0 0 0 3px rgba(34,197,94,.18)}
@@ -412,8 +418,8 @@ let _db=null,_dbOpening=null;
 function openDB(){
  if(_db)return Promise.resolve(_db);
  if(_dbOpening)return _dbOpening;
- _dbOpening=new Promise((res,rej)=>{const r=indexedDB.open('RecapsDB',1);
-  r.onupgradeneeded=()=>{r.result.createObjectStore('videos',{keyPath:'id',autoIncrement:true})};
+ _dbOpening=new Promise((res,rej)=>{const r=indexedDB.open('RecapsDB',2);
+  r.onupgradeneeded=()=>{const db=r.result;if(!db.objectStoreNames.contains('videos'))db.createObjectStore('videos',{keyPath:'id',autoIncrement:true});if(!db.objectStoreNames.contains('peaks'))db.createObjectStore('peaks',{keyPath:'sig'})};
   r.onsuccess=()=>{_db=r.result;_dbOpening=null;_db.onclose=()=>{_db=null};_db.onversionchange=()=>{try{_db.close()}catch(e){}_db=null};res(_db)};
   r.onerror=()=>{_dbOpening=null;rej(r.error)}});
  return _dbOpening}
@@ -543,6 +549,8 @@ const blurHome='<div class="picker-row" style="margin-bottom:10px;align-items:ce
    the per-cue edit pop-up) and a voice block; the playhead follows
    playback. Blocks are (re)built by renderTimeline(). */
 const timelineInner='<div class="tl-wrap" id="'+p+'-timeline"><div class="tl-scroll" id="'+p+'-tlScroll"><div class="tl-inner" id="'+p+'-tlInner">'
++'<div class="tl-ruler-row"><canvas id="'+p+'-tlRuler"></canvas></div>'
++'<div class="tl-wave-row"><canvas id="'+p+'-tlWave"></canvas><div class="tl-wave-msg" id="'+p+'-tlWaveMsg" style="display:none"></div></div>'
 +'<div class="tl-track tl-track-subs" id="'+p+'-tlSubs"></div>'
 +'<div class="tl-track"><div class="tl-block tl-voblock" id="'+p+'-tlVoBlock" style="display:none"></div></div>'
 +'<div class="tl-playhead" id="'+p+'-tlPlay" style="left:0"></div>'
@@ -1879,6 +1887,7 @@ function cueSigFor(ed){
   const vo=E('tlVoBlock');
   if(vo){const c=ed.voiceCache;if(c&&c.dur){const vd=c.dur/effSpeedOf(ed);const stale=!voiceFresh();vo.style.display='block';vo.style.left=(r.start*TL_PPS)+'px';vo.style.width=Math.max(24,vd*TL_PPS)+'px';vo.classList.toggle('stale',stale);vo.textContent='🎙️ အသံ '+fmtDur(vd)+(stale?' · အသံ မကိုက်တော့':'')}else vo.style.display='none'}
   updatePlayhead();
+  renderTlStrip(); /* V222: ruler + waveform rows follow the same rebuild */
  }
  function updatePlayhead(){
   const ph=E('tlPlay');if(!ph)return;
@@ -1890,6 +1899,149 @@ function cueSigFor(ed){
   if(sc&&!vidEl.paused&&sc.clientWidth){const x=t*TL_PPS;if(x<sc.scrollLeft+30||x>sc.scrollLeft+sc.clientWidth-60)sc.scrollLeft=Math.max(0,x-sc.clientWidth/3)}
  }
  window.__recapTimeline=renderTimeline;
+ /* ================= V222: time ruler + video waveform =================
+    Two slim rows above the cue track, mapped EXACTLY like the tracks
+    (file time × TL_PPS inside tlInner; the playhead already spans the
+    inner's full height, so it crosses the new rows for free). Peaks are
+    extracted ONCE per file, in the background, never blocking editing:
+    the shared ffmpeg downmixes to mono 8 kHz s16le in slices —
+    SLICING RULE: one exec per ≤120 s of media, so a single MEMFS
+    output stays ≤ 120×8000×2 B ≈ 1.9 MB; each slice's peak buckets are
+    computed (and its file deleted) before the next slice starts.
+    Buckets are max-abs per 0.1 s, normalised to 0..255, and cached in
+    IndexedDB (RecapsDB 'peaks' store) keyed by the file signature, so
+    re-selecting the same file is instant. Trim changes only RE-RENDER
+    the strip (peaks outside the window draw dimmer) — the peaks are
+    whole-file, so a trim change never re-extracts. */
+ const WAVE_SR=8000,WAVE_BUCKET=0.1,WAVE_SLICE=120;
+ let wvJob=0,wvExtractRuns=0;
+ function waveSigOf(f){return f?('wv|'+f.name+'|'+f.size+'|'+(f.lastModified||0)):''}
+ function peaksFromPCM(u8){
+  const n=Math.floor(u8.length/2),per=Math.max(1,Math.round(WAVE_SR*WAVE_BUCKET));
+  const out=new Float32Array(Math.ceil(n/per));const dv=new DataView(u8.buffer,u8.byteOffset,u8.length);
+  for(let i=0;i<n;i++){const v=Math.abs(dv.getInt16(i*2,true))/32768;const b=Math.floor(i/per);if(v>out[b])out[b]=v}
+  return out;
+ }
+ function normalizePeaks(raw){
+  let mx=0;for(let i=0;i<raw.length;i++)if(raw[i]>mx)mx=raw[i];
+  const out=new Uint8Array(raw.length);if(mx>0)for(let i=0;i<raw.length;i++)out[i]=Math.round(raw[i]/mx*255);
+  return out;
+ }
+ function tickIntervalFor(span){span=Math.max(0,span||0);return span<=30?5:span<=90?10:span<=300?30:60}
+ function rulerTicks(dur,span){
+  const iv=tickIntervalFor(span),out=[];
+  for(let t=0;t<=dur+0.001;t+=iv)out.push({t:Math.round(t*10)/10,label:fmtDur(t)});
+  return out;
+ }
+ function waveSliceFor(len,t0,t1){
+  const from=Math.max(0,Math.min(len,Math.floor(t0/WAVE_BUCKET))),to=Math.max(from,Math.min(len,Math.ceil(t1/WAVE_BUCKET)));
+  return {from,to};
+ }
+ function peaksIdb(mode,sig,rec){
+  return new Promise(res=>{
+   if(typeof indexedDB==='undefined')return res(null);
+   let done=false;const fin=v=>{if(!done){done=true;res(v)}};
+   try{
+    openDB().then(db=>{
+     const tx=db.transaction('peaks',mode);const st=tx.objectStore('peaks');
+     if(mode==='readonly'){const q=st.get(sig);q.onsuccess=()=>fin(q.result||null);q.onerror=()=>fin(null)}
+     else{st.put(rec);tx.oncomplete=()=>fin(true);tx.onerror=()=>fin(null);tx.onabort=()=>fin(null)}
+    }).catch(()=>fin(null));
+   }catch(e){fin(null)}
+   setTimeout(()=>fin(null),4000);
+  });
+ }
+ async function ensureWavePeaks(){
+  const f=ed.file;if(!f||!ed.duration)return;
+  const sig=waveSigOf(f);
+  if(ed.waveSig===sig&&(ed.waveState==='ready'||ed.waveState==='loading'||ed.waveState==='fail'))return;
+  const job=++wvJob;ed.waveSig=sig;ed.wavePeaks=null;ed.waveState='loading';renderTlStrip();
+  const cached=await peaksIdb('readonly',sig);
+  if(job!==wvJob)return;
+  if(cached&&cached.peaks&&cached.peaks.length){ed.wavePeaks=cached.peaks;ed.waveState='ready';renderTlStrip();return}
+  /* the ffmpeg instance is single — defer while another job owns it */
+  if(ed.busy||ed.aiBusy||ed.voiceBusy){ed.waveState='idle';return}
+  wvExtractRuns++;
+  try{
+   const ff=await getFFmpeg(()=>{});
+   if(job!==wvJob)return;
+   const fetchFile=window.FFmpegUtil&&window.FFmpegUtil.fetchFile;
+   await ff.writeFile('wv_in.mp4',fetchFile?await fetchFile(f):new Uint8Array(await f.arrayBuffer()));
+   const dur=ed.duration,total=Math.max(1,Math.ceil(dur/WAVE_BUCKET)),raw=new Float32Array(total);
+   let any=false;
+   try{
+    for(let s=0;s<dur;s+=WAVE_SLICE){
+     if(job!==wvJob)throw new Error('superseded');
+     if(ed.busy||ed.aiBusy||ed.voiceBusy)throw new Error('deferred');
+     const len=Math.min(WAVE_SLICE,dur-s);
+     const code=await ff.exec(['-ss',s.toFixed(2),'-i','wv_in.mp4','-t',len.toFixed(2),'-vn','-ac','1','-ar',String(WAVE_SR),'-f','s16le','wv_a.pcm'],300000);
+     if(code!==0){if(s===0)throw new Error('no-audio');throw new Error('ffmpeg exit '+code)}
+     const data=await ffReadU8(ff,'wv_a.pcm');try{await ff.deleteFile('wv_a.pcm')}catch(e2){}
+     if(!data.length&&s===0)throw new Error('no-audio');
+     if(data.length)any=true;
+     const pk=peaksFromPCM(data),off=Math.round(s/WAVE_BUCKET);
+     for(let i=0;i<pk.length&&off+i<total;i++)raw[off+i]=pk[i];
+    }
+   }finally{try{await ff.deleteFile('wv_in.mp4')}catch(e3){}}
+   if(!any)throw new Error('no-audio');
+   if(job!==wvJob)return;
+   ed.wavePeaks=normalizePeaks(raw);ed.waveState='ready';
+   peaksIdb('readwrite',sig,{sig,dur,bucket:WAVE_BUCKET,peaks:ed.wavePeaks});
+   renderTlStrip();
+  }catch(e){
+   if(job!==wvJob)return;
+   if(e&&e.message==='deferred'){ed.waveState='idle';return}
+   ed.wavePeaks=null;ed.waveState='fail';renderTlStrip();
+  }
+ }
+ function tlCanvasSetup(cv,cssW,cssH){
+  if(!cv||cssW<=0)return null;
+  const dpr=Math.min(window.devicePixelRatio||1,2,8192/Math.max(1,cssW));
+  const pw=Math.max(1,Math.round(cssW*dpr)),ph=Math.max(1,Math.round(cssH*dpr));
+  if(cv.width!==pw)cv.width=pw;if(cv.height!==ph)cv.height=ph;
+  cv.style.width=cssW+'px';cv.style.height=cssH+'px';
+  const ctx=cv.getContext('2d');if(!ctx)return null;
+  ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,cssW,cssH);
+  return ctx;
+ }
+ function renderTlStrip(){
+  const inner=E('tlInner');if(!inner)return;
+  const dur=ed.duration||0,r=trimRange();
+  const sc=E('tlScroll');
+  const Wpx=inner.clientWidth||Math.max(sc?sc.clientWidth:0,Math.ceil(dur*TL_PPS));
+  const rc=E('tlRuler');
+  if(rc){const ctx=tlCanvasSetup(rc,Wpx,14);if(ctx&&dur>0){
+   ctx.strokeStyle='#3A3A44';ctx.fillStyle='#9A9AA5';ctx.font='9px sans-serif';ctx.lineWidth=1;ctx.beginPath();
+   const ticks=rulerTicks(dur,r.end-r.start);
+   for(const tk of ticks){const x=Math.round(tk.t*TL_PPS)+0.5;ctx.moveTo(x,5);ctx.lineTo(x,14)}
+   ctx.stroke();
+   for(const tk of ticks)ctx.fillText(tk.label,tk.t*TL_PPS+2,9);
+  }}
+  const msg=E('tlWaveMsg'),wc=E('tlWave');
+  const st=ed.file?(ed.waveState||'idle'):'idle';
+  if(msg){
+   if(!ed.file||st==='ready')msg.style.display='none';
+   else if(st==='fail'){msg.style.display='flex';msg.textContent='waveform မရပါ'}
+   else{msg.style.display='flex';msg.textContent='waveform ပြင်ဆင်နေပါတယ်…'}
+  }
+  if(wc){const ctx=tlCanvasSetup(wc,Wpx,30);if(ctx&&dur>0&&ed.wavePeaks&&ed.wavePeaks.length){
+   const pk=ed.wavePeaks,mid=15,maxH=13;
+   for(let x=0;x<Wpx;x++){
+    const t0=x/TL_PPS,sl=waveSliceFor(pk.length,t0,(x+1)/TL_PPS);
+    let v=0;for(let i=sl.from;i<sl.to;i++)if(pk[i]>v)v=pk[i];
+    if(!v)continue;const h=Math.max(1,v/255*maxH),inWin=t0>=r.start-0.001&&t0<r.end;
+    ctx.fillStyle=inWin?'#F97316':'rgba(249,115,22,0.4)';
+    ctx.fillRect(x,mid-h,1,h);
+    ctx.fillStyle=inWin?'rgba(249,115,22,0.55)':'rgba(249,115,22,0.22)';
+    ctx.fillRect(x,mid,1,Math.max(1,h*0.8));
+   }
+  }}
+  if(ed.file&&ed.duration&&(!ed.waveState||ed.waveState==='idle'))ensureWavePeaks();
+ }
+ let _tlStripT=null;const tlStripSoon=()=>{if(_tlStripT)clearTimeout(_tlStripT);_tlStripT=setTimeout(renderTlStrip,120)};
+ ['start','end','rstart','rend'].forEach(id=>{const el=E(id);if(el)el.addEventListener('input',tlStripSoon)});
+ window.addEventListener('resize',tlStripSoon);
+ window.__waveHelpers={peaksFromPCM,normalizePeaks,tickIntervalFor,rulerTicks,waveSliceFor,renderTlStrip,ensureWavePeaks,waveSigOf,extractRuns:()=>wvExtractRuns,state:()=>({sig:ed.waveSig,state:ed.waveState,n:ed.wavePeaks?ed.wavePeaks.length:0})};
  /* --- draggable subtitle position (the reference studio's draggable texts):
     drag the live subtitle band up/down on the frame. The position is a
     fraction of the frame height, remembered on the editor + settings, used

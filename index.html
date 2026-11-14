@@ -477,6 +477,16 @@ function fmtDur(s){s=Math.max(0,Math.round(s||0));return Math.floor(s/60)+':'+St
 /* notices */
 let noticeTimer=null;
 function showNotice(msg,type){const n=$('#notice');n.textContent=msg;n.className='show '+(type||'info');clearTimeout(noticeTimer);noticeTimer=setTimeout(()=>{n.className=''},5200)}
+/* V240 (D8): last-resort error surface — a synchronous throw inside a
+   click handler (or a promise rejection nobody caught) used to vanish
+   silently and leave the UI wedged with no explanation. Surface the
+   real message through the notice, throttled so an error storm
+   cannot spam it. */
+let _jsErrAt=0;
+function surfaceJsError(msg){const m=String(msg==null?'':msg).trim().slice(0,180);if(!m)return;const now=Date.now();if(now-_jsErrAt<3000)return;_jsErrAt=now;try{showNotice('⚠️ Error: '+m,'err')}catch(e){}}
+window.addEventListener('error',e=>{surfaceJsError(e&&e.message)});
+window.addEventListener('unhandledrejection',e=>{const r=e&&e.reason;surfaceJsError(r&&r.message?r.message:r)});
+window.onerror=msg=>{surfaceJsError(msg);return false};
 function showDone(title,text){$('#doneTitle').textContent=title;$('#doneText').textContent=text;$('#donePop').classList.add('show')}
 $('#doneOk').addEventListener('click',()=>$('#donePop').classList.remove('show'));
 /* bottom sheet */
@@ -1530,7 +1540,10 @@ async function autoFitVoice(ed,targetSec){
    }
   }
   const eff=effSpeedOf(ed),fs=(Math.round(eff*100)/100).toFixed(2)+'×';
-  if(clamped)return '⚠️ အသံ '+natural.toFixed(1)+' စက္ကန့် က Video '+target.toFixed(1)+' စက္ကန့် နဲ့ အများကြီး ကွာနေပါတယ် — အမြန် '+fs+' (အများဆုံး) ပဲ ချိန်ထားပါတယ်၊ '+Math.abs(rendered-target).toFixed(1)+' စက္ကန့် ကွာနေဆဲပါ။ Script စာသား ပြင်/ဖြတ်ရန် သို့မဟုတ် ✂️ Trim အပိုင်းကို ညှိပါ။';
+  /* V240 (fix 9): ONE basis throughout — the rendered (post-clamp)
+     duration and the gap measured from it. The natural duration was
+     mixed in before, so the two numbers in this warning never agreed */
+  if(clamped)return '⚠️ အသံ '+rendered.toFixed(1)+' စက္ကန့် က Video '+target.toFixed(1)+' စက္ကန့် နဲ့ အများကြီး ကွာနေပါတယ် — အမြန် '+fs+' (အများဆုံး) ပဲ ချိန်ထားပါတယ်၊ '+Math.abs(rendered-target).toFixed(1)+' စက္ကန့် ကွာနေဆဲပါ။ Script စာသား ပြင်/ဖြတ်ရန် သို့မဟုတ် ✂️ Trim အပိုင်းကို ညှိပါ။';
   return '🎯 အသံ '+natural.toFixed(1)+' စက္ကန့် → Video '+target.toFixed(1)+' စက္ကန့် နဲ့ ကွက်တိ ('+fs+')';
  }catch(e){return null}
 }
@@ -1603,8 +1616,13 @@ async function exportOne(ff,ed,seg,idx,total,log,progs){
     W + opts are fixed for the whole export) render their PNG ONCE
     and reuse the bytes — repeated lines no longer pay the draw +
     PNG-encode again. Each write passes ffCopy: writeFile detaches
-    the caller's buffer, and a deduped buffer is written 2+ times. */
- if(useSub){const _tSub=expNow();const subOpts=subPngOpts(ed,S);const pngByKey=new Map();for(let i=0;i<seg.cues.length;i++){const fn='sub'+i+'.png';const cg=subBlockGeom(ed,G,seg.cues[i].text);const key=seg.cues[i].text+'\n'+cg.blockH;let pngB=pngByKey.get(key);if(!pngB){pngB=await textPNG(seg.cues[i].text,W,cg.blockH,subOpts);pngByKey.set(key,pngB)}await ff.writeFile(fn,ffCopy(pngB));prepStep('🖼️ စာတန်း ပုံများ ပြင်နေပါတယ်… ('+(i+1)+'/'+seg.cues.length+')');overlays.push({file:fn,y:cg.subY,from:seg.cues[i].start-seg.start,to:seg.cues[i].end-seg.start})}expPhaseLog(log,'စာတန်း ပုံများ',_tSub)}
+    the caller's buffer, and a deduped buffer is written 2+ times.
+    V239: the dedupe key also carries the strip's y offset (cg.subY)
+    in BOTH engines. Within one export subY is a pure function of
+    blockH + the editor's position settings, so identical cues
+    still share exactly one strip — and a strip is never reused
+    at a different offset. */
+ if(useSub){const _tSub=expNow();const subOpts=subPngOpts(ed,S);const pngByKey=new Map();for(let i=0;i<seg.cues.length;i++){const fn='sub'+i+'.png';const cg=subBlockGeom(ed,G,seg.cues[i].text);const key=seg.cues[i].text+'\n'+cg.blockH+'\n'+cg.subY;let pngB=pngByKey.get(key);if(!pngB){pngB=await textPNG(seg.cues[i].text,W,cg.blockH,subOpts);pngByKey.set(key,pngB)}await ff.writeFile(fn,ffCopy(pngB));prepStep('🖼️ စာတန်း ပုံများ ပြင်နေပါတယ်… ('+(i+1)+'/'+seg.cues.length+')');overlays.push({file:fn,y:cg.subY,from:seg.cues[i].start-seg.start,to:seg.cues[i].end-seg.start})}expPhaseLog(log,'စာတန်း ပုံများ',_tSub)}
  /* player-block overlays (🛡️ Logo watermark + ➕ free Text): same canvas-PNG pipeline,
     positions mapped from the dragged frame fractions just like the subtitle band */
  if(useLogo){const lp=await buildLogoPNG(ed,W);await ff.writeFile('logo.png',lp.bytes);const lx=Math.max(0,Math.min(W-lp.w,Math.round(((ed.logoX==null?0.10:ed.logoX))*W-lp.w/2)));const ly=Math.max(0,Math.min(H-lp.h,Math.round(((ed.logoY==null?0.08:ed.logoY))*H-lp.h/2)));prepStep('🖼️ Logo ပုံ ပြင်နေပါတယ်…');overlays.push({file:'logo.png',x:lx,y:ly,from:0,to:dur})}
@@ -2328,8 +2346,9 @@ async function exportOneHw(ff,ed,seg,idx,total,log,progs){
  if(useTitle){const tbh=Math.round(170*S);const tty=Math.max(0,Math.min(H-tbh,Math.round(((ed.titleY==null?0.15:ed.titleY))*H-tbh/2)));const img=await hwImgFromBytes(await textPNG($('#'+ed.p+'-title').value.trim(),W,tbh,{size:Math.round(((ed.titleSize||52))*S),color:(ed.titleColor||'#FFE92E'),cx:(ed.titleX==null?0.5:ed.titleX)}));if(!img)throw new Error('ခေါင်းစဉ် ပုံ ဖွင့် မရပါ');layers.title={img:img,x:0,y:tty};prepStep('🖼️ ခေါင်းစဉ် ပုံ ပြင်နေပါတယ်…')}
  /* V235: identical cues share ONE rendered PNG and ONE decoded
     Image (same dedupe key as exportOne: text + tight block height;
-    W + opts are fixed for the whole export) */
- if(useSub){const _tSub=expNow();const subOpts=subPngOpts(ed,S);const imgByKey=new Map();for(let i=0;i<seg.cues.length;i++){const cg=subBlockGeom(ed,G,seg.cues[i].text);const key=seg.cues[i].text+'\n'+cg.blockH;let img=imgByKey.get(key);if(!img){img=await hwImgFromBytes(await textPNG(seg.cues[i].text,W,cg.blockH,subOpts));if(!img)throw new Error('စာတန်း ပုံ ဖွင့် မရပါ');imgByKey.set(key,img)}layers.subs.push({img:img,y:cg.subY,from:seg.cues[i].start-seg.start,to:seg.cues[i].end-seg.start});prepStep('🖼️ စာတန်း ပုံများ ပြင်နေပါတယ်… ('+(i+1)+'/'+seg.cues.length+')')}expPhaseLog(log,'စာတန်း ပုံများ',_tSub)}
+    W + opts are fixed for the whole export). V239: the key also
+    carries the strip's y offset (cg.subY) — see exportOne. */
+ if(useSub){const _tSub=expNow();const subOpts=subPngOpts(ed,S);const imgByKey=new Map();for(let i=0;i<seg.cues.length;i++){const cg=subBlockGeom(ed,G,seg.cues[i].text);const key=seg.cues[i].text+'\n'+cg.blockH+'\n'+cg.subY;let img=imgByKey.get(key);if(!img){img=await hwImgFromBytes(await textPNG(seg.cues[i].text,W,cg.blockH,subOpts));if(!img)throw new Error('စာတန်း ပုံ ဖွင့် မရပါ');imgByKey.set(key,img)}layers.subs.push({img:img,y:cg.subY,from:seg.cues[i].start-seg.start,to:seg.cues[i].end-seg.start});prepStep('🖼️ စာတန်း ပုံများ ပြင်နေပါတယ်… ('+(i+1)+'/'+seg.cues.length+')')}expPhaseLog(log,'စာတန်း ပုံများ',_tSub)}
  if(useLogo){const lp=await buildLogoPNG(ed,W);const img=await hwImgFromBytes(lp.bytes);if(!img)throw new Error('Logo ပုံ ဖွင့် မရပါ');const lx=Math.max(0,Math.min(W-lp.w,Math.round(((ed.logoX==null?0.10:ed.logoX))*W-lp.w/2)));const ly=Math.max(0,Math.min(H-lp.h,Math.round(((ed.logoY==null?0.08:ed.logoY))*H-lp.h/2)));layers.logo={img:img,x:lx,y:ly};prepStep('🖼️ Logo ပုံ ပြင်နေပါတယ်…')}
  if(useText){const bh=Math.round(170*S);const ty=Math.max(0,Math.min(H-bh,Math.round((ed.textY||0.16)*H-bh/2)));const img=await hwImgFromBytes(await textPNG(ed.textStr.trim(),W,bh,{size:Math.round((ed.textSize||44)*S),color:(ed.textColor||'#FFFFFF'),cx:(ed.textX==null?0.5:ed.textX)}));if(!img)throw new Error('စာသား ပုံ ဖွင့် မရပါ');layers.text={img:img,x:0,y:ty};prepStep('🖼️ စာသား ပုံ ပြင်နေပါတယ်…')}
  const _tMix=expNow();
@@ -2950,25 +2969,69 @@ function cueSigFor(ed){
     the canonical split map) and the cue list is re-derived. The edited
     text is re-split by the same one-line rule if it no longer fits,
     and the voice goes stale through the normal text-change path, so
-    subtitle text and spoken text can never quietly diverge. (The
-    pop-up's manual times are re-derived in this branch; the 1:1
-    branch above keeps them, as before.) */
- function spliceCueTextToScript(i,newText){
-  const parts=canonicalSplit(ed);const part=parts[i];if(!part)return;
+    subtitle text and spoken text can never quietly diverge. (V240:
+    the splice now replaces ONLY the edited part's own span — located
+    by an in-order walk — so sibling texts stay byte-identical, and
+    the pop-up's manual times are re-applied to the re-split result
+    while unedited cues keep their pre-save times.) */
+ /* V240 (D7): pop-up time fields — Myanmar numerals (၀-၉) read as
+    ASCII digits; null when the value cannot be used at all (the Save
+    handler then keeps the old time WITH a warning, not silently) */
+ function parseCueTime(v){const s=String(v==null?'':v).replace(/[၀-၉]/g,d=>String('၀၁၂၃၄၅၆၇၈၉'.indexOf(d)));const n=parseFloat(s);return(isFinite(n)&&n>=0)?n:null}
+ /* V240 (D3): index alignment between the cue list and the canonical
+    split, MEASURED at save time — a cue Delete/Add (or any other
+    desync) makes the counts/texts differ, and the 1:1 / splice script
+    writes are only safe while this holds */
+ function cueTextsAligned(parts){if(!parts||parts.length!==ed.cues.length)return false;for(let i=0;i<parts.length;i++)if(parts[i].text!==ed.cues[i].text)return false;return true}
+ function spliceCueTextToScript(i,newText,ns,ne,parts){
+  parts=parts||canonicalSplit(ed);const part=parts[i];if(!part)return;
   const rawLines=(E('subs').value||'').split('\n');
   let seen=-1,ti=-1;
   for(let k=0;k<rawLines.length;k++){if(rawLines[k].trim()){seen++;if(seen===part.raw){ti=k;break}}}
   if(ti<0)return;
-  const rawText=rawLines[ti],old=ed.cues[i].text;
-  const pos=rawText.indexOf(old);
-  if(pos>=0)rawLines[ti]=rawText.slice(0,pos)+newText+rawText.slice(pos+old.length);
-  else{const sib=[];parts.forEach((pt,pi)=>{if(pt.raw===part.raw)sib.push(pi===i?newText:pt.text)});rawLines[ti]=sib.join(' ')}
+  const rawText=rawLines[ti],trimmed=rawText.trim(),lead=rawText.indexOf(trimmed);
+  const sib=[];parts.forEach((pt,pi)=>{if(pt.raw===part.raw)sib.push(pi)});
+  /* V240 (D2): locate EVERY sibling part's own span inside the parent
+     line, in order. The parts are consecutive trimmed slices of this
+     line, so an in-order indexOf walk finds each part's own occurrence
+     even when siblings repeat or are substrings of one another. (The
+     pre-V240 code read the "old" text AFTER the Save handler had
+     already overwritten it with the new text, so the exact splice
+     never matched and the line was rebuilt by joining siblings with
+     single spaces — losing non-space split points and trims.) Only
+     the edited span is replaced, so siblings stay byte-identical. */
+  let from=0;const spans={};
+  for(const pi of sib){const t=parts[pi].text,at=trimmed.indexOf(t,from);if(at<0)throw new Error('Cue splice failed: part not found in its script line');spans[pi]=[at,at+t.length];from=at+t.length}
+  const preCues=ed.cues.map(c=>({text:c.text,start:c.start,end:c.end}));
+  const sp=spans[i],newTrimmed=trimmed.slice(0,sp[0])+newText+trimmed.slice(sp[1]);
+  rawLines[ti]=rawText.slice(0,lead)+newTrimmed+rawText.slice(lead+trimmed.length);
   E('subs').value=rawLines.join('\n');
-  rebuildCues();checkVoiceStale();refreshVoiceGate();
+  rebuildCues();
+  if(newTrimmed.trim()){
+   /* the edited span after the re-split: this parent line's new parts
+      minus the unchanged siblings matched from the head (parts before
+      the edited one) and the tail (parts after it) */
+   const newParts=canonicalSplit(ed),run=[];
+   newParts.forEach((pt,pi)=>{if(pt.raw===part.raw)run.push(pi)});
+   const j=sib.indexOf(i),tail=sib.length-j-1;
+   let a=0;while(a<j&&a<run.length&&ed.cues[run[a]]&&ed.cues[run[a]].text===parts[sib[a]].text)a++;
+   let b=0;while(b<tail&&b<run.length-a&&ed.cues[run[run.length-1-b]]&&ed.cues[run[run.length-1-b]].text===parts[sib[sib.length-1-b]].text)b++;
+   const spanSet=new Set(run.slice(a,run.length-b));
+   /* V240 (D1): unedited cues keep their pre-save times (matched by
+      text, in order); only the edited span is re-timed — onto the
+      pop-up's ns..ne, scaled by the rebuilt boundaries */
+   const used=new Set();
+   ed.cues.forEach((cue,r)=>{if(spanSet.has(r))return;for(let k=0;k<preCues.length;k++){if(k===i||used.has(k))continue;if(preCues[k].text===cue.text){used.add(k);cue.start=preCues[k].start;cue.end=preCues[k].end;break}}});
+   if(spanSet.size){
+    const rc=[...spanSet].sort((x,y)=>x-y).map(r=>ed.cues[r]),o0=rc[0].start,o1=rc[rc.length-1].end,ospan=o1-o0;
+    rc.forEach(cue=>{const s=ospan>0?(cue.start-o0)/ospan:0,e=ospan>0?(cue.end-o0)/ospan:1;cue.start=ns+(ne-ns)*s;cue.end=ns+(ne-ns)*e});
+    rc[0].start=ns;rc[rc.length-1].end=ne;ed.cuesManual=true;
+   }
+  }
+  checkVoiceStale();refreshVoiceGate();
  }
  function openCuePop(i,fromSubs){
   const cue=ed.cues[i];if(!cue)return;
-  cuePopIdx=i;cuePopFromSubs=!!fromSubs;
   openSheet('✏️ Cue ပြင်ရန်','<div class="cue-pop">'
    +'<div class="field"><label>စာတန်း စာသား</label><textarea id="'+p+'-cpText" rows="3">'+escapeHtml(cue.text||'')+'</textarea></div>'
    +'<div class="row2"><div class="field"><label>စချိန် (စက္ကန့်)</label><input type="number" id="'+p+'-cpStart" step="0.1" min="0" value="'+cue.start.toFixed(1)+'"></div><div class="field"><label>ဆုံးချိန် (စက္ကန့်)</label><input type="number" id="'+p+'-cpEnd" step="0.1" min="0" value="'+cue.end.toFixed(1)+'"></div></div>'
@@ -2977,23 +3040,56 @@ function cueSigFor(ed){
    +'<button class="btn danger" id="'+p+'-cpDel" style="width:100%;margin-top:10px">🗑️ ဒီ cue ဖျက်</button></div>');
   /* any close path funnels through closeSheet -> flushSheet, so this
      onClose covers Save / delete / ✓ / backdrop uniformly */
+  /* V240 (D6): the index is assigned AFTER openSheet — openSheet
+     flushes the PREVIOUS sheet's onClose first, and a previous cue
+     pop-up's onClose resets cuePopIdx to -1; assigning it before the
+     call let that flush clobber the fresh index, after which Save
+     found no cue and silently closed the pop-up */
+  cuePopIdx=i;cuePopFromSubs=!!fromSubs;
   sheetOnClose=()=>{const back=cuePopFromSubs;cuePopFromSubs=false;cuePopIdx=-1;if(back)setTimeout(()=>openFeatureSheet('homeSubs','🎨 စာတန်း'),0)};
   E('cpSeek').onclick=()=>{const c=ed.cues[cuePopIdx];if(!c)return;try{vidEl.currentTime=c.start;vidEl.play().catch(()=>{})}catch(e){}updateOverlay(true)};
   E('cpSave').onclick=()=>{
-   const c=ed.cues[cuePopIdx];if(!c){closeSheet();return}
-   let sv=parseFloat(E('cpStart').value);if(isNaN(sv)||sv<0)sv=c.start;
-   let ev=parseFloat(E('cpEnd').value);if(isNaN(ev))ev=c.end;
-   const ns=Math.min(sv,Math.max(0,ev-0.1)),ne=Math.max(ev,ns+0.1);
-   const nt=E('cpText').value,textChanged=nt!==c.text;
-   c.start=ns;c.end=ne;c.text=nt;ed.cuesManual=true;
-   if(textChanged){if(ed.cues.length===scriptLines().length)syncCueTextToScript(cuePopIdx,nt);else spliceCueTextToScript(cuePopIdx,nt)}
-   renderCueList();updateCueCount();updateOverlay(true);renderTimeline();refreshSummaries();
-   showNotice('✅ Cue ပြင်ပြီးပါပြီ','ok');
-   closeSheet();
+   /* V240 (D4): the save is contained — a throw anywhere in the write
+      paths surfaces a true error notice and the pop-up still closes;
+      the success notice shows only when the save took effect */
+   try{
+    const c=ed.cues[cuePopIdx];if(!c){closeSheet();return}
+    /* V240 (D7): Myanmar-digit times normalize inside parseCueTime; a
+       time that still cannot be read keeps its old value WITH a
+       warning instead of silently */
+    let timeWarn=false;
+    let sv=parseCueTime(E('cpStart').value);if(sv==null){sv=c.start;timeWarn=true}
+    let ev=parseCueTime(E('cpEnd').value);if(ev==null){ev=c.end;timeWarn=true}
+    const ns=Math.min(sv,Math.max(0,ev-0.1)),ne=Math.max(ev,ns+0.1);
+    const nt=E('cpText').value,textChanged=nt!==c.text;
+    if(textChanged){
+     /* V240 (D2/D3): the script write path follows MEASURED alignment
+        (cueTextsAligned). While aligned: 1:1 counts rewrite the one
+        script line, split cues splice into their parent line. After a
+        Delete/Add desync the save is a cue-level (part) edit instead,
+        which can never rewrite the wrong script line */
+     const parts=canonicalSplit(ed),aligned=cueTextsAligned(parts);
+     if(aligned&&ed.cues.length===scriptLines().length){c.start=ns;c.end=ne;c.text=nt;ed.cuesManual=true;syncCueTextToScript(cuePopIdx,nt)}
+     else if(aligned&&nt.indexOf('\n')<0)spliceCueTextToScript(cuePopIdx,nt,ns,ne,parts);
+     else{c.start=ns;c.end=ne;c.text=nt;ed.cuesManual=true;checkVoiceStale();refreshVoiceGate()}
+    }else{c.start=ns;c.end=ne;ed.cuesManual=true}
+    renderCueList();updateCueCount();updateOverlay(true);renderTimeline();refreshSummaries();
+    if(timeWarn)showNotice('⚠️ အချိန် ဖတ်မရလို့ မူရင်း အချိန် ပြန်သုံးထားပါတယ် — ကျန်တာ သိမ်းပြီးပါပြီ','err');
+    else showNotice('✅ Cue ပြင်ပြီးပါပြီ','ok');
+   }catch(e){showNotice('⚠️ Cue သိမ်းမရပါ — '+humanErr(e),'err')}
+   finally{closeSheet()}
   };
   E('cpDel').onclick=()=>{
-   if(cuePopIdx>=0&&ed.cues[cuePopIdx]){ed.cues.splice(cuePopIdx,1);ed.cuesManual=true;renderCueList();updateCueCount();updateOverlay(true);renderTimeline();showNotice('🗑️ Cue ဖျက်ပြီးပါပြီ','ok')}
-   closeSheet();
+   /* V240 (D4): contained like Save — a throw surfaces a true error.
+      V240 (D2/D3): the delete also re-checks voice staleness (the
+      spoken line list no longer matches the cue list). ed.cuesSig is
+      deliberately NOT touched: its inputs (script, trim, voice) did
+      not change, so SRT download / export keep reading this manual
+      cue list — with the deleted cue gone — instead of re-deriving it */
+   try{
+    if(cuePopIdx>=0&&ed.cues[cuePopIdx]){ed.cues.splice(cuePopIdx,1);ed.cuesManual=true;renderCueList();updateCueCount();updateOverlay(true);renderTimeline();checkVoiceStale();refreshVoiceGate();showNotice('🗑️ Cue ဖျက်ပြီးပါပြီ','ok')}
+   }catch(e){showNotice('⚠️ Cue ဖျက်မရပါ — '+humanErr(e),'err')}
+   finally{closeSheet()}
   };
  }
  E('cueRebuild').onclick=()=>{if(!scriptLines().length){showNotice('⚠️ Cue ခွဲရန် မြန်မာ Script အရင် လိုပါတယ် — 📝 Script ထဲက "🎧 Original / ✨ New" နှိပ်ပြီး Script အရင် ထုတ်ပါ','err');openFeatureSheet('homeScript','📝 Script');return}rebuildCues(); /* V229: the mode buttons live in the Script sheet now */showNotice('✅ Script မှ cue '+ed.cues.length+' ခု ပြန်ခွဲပြီးပါပြီ','ok')};
@@ -3265,6 +3361,18 @@ function cueSigFor(ed){
  function enterPreview(){
   if(!ed.voiceCache||!ed.voiceUrl){showNotice('⚠️ စစ်ကြည့်ရန် အသံ အရင် လိုပါတယ် — 🎙️ Voice Create မှာ အသံ အရင် ထုတ်ပါ','err');goStep(2);return}
   if(!ed.file){showNotice('⚠️ Video ဖိုင် အရင် လိုပါတယ် — အပေါ်မှာ ရွေးပါ','err');goStep(0);return}
+  /* V240 (D5): a STALE voice must not play against cue times that
+     were re-derived from the edited script — the voice would speak
+     the old text over the new timings. Like the stage (V230),
+     Preview then plays the ORIGINAL audio only and says what to do;
+     the voice element is never started */
+  if(!voiceFresh()){
+   if(ed.url&&vidEl.src!==ed.url)vidEl.src=ed.url;
+   const r0=trimRange();if(vidEl.currentTime<r0.start||vidEl.currentTime>=r0.end)vidEl.currentTime=r0.start;
+   vidEl.muted=false;vidEl.volume=1;vidEl.play().catch(()=>{});
+   showNotice('⚠️ အသံ က Script နဲ့ မကိုက်တော့ပါ — Preview မှာ မူရင်း အသံနဲ့ပဲ ပြပါမယ်။ အသံ ပြန်ကိုက်အောင် 🎙️ Voice Create မှာ "📣 အသံ ထုတ်မယ်" ပြန်နှိပ်ပြီး အသံ အသစ် ထုတ်ပါ','err');
+   return;
+  }
   ensureCues();
   if(ed.url&&vidEl.src!==ed.url)vidEl.src=ed.url; /* preview always uses the original video */
   pvAudio.src=pvUseRendered()?ed.renderUrl:ed.voiceUrl;
@@ -4350,7 +4458,9 @@ function cueSigFor(ed){
   const qs=qtSrtEl();if(qs){const t=E('subTgl');qs.classList.toggle('on',!!(t&&t.classList.contains('on')))}
   const qv=qtVoiceEl();if(qv)qv.classList.toggle('on',ed.audioMode==='voice');
  }
- const qtS=qtSrtEl();if(qtS)qtS.onclick=()=>{const t=E('subTgl');if(t)t.click();syncMainToggles();updateOverlay()};
+ /* V240 (D9): the SRT quick toggle toasts its NEW state — it used to
+    flip silently, which read as "nothing happened" */
+ const qtS=qtSrtEl();if(qtS)qtS.onclick=()=>{const t=E('subTgl');if(t)t.click();syncMainToggles();updateOverlay();showNotice(t&&t.classList.contains('on')?'စာတန်း ဖွင့်ထားပါတယ်':'စာတန်း ပိတ်ထားပါတယ်','info')};
  const qtV=qtVoiceEl();if(qtV)qtV.onclick=()=>{
   if(ed.audioMode==='voice'){ed.audioMode='original'}
   else{ed.audioMode='voice';const dk=E('autoDuck');if(dk&&dk.checked)applyAutoDuck()}

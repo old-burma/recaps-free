@@ -1288,6 +1288,37 @@ function hwProbe(){
    builds, voice lines) poll ed._expCancel.hit between items. */
 let expCancelRace=null;
 function expCancelError(){const e=new Error('Export ကို ရပ်လိုက်ပါပြီ');e.cancelled=true;return e}
+/* V237: Wake Lock — the user sets the phone down during long runs and
+   the screen turning off stalls them, so while Script generation,
+   Voice Create or an Export runs, the screen Wake Lock is held. ONE
+   shared helper with reference counting: overlapping operations hold
+   a single lock until the LAST one ends (the export scope includes
+   its internal voice-generation phase — it acquires once, here).
+   The browser drops the lock by itself when the page is hidden; the
+   visibilitychange hook below re-acquires it when the page returns
+   while a covered operation is still running. Fail-soft throughout:
+   no Wake Lock API (older browser / non-secure context) or a
+   rejected request is a silent no-op and the operation runs exactly
+   as before. No UI, no settings — acquire/release only. */
+let _wlCount=0,_wlSentinel=null,_wlAsking=false;
+function _wlRequest(){
+ if(_wlSentinel||_wlAsking||_wlCount<1)return;
+ if(!('wakeLock' in navigator)||!navigator.wakeLock||typeof navigator.wakeLock.request!=='function')return;
+ _wlAsking=true;
+ let p;try{p=navigator.wakeLock.request('screen')}catch(e){_wlAsking=false;return}
+ Promise.resolve(p).then(s=>{
+  _wlAsking=false;
+  if(_wlCount<1){try{const r=s.release();if(r&&r.catch)r.catch(()=>{})}catch(e){}return}
+  _wlSentinel=s;
+  s.addEventListener('release',()=>{if(_wlSentinel===s){_wlSentinel=null;if(_wlCount>0&&!document.hidden)_wlRequest()}});
+ }).catch(()=>{_wlAsking=false});
+}
+function wlAcquire(){_wlCount++;_wlRequest()}
+function wlRelease(){
+ if(_wlCount>0)_wlCount--;
+ if(_wlCount===0&&_wlSentinel){const s=_wlSentinel;_wlSentinel=null;try{const r=s.release();if(r&&r.catch)r.catch(()=>{})}catch(e){}}
+}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&_wlCount>0)_wlRequest()});
 /* Raw ffmpeg.wasm log lines must never reach status elements: the wasm runtime
    prints a bare "Aborted()" line when an exec finishes/aborts, and streaming the
    log into the voice-step status made that text appear under the Create Voice
@@ -2384,6 +2415,7 @@ async function runExport(ed){
   if(expEtaEl)expEtaEl.textContent=expS.done?'':etaRunText();
  },250);
  const baseName=(ed.file.name||'recap').replace(/\.[^.]+$/,'').replace(/[^\w\- ]+/g,'').trim()||'recap';
+ wlAcquire(); /* V237: screen stays on for the whole export (incl. its voice phase) */
  try{
   log(expStartLine(ed._expOpts));
   const _tLoad=expNow();
@@ -2444,7 +2476,7 @@ async function runExport(ed){
   if(err&&err.cancelled){expS.pos=0;expS.ceil=0;expS.fracMax=0;etaRunEnd();expRender();if(expStageEl)expStageEl.textContent='⛔ ရပ်လိုက်ပါပြီ';if(expEtaEl)expEtaEl.textContent='';log('⛔ Export ကို ရပ်လိုက်ပါပြီ');showNotice('⛔ Export ကို ရပ်လိုက်ပါပြီ','info')}
   else{etaRunEnd();console.error(err);log('❌ '+humanErr(err));if(expStageEl)expStageEl.textContent='❌ မအောင်မြင်ပါ';logBox.style.display='block';if(logTgl)logTgl.textContent='📄 Log ဖျောက်ရန်';showNotice('❌ Export မအောင်မြင်ပါ: '+humanErr(err),'err')}
  }
- finally{if(expTimer)clearInterval(expTimer);expCancelRace=null;ed._expCancel=null;etaRunEnd();if(expCancelBtn)expCancelBtn.style.display='none';if(expEtaEl)expEtaEl.textContent='';if(expSetupEl)expSetupEl.style.display='';ed.busy=false;ed._cachedVoice=null;ed._cachedVoiceExt=null;btn.classList.remove('loading');btn.disabled=false;btn.querySelector('.btn-label').textContent='🎬 Export';if(window.__refreshFeatureSummaries)window.__refreshFeatureSummaries()}
+ finally{wlRelease();if(expTimer)clearInterval(expTimer);expCancelRace=null;ed._expCancel=null;etaRunEnd();if(expCancelBtn)expCancelBtn.style.display='none';if(expEtaEl)expEtaEl.textContent='';if(expSetupEl)expSetupEl.style.display='';ed.busy=false;ed._cachedVoice=null;ed._cachedVoiceExt=null;btn.classList.remove('loading');btn.disabled=false;btn.querySelector('.btn-label').textContent='🎬 Export';if(window.__refreshFeatureSummaries)window.__refreshFeatureSummaries()}
 }
 </script>
 <script>
@@ -3392,6 +3424,7 @@ function cueSigFor(ed){
   const mode=ed.aiMode;
   ed.aiBusy=true;[E('modeOrig'),E('modeNew')].forEach(b=>{if(b)b.disabled=true});
   genProgBegin(); /* V236: the spacer block tracks this run's real units */
+  wlAcquire(); /* V237: screen stays on while the script generates */
   try{
    showNotice('▶️ Recaps ဖန်တီးခြင်း စတင်ပါပြီ — '+modeLabel(),'info');
    /* stage (a): transcript \u2014 reuse when this exact video+trim already has one */
@@ -3423,7 +3456,7 @@ function cueSigFor(ed){
    showNotice('✅ Recaps ရပါပြီ — စာတန်းကို video ပေါ်မှာ စစ်ပြီး စိတ်ကြိုက် ပြင်နိုင်ပါတယ်','ok');
    goStep(1);
   }catch(err){console.error(err);setCreateStatus('❌ '+humanErr(err));showNotice('❌ Recaps လုပ်မရပါ: '+humanErr(err),'err')}
-  finally{genProgHide();ed.aiBusy=false;[E('modeOrig'),E('modeNew')].forEach(b=>{if(b)b.disabled=false})}
+  finally{genProgHide();wlRelease();ed.aiBusy=false;[E('modeOrig'),E('modeNew')].forEach(b=>{if(b)b.disabled=false})}
  }
  /* A deck mode-button tap = the Create run starts IMMEDIATELY (no second
     tap; the old Mode band and its sheet were removed in V208 — the two
@@ -3646,6 +3679,7 @@ function cueSigFor(ed){
   if(ed.ttsEngine==='gemini'&&!getApiKey()){showNotice('⚠️ Gemini TTS အတွက် Gemini API Key လိုပါတယ် — အောက်ခြေ toolbar က 🔑 Key မှာ သင့် key ထည့်ပါ (Edge TTS ဆိုရင် key မလိုပါ)','err');const ki=$('#recap-apiKey');ki.focus();ki.scrollIntoView({behavior:'smooth',block:'center'});return}
   ed.voiceBusy=true;const btn=E('voiceGen');busyBtn(btn,true,'အသံ ထုတ်နေပါတယ်…');
   setVoiceStatus('🎙️ အသံ ထုတ်နေပါတယ်…');showNotice('▶️ အသံ ထုတ်ခြင်း စတင်ပါပြီ','info');
+  wlAcquire(); /* V237: screen stays on while the voice generates */
   try{
    /* V219: the voice speaks the CANONICAL line list (one chunk per
       display line) — the same list the cues are built from */
@@ -3671,7 +3705,7 @@ function cueSigFor(ed){
       '✅ အသံ ရပါပြီ' DONE POP-UP, not just a toast */
    showDone('✅ အသံ ရပါပြီ','အသံ ထုတ်ပြီးပါပြီ — ဒီ pop-up ထဲက player မှာ နားထောင်ကြည့်ပါ။ Export မှာ ဒီ အသံကို ပြန်သုံးပါမယ်။');const adl2=E('audioDl');if(adl2){adl2.classList.remove('off');if(adl2.removeAttribute)adl2.removeAttribute('aria-disabled')}
   }catch(err){console.error(err);let m=err.message||String(err);if(ed.ttsEngine==='edge')m+=' — Edge TTS မရရင် Engine ကို Gemini သို့ ပြောင်းသုံးကြည့်ပါ';setVoiceStatus('❌ '+m);showNotice('❌ အသံ ထုတ်မရပါ: '+m,'err')}
-  finally{ed.voiceBusy=false;busyBtn(btn,false,'📣 အသံ ထုတ်မယ်');refreshVoiceGate();checkVoiceStale()}
+  finally{wlRelease();ed.voiceBusy=false;busyBtn(btn,false,'📣 အသံ ထုတ်မယ်');refreshVoiceGate();checkVoiceStale()}
  }
  E('voiceGen').onclick=runVoiceGen;
  /* mini player (custom controls over a hidden <audio>) */

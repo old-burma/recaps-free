@@ -887,7 +887,39 @@ function subTextLayout(x,text,W,opts){
  if(hasKw){kwLines=wrapKwLines(x,text,W-40);while(kwLines.length>2&&fs>floorFs){fs=Math.max(floorFs,fs-2);setF();kwLines=wrapKwLines(x,text,W-40)}if(kwLines.length>2)kwLines.length=2}
  else{lines=wrapAllLines(x,text,W-40);while(lines.length>2&&fs>floorFs){fs=Math.max(floorFs,fs-2);setF();lines=wrapAllLines(x,text,W-40)}if(lines.length>2)lines.length=2}
  const nLines=hasKw?kwLines.length:lines.length;
+ /* V235: keep each «kw» atom's measured width ON the layout — the
+    wrap already paid for these measurements, and textPNG's draw loop
+    used to measure every atom TWICE more (line total + advance).
+    Same context font, same strings -> the values are identical. */
+ if(hasKw&&kwLines)for(const atoms of kwLines)for(const a of atoms)a.w=x.measureText(a.t).width;
  return{fs:fs,hasKw:hasKw,lines:lines,kwLines:kwLines,nLines:nLines,lh:fs*1.45};
+}
+/* V235: the shared LAYOUT CACHE. Before V235 every subtitle cue was
+   laid out TWICE during export prep — subBlockHFor measured it on
+   the measure context, then textPNG laid it out again on its own
+   drawing context — and prep re-ran for every segment/export. The
+   layout depends only on (exact text + canvas width + the opts that
+   shape it: size, colours, band flag, align/cx/pad), so cache the
+   computed layout under that key and let BOTH consumers share it:
+   each unique cue is laid out ONCE. The layout math itself is
+   unchanged (subTextLayout above), so every value a consumer reads
+   — fs, lines, kwLines (with atom widths), nLines, lh, and hence
+   blockH and the drawn pixels — is identical to the uncached path.
+   Bounded (cleared wholesale at the cap) so a long session cannot
+   grow it without limit. */
+const _subLayoutCache=new Map();
+function subLayoutFor(x,text,W,opts){
+ opts=opts||{};
+ const key=JSON.stringify([String(text),W,opts.size||0,opts.color||'',opts.kw||'',opts.band?1:0,opts.align||'',opts.cx==null?'':opts.cx,opts.pad||0]);
+ let lay=_subLayoutCache.get(key);
+ if(lay){/* a hit skips subTextLayout, whose side effect of leaving
+    x.font at the final drawn size textPNG relies on — restore it */
+  if(x)try{x.font='700 '+lay.fs+'px Padauk, "Noto Sans Myanmar", sans-serif'}catch(e){}
+  return lay}
+ lay=subTextLayout(x,text,W,opts);
+ if(_subLayoutCache.size>=2000)_subLayoutCache.clear();
+ _subLayoutCache.set(key,lay);
+ return lay;
 }
 /* V234 (Fix D): the TIGHT subtitle block height at canvas width W —
    the rendered lines x line height + the plate padding when the band
@@ -896,21 +928,39 @@ function subTextLayout(x,text,W,opts){
 function subBlockHFor(text,W,opts){
  opts=opts||{};
  const x=subTextMeasureCtx();if(!x)return Math.round(170*(W/720));
- const lay=subTextLayout(x,text,W,opts);
+ const lay=subLayoutFor(x,text,W,opts);
  return Math.round(lay.nLines*lay.lh+(opts.band?Math.round(lay.fs*0.38)*2:0));
 }
 function textPNG(text,W,H,opts){opts=opts||{};const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');x.textAlign=opts.align==='left'?'left':'center';x.textBaseline='middle';
 /* V234: the layout comes from subTextLayout — the SAME function
    subBlockHFor measures with, so the drawn block and the geometry's
-   block height can never disagree */
-const _lay=subTextLayout(x,text,W,opts);const fs=_lay.fs,hasKw=_lay.hasKw,lines=_lay.lines,kwLines=_lay.kwLines;
+   block height can never disagree. V235: it comes through the shared
+   layout CACHE (subLayoutFor), so a cue already measured for its
+   block height is not laid out a second time here. */
+const _lay=subLayoutFor(x,text,W,opts);const fs=_lay.fs,hasKw=_lay.hasKw,lines=_lay.lines,kwLines=_lay.kwLines;
 const nLines=_lay.nLines;const lh=_lay.lh;const y0=H/2-((nLines-1)*lh)/2;
 /* V217 subtitle band: a translucent black plate behind the text block */
 if(opts.band){const padY=Math.round(fs*0.38),padX=Math.round(W*0.02);const bh=nLines*lh+padY*2,by=Math.max(0,y0-lh/2-padY);x.fillStyle='rgba(0,0,0,0.55)';x.fillRect(padX,by,W-padX*2,Math.min(H-by,bh))}
 /* draw x: left-aligned (logo) at opts.pad, else centred — optionally shifted by opts.cx (0..1 frame fraction, free-text overlay) */
 const txOf=()=>opts.align==='left'?(opts.pad||24):(W/2+((opts.cx!=null)?(opts.cx-0.5)*W:0));
-if(hasKw){x.textAlign='left';kwLines.forEach((atoms,i)=>{const y=y0+i*lh;const lw=atoms.reduce((s,a)=>s+x.measureText(a.t).width,0);let cx0=opts.align==='left'?(opts.pad||24):(W/2+((opts.cx!=null)?(opts.cx-0.5)*W:0)-lw/2);x.lineWidth=Math.max(6,fs/6);x.strokeStyle='rgba(0,0,0,0.85)';x.lineJoin='round';for(const a of atoms){const w=x.measureText(a.t).width;if(a.t!==' '){x.strokeText(a.t,cx0,y);x.shadowColor='rgba(0,0,0,0.7)';x.shadowBlur=6;x.fillStyle=a.kw?opts.kw:(opts.color||'#ffffff');x.fillText(a.t,cx0,y)}cx0+=w}})}
-else lines.forEach((ln,i)=>{const y=y0+i*lh;x.lineWidth=Math.max(6,fs/6);x.strokeStyle='rgba(0,0,0,0.85)';x.lineJoin='round';x.strokeText(ln,txOf(),y);x.shadowColor='rgba(0,0,0,0.7)';x.shadowBlur=6;x.fillStyle=opts.color||'#ffffff';x.fillText(ln,txOf(),y)});
+/* V235 (the 4-seconds-per-PNG fix): the old draw set shadowBlur=6 on
+   EVERY fillText — in the «kw» branch that is one full-canvas blur
+   pass PER GRAPHEME ATOM, on Android canvas the classic multi-second
+   killer (measured on the user's phone: 53 subtitle PNGs at ~4.0s
+   each, 2026-11-14). Shadows are GONE. The soft dark halo the shadow
+   produced (blur 6, black 0.7, zero offset, behind the fill) is
+   reproduced with a plain wider translucent STROKE pass under the
+   existing outline stroke: lineWidth +12 == the main stroke's reach
+   + ~6px a side, alpha 0.45, round joins — the same outer extent
+   and near the same weight, rendered as ordinary path strokes with
+   no blur pass. Honest note: a stroke edge is a step, not a Gaussian
+   falloff, so the fringe differs at pixel-peeping level; at video
+   scale the text, outline, plate and colours read identically.
+   «kw» advance widths come from the layout's cached atom widths
+   (a.w) instead of two fresh measureText calls per atom. */
+const lwMain=Math.max(6,fs/6),lwHalo=lwMain+12;
+if(hasKw){x.textAlign='left';x.lineJoin='round';kwLines.forEach((atoms,i)=>{const y=y0+i*lh;const wOf=a=>(a.w!=null?a.w:x.measureText(a.t).width);const lw=atoms.reduce((s,a)=>s+wOf(a),0);let cx0=opts.align==='left'?(opts.pad||24):(W/2+((opts.cx!=null)?(opts.cx-0.5)*W:0)-lw/2);for(const a of atoms){const w=wOf(a);if(a.t!==' '){x.lineWidth=lwHalo;x.strokeStyle='rgba(0,0,0,0.45)';x.strokeText(a.t,cx0,y);x.lineWidth=lwMain;x.strokeStyle='rgba(0,0,0,0.85)';x.strokeText(a.t,cx0,y);x.fillStyle=a.kw?opts.kw:(opts.color||'#ffffff');x.fillText(a.t,cx0,y)}cx0+=w}})}
+else{x.lineJoin='round';lines.forEach((ln,i)=>{const y=y0+i*lh;const txo=txOf();x.lineWidth=lwHalo;x.strokeStyle='rgba(0,0,0,0.45)';x.strokeText(ln,txo,y);x.lineWidth=lwMain;x.strokeStyle='rgba(0,0,0,0.85)';x.strokeText(ln,txo,y);x.fillStyle=opts.color||'#ffffff';x.fillText(ln,txo,y)})}
 return new Promise(res=>c.toBlob(b=>b.arrayBuffer().then(ab=>res(new Uint8Array(ab))),'image/png'))}
 /* V217: the ONE place subtitle PNG params are derived from the editor —
    body colour + contrasting «keyword» colour + band flag (used by
@@ -1349,6 +1399,19 @@ async function effectiveVoiceBytes(ed,pristine,ext,logFn,progFn){
  ed._effVoice={key,bytes:r.bytes,ext:r.ext};
  return ed._effVoice;
 }
+/* V235: per-phase export timing for the Log. A phone run's cost split
+   must be diagnosable from a Log screenshot (2026-11-14: 83s in, the
+   export was still on subtitle PNG 20/53 — invisible until the phase
+   was named). expPhaseLog appends ONE "⏱️ <phase>: X.Xs" line per
+   phase boundary through the export's existing log sink — the Log
+   view ONLY, never a toast or the progress caption. */
+function expNow(){return (typeof performance!=='undefined'&&performance&&typeof performance.now==='function')?performance.now():Date.now()}
+function expPhaseLog(log,label,t0){if(typeof log!=='function'||t0==null)return;const s=Math.max(0,(expNow()-t0)/1000);log('⏱️ '+label+': '+s.toFixed(1)+'s')}
+/* V235: the ONE Log line naming the path an export actually took —
+   engine (+ pacing for Hardware) + resolution, from the chooser's
+   _expOpts snapshot (absent snapshot = the pre-V221 programmatic
+   default: standard engine at 1080). */
+function expStartLine(opts){const o=opts||{};const eng=o.engine==='hw'?'Hardware':(o.engine==='mt'?'Multi-thread':'ပုံမှန်');return '🎬 Export: '+eng+(o.engine==='hw'?(' · '+(o.hwPace==='rt'?'▶️ Real-time':'⚡ Fast')):'')+' · '+(o.res||1080)}
 async function exportOne(ff,ed,seg,idx,total,log,progs){
  /* V220: progress is split — progs.prep(f,stage) covers everything BEFORE
     the encode (input write, voice write, title/subtitle/logo/text PNG
@@ -1393,7 +1456,12 @@ async function exportOne(ff,ed,seg,idx,total,log,progs){
  if(ed.audioMode==='voice'){if(ed._cachedVoice){log('✅ အသံ အပိုင်းမှာ ထုတ်ထားသော အသံကို ပြန်သုံးပါတယ်');voiceArr=ed._cachedVoice;voiceFile='voice.'+(ed._cachedVoiceExt||'wav')}else{log('အသံ ထုတ်နေပါတယ်…');const gv=await generateVoiceLines(ed,seg.cues.map(c=>c.text),log,(i,n)=>{if(prep)prep(Math.min(1,(prepN+(n?i/n:1))/Math.max(1,prepItems)),'🎙️ အသံ ထုတ်နေပါတယ်… ('+i+'/'+n+')')});voiceArr=gv.bytes;voiceFile='voice.'+gv.ext}await ff.writeFile(voiceFile,ffCopy(voiceArr))}prepStep('🎙️ အသံ ပြင်နေပါတယ်…');
  const overlays=[]; /* {file,y} */
  if(useTitle){const tbh=Math.round(170*S);const tty=Math.max(0,Math.min(H-tbh,Math.round(((ed.titleY==null?0.15:ed.titleY))*H-tbh/2)));await ff.writeFile('title.png',await textPNG($('#'+ed.p+'-title').value.trim(),W,tbh,{size:Math.round(((ed.titleSize||52))*S),color:(ed.titleColor||'#FFE92E'),cx:(ed.titleX==null?0.5:ed.titleX)}));prepStep('🖼️ ခေါင်းစဉ် ပုံ ပြင်နေပါတယ်…');overlays.push({file:'title.png',x:0,y:tty,from:0,to:dur})}
- if(useSub){for(let i=0;i<seg.cues.length;i++){const fn='sub'+i+'.png';const cg=subBlockGeom(ed,G,seg.cues[i].text);await ff.writeFile(fn,await textPNG(seg.cues[i].text,W,cg.blockH,subPngOpts(ed,S)));prepStep('🖼️ စာတန်း ပုံများ ပြင်နေပါတယ်… ('+(i+1)+'/'+seg.cues.length+')');overlays.push({file:fn,y:cg.subY,from:seg.cues[i].start-seg.start,to:seg.cues[i].end-seg.start})}}
+ /* V235: identical cues (same text -> same tight block height, and
+    W + opts are fixed for the whole export) render their PNG ONCE
+    and reuse the bytes — repeated lines no longer pay the draw +
+    PNG-encode again. Each write passes ffCopy: writeFile detaches
+    the caller's buffer, and a deduped buffer is written 2+ times. */
+ if(useSub){const _tSub=expNow();const subOpts=subPngOpts(ed,S);const pngByKey=new Map();for(let i=0;i<seg.cues.length;i++){const fn='sub'+i+'.png';const cg=subBlockGeom(ed,G,seg.cues[i].text);const key=seg.cues[i].text+'\n'+cg.blockH;let pngB=pngByKey.get(key);if(!pngB){pngB=await textPNG(seg.cues[i].text,W,cg.blockH,subOpts);pngByKey.set(key,pngB)}await ff.writeFile(fn,ffCopy(pngB));prepStep('🖼️ စာတန်း ပုံများ ပြင်နေပါတယ်… ('+(i+1)+'/'+seg.cues.length+')');overlays.push({file:fn,y:cg.subY,from:seg.cues[i].start-seg.start,to:seg.cues[i].end-seg.start})}expPhaseLog(log,'စာတန်း ပုံများ',_tSub)}
  /* player-block overlays (🛡️ Logo watermark + ➕ free Text): same canvas-PNG pipeline,
     positions mapped from the dragged frame fractions just like the subtitle band */
  if(useLogo){const lp=await buildLogoPNG(ed,W);await ff.writeFile('logo.png',lp.bytes);const lx=Math.max(0,Math.min(W-lp.w,Math.round(((ed.logoX==null?0.10:ed.logoX))*W-lp.w/2)));const ly=Math.max(0,Math.min(H-lp.h,Math.round(((ed.logoY==null?0.08:ed.logoY))*H-lp.h/2)));prepStep('🖼️ Logo ပုံ ပြင်နေပါတယ်…');overlays.push({file:'logo.png',x:lx,y:ly,from:0,to:dur})}
@@ -1463,6 +1531,7 @@ async function exportOne(ff,ed,seg,idx,total,log,progs){
  log('Video ထုတ်နေပါတယ် ('+(idx+1)+'/'+total+') — '+dur.toFixed(1)+' စက္ကန့်…');
  const wantMix=ed.audioMode==='voice'&&bgmF>0;
  if(runP)runP(0,'🎬 Video ထုတ်နေပါတယ် ('+(idx+1)+'/'+total+')');
+ const _tEnc=expNow();
  let code;
  if(ed.audioMode!=='voice'){
   code=await ffExecP(ff,buildArgs(false,true),3600000,dur,runP);
@@ -1472,6 +1541,7 @@ async function exportOne(ff,ed,seg,idx,total,log,progs){
   if(code!==0&&wantMix){log('ℹ️ မူရင်းအသံ ရောမရပါ (အသံ မပါသော video ဖြစ်နိုင်ပါတယ်) — voice သီးသန့်ဖြင့် ပြန်ထုတ်နေပါတယ်…');code=await ffExecP(ff,buildArgs(false),3600000,dur,runP)}
  }
  if(code!==0)throw new Error('ffmpeg exit code '+code+' — အသေးစိတ်ကို log တွင် ကြည့်ပါ');
+ expPhaseLog(log,'Encode ချိန်',_tEnc);
  if(runP)runP(1);
  const data=await ff.readFile('out'+idx+'.mp4');
  const blob=new Blob([data.buffer||data],{type:'video/mp4'});
@@ -2113,10 +2183,15 @@ async function exportOneHw(ff,ed,seg,idx,total,log,progs){
    decoded to drawables instead of written to MEMFS */
  const layers={title:null,subs:[],logo:null,text:null};
  if(useTitle){const tbh=Math.round(170*S);const tty=Math.max(0,Math.min(H-tbh,Math.round(((ed.titleY==null?0.15:ed.titleY))*H-tbh/2)));const img=await hwImgFromBytes(await textPNG($('#'+ed.p+'-title').value.trim(),W,tbh,{size:Math.round(((ed.titleSize||52))*S),color:(ed.titleColor||'#FFE92E'),cx:(ed.titleX==null?0.5:ed.titleX)}));if(!img)throw new Error('ခေါင်းစဉ် ပုံ ဖွင့် မရပါ');layers.title={img:img,x:0,y:tty};prepStep('🖼️ ခေါင်းစဉ် ပုံ ပြင်နေပါတယ်…')}
- if(useSub){for(let i=0;i<seg.cues.length;i++){const cg=subBlockGeom(ed,G,seg.cues[i].text);const img=await hwImgFromBytes(await textPNG(seg.cues[i].text,W,cg.blockH,subPngOpts(ed,S)));if(!img)throw new Error('စာတန်း ပုံ ဖွင့် မရပါ');layers.subs.push({img:img,y:cg.subY,from:seg.cues[i].start-seg.start,to:seg.cues[i].end-seg.start});prepStep('🖼️ စာတန်း ပုံများ ပြင်နေပါတယ်… ('+(i+1)+'/'+seg.cues.length+')')}}
+ /* V235: identical cues share ONE rendered PNG and ONE decoded
+    Image (same dedupe key as exportOne: text + tight block height;
+    W + opts are fixed for the whole export) */
+ if(useSub){const _tSub=expNow();const subOpts=subPngOpts(ed,S);const imgByKey=new Map();for(let i=0;i<seg.cues.length;i++){const cg=subBlockGeom(ed,G,seg.cues[i].text);const key=seg.cues[i].text+'\n'+cg.blockH;let img=imgByKey.get(key);if(!img){img=await hwImgFromBytes(await textPNG(seg.cues[i].text,W,cg.blockH,subOpts));if(!img)throw new Error('စာတန်း ပုံ ဖွင့် မရပါ');imgByKey.set(key,img)}layers.subs.push({img:img,y:cg.subY,from:seg.cues[i].start-seg.start,to:seg.cues[i].end-seg.start});prepStep('🖼️ စာတန်း ပုံများ ပြင်နေပါတယ်… ('+(i+1)+'/'+seg.cues.length+')')}expPhaseLog(log,'စာတန်း ပုံများ',_tSub)}
  if(useLogo){const lp=await buildLogoPNG(ed,W);const img=await hwImgFromBytes(lp.bytes);if(!img)throw new Error('Logo ပုံ ဖွင့် မရပါ');const lx=Math.max(0,Math.min(W-lp.w,Math.round(((ed.logoX==null?0.10:ed.logoX))*W-lp.w/2)));const ly=Math.max(0,Math.min(H-lp.h,Math.round(((ed.logoY==null?0.08:ed.logoY))*H-lp.h/2)));layers.logo={img:img,x:lx,y:ly};prepStep('🖼️ Logo ပုံ ပြင်နေပါတယ်…')}
  if(useText){const bh=Math.round(170*S);const ty=Math.max(0,Math.min(H-bh,Math.round((ed.textY||0.16)*H-bh/2)));const img=await hwImgFromBytes(await textPNG(ed.textStr.trim(),W,bh,{size:Math.round((ed.textSize||44)*S),color:(ed.textColor||'#FFFFFF'),cx:(ed.textX==null?0.5:ed.textX)}));if(!img)throw new Error('စာသား ပုံ ဖွင့် မရပါ');layers.text={img:img,x:0,y:ty};prepStep('🖼️ စာသား ပုံ ပြင်နေပါတယ်…')}
+ const _tMix=expNow();
  const mixFile=await hwMixedAudio(ff,ed,seg,voiceFile,idx,f=>{if(prep)prep(Math.min(1,(prepN+f)/Math.max(1,prepItems)),'🎙️ အသံ ရောနေပါတယ်…')});
+ expPhaseLog(log,'အသံ ရောချိန်',_tMix);
  if(!mixFile)log('ℹ️ အသံ မပါသော video — အသံ မပါဘဲ ထုတ်ပါတယ်');
  prepStep('🎙️ အသံ ပြင်နေပါတယ်…');
  log('Video ထုတ်နေပါတယ် ('+(idx+1)+'/'+total+') — '+dur.toFixed(1)+' စက္ကန့် (Hardware)…');
@@ -2127,11 +2202,15 @@ async function exportOneHw(ff,ed,seg,idx,total,log,progs){
     fallback, outcome logged); ▶️ Real-time is unchanged. */
  const hwPaceRt=!!(ed._expOpts&&ed._expOpts.hwPace==='rt');
  if(hwPaceRt)log('▶️ Real-time နည်းနဲ့ ထုတ်နေပါတယ် (video အရှည် အတိုင်း ကြာပါမည်)');
+ const _tEnc=expNow();
  const enc=hwPaceRt?await hwEncodeSegmentRt(ed,seg,plan,layers,runP?(f,info)=>runP(f*0.9,info):null)
                    :await hwEncodeSegmentFast(ed,seg,plan,layers,runP?(f,info)=>runP(f*0.9,info):null,log);
+ expPhaseLog(log,'Encode ချိန်',_tEnc);
  await ff.writeFile('hw_v'+idx+'.h264',enc.stream);
  const fpsStr=(enc.frames/Math.max(0.01,dur)).toFixed(3);
+ const _tMux=expNow();
  const code=await ffExecP(ff,hwMuxArgs(fpsStr,mixFile,idx),3600000,dur,runP?(f,info)=>runP(0.9+0.1*f,info):null);
+ expPhaseLog(log,'Mux ချိန်',_tMux);
  if(code!==0)throw new Error('ffmpeg exit code '+code+' (mux) — အသေးစိတ်ကို log တွင် ကြည့်ပါ');
  if(runP)runP(1);
  const data=await ff.readFile('out'+idx+'.mp4');
@@ -2255,12 +2334,16 @@ async function runExport(ed){
  },250);
  const baseName=(ed.file.name||'recap').replace(/\.[^.]+$/,'').replace(/[^\w\- ]+/g,'').trim()||'recap';
  try{
+  log(expStartLine(ed._expOpts));
+  const _tLoad=expNow();
   const ff=await getFFmpeg(log);
+  expPhaseLog(log,'Engine တင်ချိန်',_tLoad);
   if(expTok.hit)throw expCancelError();
   expSet(LOAD_W);
   const made=[];
   ed._cachedVoice=null;ed._cachedVoiceExt=null;
   if(ed.audioMode==='voice'){
+   const _tVoice=expNow();
    /* voice prep: reuse the voice section's voice when it matches, else generate; apply the
       speed controls; and NEVER silently trim a too-long voice mid-sentence —
       block with both durations + the speed needed (instructive error). */
@@ -2281,6 +2364,7 @@ async function runExport(ed){
    const rv=await effectiveVoiceBytes(ed,pristine,pext,log,voiceW?mkRun(LOAD_W+GEN_W,voiceW,'🎙️ အသံ အမြန် ပြင်နေပါတယ်…',effDur):undefined);
    ed._cachedVoice=rv.bytes;ed._cachedVoiceExt=rv.ext;
    if(effDur)log('🎙️ အသံ အမြန် '+eff.toFixed(2)+'× — အသံ '+effDur.toFixed(1)+' စက္ကန့် / video '+dur.toFixed(1)+' စက္ကန့်');
+   expPhaseLog(log,'အသံ ပြင်ဆင်မှု',_tVoice);
   }
   /* V219: the voice is fresh now (reused or just regenerated) — when the
      cues were not hand-timed, re-derive them from the voice's own chunk

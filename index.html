@@ -933,7 +933,35 @@ function expMtStatus(){
  if(typeof SharedArrayBuffer==='undefined')return{ok:false,reason:'ဒီ browser က SharedArrayBuffer မရပါ'};
  return{ok:true,reason:''};
 }
-function desiredEngine(){return (typeof SETTINGS!=='undefined'&&SETTINGS&&SETTINGS.expEngine==='mt'&&expMtStatus().ok)?'mt':'st'}
+function desiredEngine(){if(typeof SETTINGS==='undefined'||!SETTINGS)return'st';if(SETTINGS.expEngine==='mt')return expMtStatus().ok?'mt':'st';/* V223: the Hardware engine still uses an ffmpeg instance for its audio mix + final mux — give those runs the MT core when it is available (invisible plumbing; the video encode itself is WebCodecs) */if(SETTINGS.expEngine==='hw')return expMtStatus().ok?'mt':'st';return'st'}
+/* ================= V223: Hardware engine availability =================
+   The third export engine composites frames on a 2D canvas and encodes
+   them with the device's HARDWARE H.264 encoder via WebCodecs
+   (window.VideoEncoder). Availability is probed ONCE (async, cached):
+   VideoEncoder must exist AND isConfigSupported must accept an H.264
+   config (annexb preferred — its chunks feed the ffmpeg muxer as an
+   Annex-B elementary stream with no conversion; avcc accepted as a
+   fallback and converted in JS). The verdict drives the chooser row
+   exactly like expMtStatus does for MT: unsupported = dimmed + reason. */
+let _hwStatus={ok:false,reason:'Hardware encoder စစ်နေပါတယ်…',probing:true},_hwProbeP=null;
+function expHwStatus(){return _hwStatus}
+function hwProbe(){
+ if(_hwProbeP)return _hwProbeP;
+ _hwProbeP=(async()=>{
+  try{
+   if(typeof window==='undefined'||!window.VideoEncoder||typeof window.VideoEncoder.isConfigSupported!=='function'){_hwStatus={ok:false,reason:'ဒီ browser မှာ WebCodecs (VideoEncoder) မရပါ'};return _hwStatus}
+   const codecs=['avc1.640028','avc1.4D4028','avc1.42001F'],fmts=['annexb','avcc'];
+   for(const c of codecs){for(const f of fmts){
+    const cfg={codec:c,width:720,height:1280,bitrate:6000000,framerate:30,hardwareAcceleration:'prefer-hardware',avc:{format:f}};
+    try{const sup=await window.VideoEncoder.isConfigSupported(cfg);if(sup&&sup.supported){_hwStatus={ok:true,codec:c,format:f};return _hwStatus}}catch(e){}
+   }}
+   _hwStatus={ok:false,reason:'ဒီ device မှာ Hardware H.264 encoder မရပါ'};
+  }catch(e){_hwStatus={ok:false,reason:'Hardware encoder စစ် မရပါ'}}
+  finally{try{if(!ed.busy&&E('expEngines')&&typeof window!=='undefined'&&window.__recapExpSetup)window.__recapExpSetup()}catch(e){}} /* renderExpSetup lives in the studio block's closure — re-render via its bridge */
+  return _hwStatus;
+ })();
+ return _hwProbeP;
+}
 /* V220: export cancellation — exportEditor arms expCancelRace for the
    duration of an export; ffExecP races every exec against it, so a
    cancel rejects the in-flight exec at once (the cancel handler then
@@ -1006,6 +1034,7 @@ function coiSetup(){
  }catch(e){}
 }
 coiSetup();
+hwProbe(); /* V223: probe the Hardware (WebCodecs) engine once, up front, so the chooser verdict is cached before the user opens Export */
 /* V221 ETA — per-RUN throughput, replacing the V218/V220 whole-export
    elapsed÷fraction estimate, which CLIMBED mid-encode (live test:
    1:43 → 2:33 → 3:47) because slow later phases diluted the global
@@ -1234,6 +1263,244 @@ async function exportOne(ff,ed,seg,idx,total,log,progs){
  const blob=new Blob([data.buffer||data],{type:'video/mp4'});
  try{await ff.deleteFile('in.mp4')}catch(e){}
  return blob}
+/* ================= V223: Hardware export engine (WebCodecs) =================
+   A third engine beside the two wasm cores. It composites each output
+   frame on a 2D canvas and encodes with the device's HARDWARE H.264
+   encoder (window.VideoEncoder), then muxes the elementary stream
+   with the SAME mixed audio the wasm path produces (an audio-only
+   ffmpeg run over the identical mix graph) via `-c copy`. Only the
+   VIDEO encode moves to hardware; geometry, overlay content, audio
+   mixing and timings come from the very same derivations exportOne
+   uses, so the two engines produce the same edit — the hardware one
+   just encodes several times faster on a phone with an H.264 block.
+   Frame TIMING parity note: the wasm graph never retimes the video
+   by the render-speed factor (its setpts carries no speed term — the
+   factor applies to the voice via atempo and to cue timings via
+   voiceCueTimings only), so hardware frame timestamps are likewise
+   the source mediaTime relative to the trim start, UNSCALED; scaling
+   them would change the output duration and desync the mixed audio. */
+const hwSleep=ms=>new Promise(r=>setTimeout(r,ms));
+function hwBitrate(W,H,fps){return Math.max(1000000,Math.min(20000000,Math.round(W*H*(fps||30)*0.12/1000)*1000))}
+/* one frame's output timestamp (µs) from its presented mediaTime:
+   relative to the trim start, never negative, strictly increasing */
+function hwFrameTs(segStart,mediaTime,prevTs){let ts=Math.round(((isFinite(mediaTime)?mediaTime:segStart)-segStart)*1000000);if(ts<0)ts=0;if(prevTs!=null&&ts<=prevTs)ts=prevTs+1;return ts}
+/* batch form of the same math (durations = gaps; last = one frame) */
+function hwTsList(segStart,mediaTimes,fps){const out=[];let prev=null;for(let i=0;i<mediaTimes.length;i++){const ts=hwFrameTs(segStart,mediaTimes[i],prev);out.push({ts:ts,dur:0});prev=ts}for(let i=0;i<out.length;i++)out[i].dur=(i+1<out.length)?(out[i+1].ts-out[i].ts):Math.round(1000000/Math.max(1,fps||30));return out}
+function hwConcat(parts){let n=0;for(const p of parts)n+=p.length;const out=new Uint8Array(n);let o=0;for(const p of parts){out.set(p,o);o+=p.length}return out}
+const HW_SC=[0,0,0,1];
+function hwAvccToAnnexB(buf){const parts=[];let i=0;while(i+4<=buf.length){const len=((buf[i]<<24)|(buf[i+1]<<16)|(buf[i+2]<<8)|buf[i+3])>>>0;if(len<=0||i+4+len>buf.length)break;parts.push(HW_SC,buf.subarray(i+4,i+4+len));i+=4+len}return hwConcat(parts)}
+/* AVCDecoderConfigurationRecord -> Annex-B SPS/PPS block (prepended
+   to the first keyframe when the encoder emitted avcc chunks) */
+function hwAvcCToAnnexB(d){try{const parts=[];let i=5;const nSps=d[i++]&0x1f;for(let k=0;k<nSps;k++){const len=(d[i]<<8)|d[i+1];i+=2;parts.push(HW_SC,d.subarray(i,i+len));i+=len}const nPps=d[i++];for(let k=0;k<nPps;k++){const len=(d[i]<<8)|d[i+1];i+=2;parts.push(HW_SC,d.subarray(i,i+len));i+=len}return hwConcat(parts)}catch(e){return null}}
+function hwChunksToAnnexB(chunks,avcDesc,format){
+ if(format!=='avcc')return hwConcat(chunks.map(c=>c.buf));
+ const head=avcDesc?hwAvcCToAnnexB(avcDesc):null;const parts=[];let first=true;
+ for(const c of chunks){if(first&&c.type==='key'&&head)parts.push(head);first=false;parts.push(hwAvccToAnnexB(c.buf))}
+ return hwConcat(parts);
+}
+/* the mux command (route i): the Annex-B stream gets its timing from
+   -framerate (frames ÷ segment seconds, so the total duration is the
+   segment's), the mixed audio is stream-copied in beside it */
+function hwMuxArgs(fpsStr,audioFile,idx){const a=['-framerate',fpsStr,'-i','hw_v'+idx+'.h264'];if(audioFile)a.push('-i',audioFile);a.push('-map','0:v:0');if(audioFile)a.push('-map','1:a:0');a.push('-c','copy','-movflags','+faststart','out'+idx+'.mp4');return a}
+/* PURE frame plan: every pixel value mirrors exportOne's graph math
+   (same G/S, picY/subY formulas, region clamping, border width), so
+   the canvas compositor draws exactly the layout the graph encodes */
+function hwFramePlan(ed,seg,G){
+ const W=G.W,H=G.H,S=W/720,dur=seg.end-seg.start;
+ const vw=(ed&&ed.videoW)||1280,vh=(ed&&ed.videoH)||720;
+ const special=aspectSpecial916(ed);
+ let picY=0,subY;
+ if(special){picY=Math.round(H*0.21875);subY=Math.round(H*(1035/1280))}
+ else if(ed.aspect==='Original')subY=H-Math.round(170*S);
+ else subY=Math.round(0.81*H);
+ if(ed.subPosCustom)subY=Math.round(clampSubPos(ed.subPosY)*H);
+ const blurPx=Math.max(2,Math.round(((ed&&ed.blur)||28)/2*S));
+ let bg=null,fg;
+ if(ed.aspect!=='Original'){const sc=Math.max(W/vw,H/vh);const w=Math.round(vw*sc),h=Math.round(vh*sc);bg={x:Math.round((W-w)/2),y:Math.round((H-h)/2),w:w,h:h}}
+ if(special){const sc=Math.min(W/vw,W/vh);const w=Math.round(vw*sc),h=Math.round(vh*sc);fg={x:Math.round((W-w)/2),y:picY,w:w,h:h}}
+ else if(ed.aspect==='Original'){fg={x:0,y:0,w:W,h:H}}
+ else{const sc=Math.min(W/vw,H/vh);const w=Math.round(vw*sc),h=Math.round(vh*sc);fg={x:Math.round((W-w)/2),y:Math.round((H-h)/2),w:w,h:h}}
+ const regions=(ed.blurRegions||[]).filter(r=>r&&r.on&&r.w>0&&r.h>0).map(r=>{
+  const rx=Math.max(0,Math.min(W-4,Math.round(r.x*W))),ry=Math.max(0,Math.min(H-4,Math.round(r.y*H)));
+  const rw=Math.max(4,Math.min(W-rx,Math.round(r.w*W))),rh=Math.max(4,Math.min(H-ry,Math.round(r.h*H)));
+  const timed=!(r.full||!(r.end>r.start));
+  return{x:rx,y:ry,w:rw,h:rh,type:r.type==='mosaic'?'mosaic':'blur',blurPx:Math.max(2,Math.round(((r.strength||40)/2)*S)),block:Math.max(4,Math.round(((r.strength||40)/2)*S)),timed:timed,from:timed?Math.max(0,r.start||0):0,to:timed?Math.min(dur,r.end):dur};
+ });
+ const bI=Math.max(2,Math.round(((ed&&ed.borderW)||6)*S));
+ return{W:W,H:H,S:S,special:special,picY:picY,subY:subY,bandH:Math.round(170*S),blurPx:blurPx,bg:bg,fg:fg,regions:regions,border:{on:!!ed.borderOn,w:bI,color:String((ed&&ed.borderColor)||'#FFE92E')},dur:dur};
+}
+/* draw ONE composited frame in the ffmpeg graph's z-order: blurred
+   cover fill -> main picture -> blur/mosaic regions -> title ->
+   subtitle -> logo -> free text -> border */
+function hwDrawFrame(ctx,cv,plan,src,layers,t){
+ const W=plan.W,H=plan.H;
+ if(plan.bg){const e=plan.blurPx,b=plan.bg;ctx.save();if('filter' in ctx)ctx.filter='blur('+e+'px) brightness(0.9) saturate(0.85)';ctx.drawImage(src,b.x-e,b.y-e,b.w+2*e,b.h+2*e);ctx.restore()}
+ ctx.drawImage(src,plan.fg.x,plan.fg.y,plan.fg.w,plan.fg.h);
+ for(const r of plan.regions){
+  if(r.timed&&(t<r.from||t>r.to))continue;
+  const tmp=document.createElement('canvas');tmp.width=r.w;tmp.height=r.h;const tx=tmp.getContext('2d');if(!tx)continue;
+  tx.drawImage(cv,r.x,r.y,r.w,r.h,0,0,r.w,r.h);
+  if(r.type==='mosaic'||!('filter' in ctx)){
+   const sw=Math.max(1,Math.round(r.w/r.block)),sh=Math.max(1,Math.round(r.h/r.block));
+   const sm=document.createElement('canvas');sm.width=sw;sm.height=sh;const sx=sm.getContext('2d');
+   if(sx){sx.drawImage(tmp,0,0,sw,sh);tx.imageSmoothingEnabled=false;tx.clearRect(0,0,r.w,r.h);tx.drawImage(sm,0,0,r.w,r.h)}
+  }else{
+   const cp=document.createElement('canvas');cp.width=r.w;cp.height=r.h;const cx2=cp.getContext('2d');
+   if(cx2){cx2.drawImage(tmp,0,0);tx.filter='blur('+r.blurPx+'px)';tx.clearRect(0,0,r.w,r.h);tx.drawImage(cp,0,0)}
+  }
+  ctx.drawImage(tmp,r.x,r.y);
+ }
+ if(layers.title)ctx.drawImage(layers.title.img,layers.title.x,layers.title.y);
+ if(layers.subs)for(const s of layers.subs){if(t>=s.from&&t<s.to)ctx.drawImage(s.img,0,plan.subY)}
+ if(layers.logo)ctx.drawImage(layers.logo.img,layers.logo.x,layers.logo.y);
+ if(layers.text)ctx.drawImage(layers.text.img,layers.text.x,layers.text.y);
+ if(plan.border.on){const b=plan.border.w;ctx.fillStyle=plan.border.color;ctx.fillRect(b,b,W-2*b,b);ctx.fillRect(b,H-2*b,W-2*b,b);ctx.fillRect(b,b,b,H-2*b);ctx.fillRect(W-2*b,b,b,H-2*b)}
+}
+async function hwImgFromBytes(bytes){
+ if(!bytes)return null;
+ const blob=new Blob([bytes.buffer||bytes],{type:'image/png'});
+ if(typeof createImageBitmap==='function'){try{return await createImageBitmap(blob)}catch(e){}}
+ return loadImg(URL.createObjectURL(blob));
+}
+function hwWaitMeta(v){
+ return new Promise((res,rej)=>{
+  if(v.readyState>=1&&(v.videoWidth||0)>0)return res();
+  const to=setTimeout(()=>rej(new Error('video metadata မရပါ — ဖိုင် ပြန် ရွေးကြည့်ပါ')),10000);
+  v.addEventListener('loadedmetadata',()=>{clearTimeout(to);res()},{once:true});
+ });
+}
+/* step the hidden decoder to media time t and resolve with the
+   PRESENTED frame's mediaTime (requestVideoFrameCallback when the
+   browser has it, the seeked event otherwise); a 4s stall is a true
+   error, never a silent hang */
+function hwSeekWait(v,t){
+ return new Promise((res,rej)=>{
+  let done=false;
+  const to=setTimeout(()=>{if(!done){done=true;rej(new Error('frame decode ရပ်နေပါတယ် (seek timeout)'))}},4000);
+  const fin=mt=>{if(done)return;done=true;clearTimeout(to);res(isFinite(mt)?mt:v.currentTime)};
+  if(typeof v.requestVideoFrameCallback==='function')v.requestVideoFrameCallback((now,meta)=>fin(meta&&isFinite(meta.mediaTime)?meta.mediaTime:v.currentTime));
+  else{const h=()=>{v.removeEventListener('seeked',h);fin(v.currentTime)};v.addEventListener('seeked',h)}
+  try{v.currentTime=t}catch(e){fin(t)}
+ });
+}
+async function hwEncoderConfig(W,H,fps,st){
+ const base={width:W,height:H,bitrate:hwBitrate(W,H,fps),framerate:fps,hardwareAcceleration:'prefer-hardware'};
+ const codecs=['avc1.640034',st&&st.codec,'avc1.640028','avc1.4D4028','avc1.42001F'].filter((v,i,a)=>v&&a.indexOf(v)===i);
+ const fmts=[st&&st.format,'annexb','avcc'].filter((v,i,a)=>v&&a.indexOf(v)===i);
+ for(const c of codecs){for(const f of fmts){
+  const cfg=Object.assign({},base,{codec:c,avc:{format:f}});
+  try{const sup=await window.VideoEncoder.isConfigSupported(cfg);if(sup&&sup.supported)return sup.config||cfg}catch(e){}
+ }}
+ throw new Error('ဒီ အရွယ်အစားအတွက် Hardware H.264 config မရပါ ('+W+'×'+H+')');
+}
+/* the encode pump: seek-step the trim window at fpsOut, composite and
+   encode every frame with bounded-queue backpressure (frames are
+   never dropped), honouring the shared cancel token per frame */
+async function hwEncodeSegment(ed,seg,plan,layers,onProg){
+ const st=expHwStatus();if(!st.ok)throw new Error('Hardware engine မရပါ — '+st.reason);
+ const dur=seg.end-seg.start,fpsOut=30,totalFrames=Math.max(1,Math.round(dur*fpsOut)),frameDurUs=Math.round(1000000/fpsOut);
+ const chkCancel=()=>{if(ed._expCancel&&ed._expCancel.hit)throw expCancelError()};
+ const v=document.createElement('video');v.muted=true;try{v.setAttribute('playsinline','')}catch(e){}v.preload='auto';v.src=ed.url;
+ let enc=null;
+ try{
+  await hwWaitMeta(v);chkCancel();
+  const cv=document.createElement('canvas');cv.width=plan.W;cv.height=plan.H;
+  const ctx=cv.getContext('2d');if(!ctx)throw new Error('Canvas 2D context မရပါ');
+  const cfg=await hwEncoderConfig(plan.W,plan.H,fpsOut,st);chkCancel();
+  const chunks=[];let encErr=null,avcDesc=null;
+  enc=new window.VideoEncoder({
+   output:(chunk,meta)=>{try{const buf=new Uint8Array(chunk.byteLength);chunk.copyTo(buf);chunks.push({buf:buf,type:chunk.type});if(meta&&meta.decoderConfig&&meta.decoderConfig.description&&!avcDesc)avcDesc=new Uint8Array(meta.decoderConfig.description)}catch(e){if(!encErr)encErr=e}},
+   error:e=>{if(!encErr)encErr=e}
+  });
+  try{enc.configure(cfg)}catch(e){throw new Error('Hardware encoder configure မရပါ: '+((e&&e.message)||e))}
+  const fmt=(cfg.avc&&cfg.avc.format)||st.format||'annexb';
+  let frames=0,prevTs=null;
+  for(let i=0;i<totalFrames;i++){
+   chkCancel();if(encErr)throw new Error('Hardware encoder error: '+((encErr&&encErr.message)||encErr));
+   while(enc.encodeQueueSize>8){await hwSleep(10);chkCancel();if(encErr)throw new Error('Hardware encoder error: '+((encErr&&encErr.message)||encErr))}
+   const mt=await hwSeekWait(v,Math.min(seg.start+i/fpsOut,seg.end-0.001));chkCancel();
+   const ts=hwFrameTs(seg.start,mt,prevTs);prevTs=ts;
+   hwDrawFrame(ctx,cv,plan,v,layers,ts/1000000);
+   const vf=new window.VideoFrame(cv,{timestamp:ts,duration:frameDurUs});
+   try{enc.encode(vf,{keyFrame:frames===0||frames%150===0})}finally{vf.close()}
+   frames++;
+   if(onProg)onProg(frames/totalFrames,{timeUs:Math.round(frames/fpsOut*1000000)});
+  }
+  chkCancel();
+  try{await enc.flush()}catch(e){if(!encErr)encErr=e}
+  if(encErr)throw new Error('Hardware encoder error: '+((encErr&&encErr.message)||encErr));
+  if(!frames)throw new Error('frame တစ်ပုံမှ မရပါ');
+  return{stream:hwChunksToAnnexB(chunks,avcDesc,fmt),frames:frames,format:fmt};
+ }finally{
+  if(enc){try{enc.close()}catch(e){}}
+  try{v.pause()}catch(e){}
+  try{v.removeAttribute('src');v.load()}catch(e){}
+ }
+}
+/* the mixed audio track, produced by an audio-only ffmpeg run over
+   the SAME mix math as exportOne's fcMix (mixGains, apad/atrim,
+   amix) — or, in original mode, the same copy-then-AAC order as
+   buildArgs. Returns the MEMFS file name, or null in original mode
+   when the source has no audio at all (the wasm path then ships a
+   video-only MP4, and so does the mux here). */
+async function hwMixedAudio(ff,ed,seg,voiceFile,idx,onMix){
+ const _mg=mixGains(ed);const bgmF=_mg.bgm,voiceF=_mg.voice;const dur=seg.end-seg.start;
+ const out='hw_mix'+idx+'.m4a';
+ if(ed.audioMode==='voice'){
+  const wantMix=bgmF>0;
+  const fcMixA='[0:a]atrim=start='+seg.start+':end='+seg.end+',asetpts=PTS-STARTPTS,volume='+bgmF.toFixed(3)+'[abg];[1:a]volume='+voiceF.toFixed(3)+',apad,atrim=0:'+dur.toFixed(2)+'[avc];[abg][avc]amix=inputs=2:duration=first:dropout_transition=0[aout]';
+  const args=mix=>mix?['-i','in.mp4','-i',voiceFile,'-filter_complex',fcMixA,'-map','[aout]','-c:a','aac','-b:a','128k','-t',dur.toFixed(2),out]
+                     :['-i',voiceFile,'-af','volume='+voiceF.toFixed(3)+',apad,atrim=0:'+dur.toFixed(2),'-c:a','aac','-b:a','128k',out];
+  let code=await ffExecP(ff,args(wantMix),3600000,dur,onMix||null);
+  if(code!==0&&wantMix){code=await ffExecP(ff,args(false),3600000,dur,onMix||null)}
+  if(code!==0)throw new Error('ffmpeg exit code '+code+' (အသံ ရောရာတွင်)');
+  return out;
+ }
+ let code=await ffExecP(ff,['-i','in.mp4','-map','0:a?','-vn','-c:a','copy','-t',dur.toFixed(2),out],3600000,dur,onMix||null);
+ if(code!==0)code=await ffExecP(ff,['-i','in.mp4','-map','0:a?','-vn','-af','atrim=0:'+dur.toFixed(2)+',asetpts=PTS-STARTPTS','-c:a','aac','-b:a','128k','-t',dur.toFixed(2),out],3600000,dur,onMix||null);
+ if(code!==0)return null;
+ return out;
+}
+/* exportOne's twin for the Hardware engine: identical signature and
+   prep/progress contract; only the video encode differs */
+async function exportOneHw(ff,ed,seg,idx,total,log,progs){
+ const prep=progs&&progs.prep,runP=progs&&progs.run;
+ const dur=seg.end-seg.start;
+ const G=exportGeom(ed);const W=G.W,H=G.H,S=W/720;
+ const plan=hwFramePlan(ed,seg,G);
+ const useSub=$('#'+ed.p+'-subTgl').classList.contains('on')&&seg.cues.length;
+ const incT=!ed._expOpts||ed._expOpts.incTitle!==false,incL=!ed._expOpts||ed._expOpts.incLogo!==false;
+ const useTitle=incT&&$('#'+ed.p+'-titleTgl').classList.contains('on')&&($('#'+ed.p+'-title').value||'').trim();
+ const useLogo=!!ed.logoOn&&incL;
+ const useText=!!(ed.textOn&&(ed.textStr||'').trim());
+ const fetchFile=window.FFmpegUtil&&window.FFmpegUtil.fetchFile;
+ const prepItems=1+(ed.audioMode==='voice'?1:0)+(useTitle?1:0)+(useSub?seg.cues.length:0)+(useLogo?1:0)+(useText?1:0)+1/* audio mix */;
+ let prepN=0;const prepStep=st=>{if(ed._expCancel&&ed._expCancel.hit)throw expCancelError();prepN++;if(prep)prep(Math.min(1,prepN/Math.max(1,prepItems)),st)};
+ await ff.writeFile('in.mp4',fetchFile?await fetchFile(ed.file):new Uint8Array(await ed.file.arrayBuffer()));prepStep('📥 ဖိုင် ပြင်နေပါတယ်…');
+ let voiceFile='voice.wav';
+ if(ed.audioMode==='voice'){let voiceArr;if(ed._cachedVoice){log('✅ အသံ အပိုင်းမှာ ထုတ်ထားသော အသံကို ပြန်သုံးပါတယ်');voiceArr=ed._cachedVoice;voiceFile='voice.'+(ed._cachedVoiceExt||'wav')}else{log('အသံ ထုတ်နေပါတယ်…');const gv=await generateVoiceLines(ed,seg.cues.map(c=>c.text),log,(i,n)=>{if(prep)prep(Math.min(1,(prepN+(n?i/n:1))/Math.max(1,prepItems)),'🎙️ အသံ ထုတ်နေပါတယ်… ('+i+'/'+n+')')});voiceArr=gv.bytes;voiceFile='voice.'+gv.ext}await ff.writeFile(voiceFile,ffCopy(voiceArr))}prepStep('🎙️ အသံ ပြင်နေပါတယ်…');
+ /* overlay images: the SAME PNG bytes exportOne would overlay,
+   decoded to drawables instead of written to MEMFS */
+ const layers={title:null,subs:[],logo:null,text:null};
+ if(useTitle){const tbh=Math.round(170*S);const tty=Math.max(0,Math.min(H-tbh,Math.round(((ed.titleY==null?0.15:ed.titleY))*H-tbh/2)));const img=await hwImgFromBytes(await textPNG($('#'+ed.p+'-title').value.trim(),W,tbh,{size:Math.round(((ed.titleSize||52))*S),color:'#FFE92E',cx:(ed.titleX==null?0.5:ed.titleX)}));if(!img)throw new Error('ခေါင်းစဉ် ပုံ ဖွင့် မရပါ');layers.title={img:img,x:0,y:tty};prepStep('🖼️ ခေါင်းစဉ် ပုံ ပြင်နေပါတယ်…')}
+ if(useSub){for(let i=0;i<seg.cues.length;i++){const img=await hwImgFromBytes(await textPNG(seg.cues[i].text,W,Math.round(170*S),subPngOpts(ed,S)));if(!img)throw new Error('စာတန်း ပုံ ဖွင့် မရပါ');layers.subs.push({img:img,from:seg.cues[i].start-seg.start,to:seg.cues[i].end-seg.start});prepStep('🖼️ စာတန်း ပုံများ ပြင်နေပါတယ်… ('+(i+1)+'/'+seg.cues.length+')')}}
+ if(useLogo){const lp=await buildLogoPNG(ed,W);const img=await hwImgFromBytes(lp.bytes);if(!img)throw new Error('Logo ပုံ ဖွင့် မရပါ');const lx=Math.max(0,Math.min(W-lp.w,Math.round(((ed.logoX==null?0.10:ed.logoX))*W-lp.w/2)));const ly=Math.max(0,Math.min(H-lp.h,Math.round(((ed.logoY==null?0.08:ed.logoY))*H-lp.h/2)));layers.logo={img:img,x:lx,y:ly};prepStep('🖼️ Logo ပုံ ပြင်နေပါတယ်…')}
+ if(useText){const bh=Math.round(170*S);const ty=Math.max(0,Math.min(H-bh,Math.round((ed.textY||0.16)*H-bh/2)));const img=await hwImgFromBytes(await textPNG(ed.textStr.trim(),W,bh,{size:Math.round((ed.textSize||44)*S),cx:(ed.textX==null?0.5:ed.textX)}));if(!img)throw new Error('စာသား ပုံ ဖွင့် မရပါ');layers.text={img:img,x:0,y:ty};prepStep('🖼️ စာသား ပုံ ပြင်နေပါတယ်…')}
+ const mixFile=await hwMixedAudio(ff,ed,seg,voiceFile,idx,f=>{if(prep)prep(Math.min(1,(prepN+f)/Math.max(1,prepItems)),'🎙️ အသံ ရောနေပါတယ်…')});
+ if(!mixFile)log('ℹ️ အသံ မပါသော video — အသံ မပါဘဲ ထုတ်ပါတယ်');
+ prepStep('🎙️ အသံ ပြင်နေပါတယ်…');
+ log('Video ထုတ်နေပါတယ် ('+(idx+1)+'/'+total+') — '+dur.toFixed(1)+' စက္ကန့် (Hardware)…');
+ if(runP)runP(0,'🎬 Hardware နဲ့ ထုတ်နေပါတယ် ('+(idx+1)+'/'+total+')');
+ const enc=await hwEncodeSegment(ed,seg,plan,layers,runP?(f,info)=>runP(f*0.9,info):null);
+ await ff.writeFile('hw_v'+idx+'.h264',enc.stream);
+ const fpsStr=(enc.frames/Math.max(0.01,dur)).toFixed(3);
+ const code=await ffExecP(ff,hwMuxArgs(fpsStr,mixFile,idx),3600000,dur,runP?(f,info)=>runP(0.9+0.1*f,info):null);
+ if(code!==0)throw new Error('ffmpeg exit code '+code+' (mux) — အသေးစိတ်ကို log တွင် ကြည့်ပါ');
+ if(runP)runP(1);
+ const data=await ff.readFile('out'+idx+'.mp4');
+ const blob=new Blob([data.buffer||data],{type:'video/mp4'});
+ try{await ff.deleteFile('in.mp4')}catch(e){}
+ return blob}
 async function exportEditor(ed){
  if(ed.busy)return;const p=ed.p,E=id=>$('#'+p+'-'+id);clearErrs(p);
  /* --- validation BEFORE any processing (instructive errors) --- */
@@ -1382,7 +1649,16 @@ async function runExport(ed){
      timeline so the burned subtitles match the speech exactly. */
   if(ed.audioMode==='voice'&&ed.voiceCache&&ed.voiceCache.chunkDurs&&!ed.cuesManual){cues=unifiedCues(ed);ed.cues=cues;ed.cuesSig=cueSigFor(ed);assignCues(cues)}
   let segBase=LOAD_W+GEN_W+voiceW;
-  for(let i=0;i<segments.length;i++){if(expTok.hit)throw expCancelError();const segDurI=segments[i].end-segments[i].start;const pwI=prepWOf(segments[i]);const blob=await exportOne(ff,ed,segments[i],i,segments.length,log,{prep:phProg(segBase,pwI),run:mkRun(segBase+pwI,segDurI,'🎬 Video ထုတ်နေပါတယ် ('+(i+1)+'/'+segments.length+')',segDurI)});segBase+=pwI+segDurI;
+  for(let i=0;i<segments.length;i++){if(expTok.hit)throw expCancelError();const segDurI=segments[i].end-segments[i].start;const pwI=prepWOf(segments[i]);const segProgs={prep:phProg(segBase,pwI),run:mkRun(segBase+pwI,segDurI,'🎬 Video ထုတ်နေပါတယ် ('+(i+1)+'/'+segments.length+')',segDurI)};
+   /* V223: the chooser's engine snapshot decides per segment — the
+      Hardware engine on failure shows its TRUE error (runExport's
+      catch) plus this hint; it never silently switches engines */
+   let blob;
+   if(ed._expOpts&&ed._expOpts.engine==='hw'){
+    try{blob=await exportOneHw(ff,ed,segments[i],i,segments.length,log,segProgs)}
+    catch(he){if(!(he&&he.cancelled))log('⚠️ Hardware engine မအောင်မြင်ပါ — Export setup မှာ ⚡ Multi-thread / 🎬 ပုံမှန် engine ပြောင်း ကြိုးစားပါ');throw he}
+   }else blob=await exportOne(ff,ed,segments[i],i,segments.length,log,segProgs);
+   segBase+=pwI+segDurI;
    const name=baseName+(segments.length>1?'_part'+(i+1):'')+'.mp4';
    const segSrt=segments[i].cues.length?buildSRT(segments[i].cues,segments[i].start,segments[i].end):'';try{await idbAdd({name,date:Date.now(),size:blob.size,blob,srt:segSrt})}catch(e){log('⚠️ နောက်ခံ သိမ်းဆည်းမှု မအောင်မြင်ပါ — ဒေါင်း link မှ ယူပါ')}made.push({name,blob});log('✅ '+name+' — '+fmtSize(blob.size))}
   expSet(expTotal-FIN_W,'💾 ဖိုင် ပြင်ဆင်နေပါတယ်…');
@@ -2925,18 +3201,26 @@ function cueSigFor(ed){
     The strip's Export segment validates (exportEditor) and lands
     here in a SETUP state; 🎬 Export စတင် snapshots the choices into
     ed._expOpts and calls runExport. Engine rows are built from the
-    EXP_ENGINES list so a third engine (Hardware, a later build)
-    slots in without new markup. Engine + resolution persist via
-    SETTINGS; the include toggles are per-export only and reset to
-    ON at every render (they appear only when the element exists). */
- const EXP_ENGINES=[{id:'mt',label:'⚡ Multi-thread',desc:'ffmpeg core များ အားလုံး သုံးပြီး ပို မြန်သည်'},{id:'st',label:'🎬 ပုံမှန်',desc:'Single-thread core — အခု သုံးနေကျ engine'}];
- function expChosenEngine(){const w=SETTINGS.expEngine;if(w==='mt')return expMtStatus().ok?'mt':'st';if(w==='st')return 'st';return expMtStatus().ok?'mt':'st'}
+    EXP_ENGINES list. Engine + resolution persist via SETTINGS; the
+    include toggles are per-export only and reset to ON at every
+    render (they appear only when the element exists).
+    V223: the third engine — ⚡ Hardware (WebCodecs) — heads the list.
+    Availability per engine comes from its status probe (expHwStatus /
+    expMtStatus); an unavailable engine renders dimmed with its reason
+    and refuses selection with the same notice. Default (no persisted
+    choice) = best available: Hardware > MT > standard; a persisted
+    choice is honoured only while it is still available. */
+ const EXP_ENGINES=[{id:'hw',label:'⚡ Hardware',desc:'ဖုန်း chip (WebCodecs) နဲ့ ထုတ်တာ — အမြန်ဆုံး'},{id:'mt',label:'⚡ Multi-thread',desc:'ffmpeg core များ အားလုံး သုံးပြီး ပို မြန်သည်'},{id:'st',label:'🎬 ပုံမှန်',desc:'Single-thread core — အခု သုံးနေကျ engine'}];
+ function expEngineStatus(id){if(id==='hw')return expHwStatus();if(id==='mt')return expMtStatus();return{ok:true,reason:''}}
+ function expBestEngine(){return expHwStatus().ok?'hw':(expMtStatus().ok?'mt':'st')}
+ function expChosenEngine(){const w=SETTINGS.expEngine;if(w==='hw'||w==='mt'||w==='st')return expEngineStatus(w).ok?w:expBestEngine();return expBestEngine()}
  function expChosenRes(){return (SETTINGS.expRes===640||SETTINGS.expRes===720)?SETTINGS.expRes:1080}
  function renderExpSetup(){
   const box=E('expEngines');if(!box)return;
-  const chosen=expChosenEngine(),mtSt=expMtStatus();
-  box.innerHTML=EXP_ENGINES.map(en=>{const un=en.id==='mt'&&!mtSt.ok;return '<button class="opt'+(chosen===en.id?' sel':'')+(un?' dim':'')+'" data-eng="'+en.id+'"><b>'+en.label+'</b><span>'+(un?mtSt.reason:en.desc)+'</span></button>'}).join('');
-  box.querySelectorAll('.opt').forEach(b=>{b.onclick=()=>{const id=b.dataset.eng;if(id==='mt'&&!expMtStatus().ok){showNotice('⚠️ Multi-thread မရပါ — '+expMtStatus().reason,'err');return}SETTINGS.expEngine=id;saveSettings();renderExpSetup()}});
+  if(_hwStatus.probing)hwProbe();
+  const chosen=expChosenEngine();
+  box.innerHTML=EXP_ENGINES.map(en=>{const st=expEngineStatus(en.id),un=!st.ok;return '<button class="opt'+(chosen===en.id?' sel':'')+(un?' dim':'')+'" data-eng="'+en.id+'"><b>'+en.label+'</b><span>'+(un?st.reason:en.desc)+'</span></button>'}).join('');
+  box.querySelectorAll('.opt').forEach(b=>{b.onclick=()=>{const id=b.dataset.eng,st=expEngineStatus(id);if(!st.ok){showNotice('⚠️ '+(EXP_ENGINES.find(e=>e.id===id)||{}).label+' မရပါ — '+st.reason,'err');return}SETTINGS.expEngine=id;saveSettings();renderExpSetup()}});
   const res=expChosenRes();
   $$('#'+p+'-expResRow .opt').forEach(b=>{b.classList.toggle('sel',parseInt(b.dataset.res,10)===res);b.onclick=()=>{SETTINGS.expRes=parseInt(b.dataset.res,10)||1080;saveSettings();renderExpSetup()}});
   const hasTitle=E('titleTgl').classList.contains('on')&&!!(E('title').value||'').trim();
@@ -2949,10 +3233,10 @@ function cueSigFor(ed){
  }
  window.__recapExpSetup=()=>renderExpSetup();
  const expStartBtn=E('expStart');if(expStartBtn)expStartBtn.onclick=()=>{
-  ed._expOpts={res:expChosenRes(),incTitle:!(E('expIncTitle')&&!E('expIncTitle').classList.contains('on')),incLogo:!(E('expIncLogo')&&!E('expIncLogo').classList.contains('on'))};
+  ed._expOpts={engine:expChosenEngine(),res:expChosenRes(),incTitle:!(E('expIncTitle')&&!E('expIncTitle').classList.contains('on')),incLogo:!(E('expIncLogo')&&!E('expIncLogo').classList.contains('on'))};
   runExport(ed)};
  const expSetupResetBtn=E('expSetupReset');if(expSetupResetBtn)expSetupResetBtn.onclick=()=>{
-  SETTINGS.expEngine=expMtStatus().ok?'mt':'st';SETTINGS.expRes=1080;saveSettings();
+  SETTINGS.expEngine=expBestEngine();SETTINGS.expRes=1080;saveSettings();
   const tTgl=E('expIncTitle'),lTgl=E('expIncLogo');if(tTgl)tTgl.classList.add('on');if(lTgl)lTgl.classList.add('on');
   renderExpSetup();showNotice('↺ Export ရွေးချယ်မှု မူလ ပြန်ထားပါပြီ','info')};
  const panelDoneBtn=E('panelDone');if(panelDoneBtn)panelDoneBtn.onclick=()=>showPanel('homeHome');

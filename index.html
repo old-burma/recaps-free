@@ -608,6 +608,10 @@ const toolbarInner='<nav class="toolbar" id="'+p+'-toolbar">'
 +'</nav>';
 const exportInner='<div id="'+p+'-expSetup">'
 +'<div class="field"><label>⚙️ Export Engine</label><div id="'+p+'-expEngines"></div></div>'
++'<div class="field" id="'+p+'-expPaceRow"><label>⏱️ Hardware ထုတ်နည်း</label><div class="scroll-row aspect-opts" id="'+p+'-expPaceOpts">'
++'<button class="opt" data-pace="fast"><b>⚡ Fast</b><span>frame ချင်း seek ထုတ် — မြန်နိုင်သလောက် မြန်</span></button>'
++'<button class="opt" data-pace="rt"><b>▶️ Real-time</b><span>video အတိုင်း play ထုတ် — ၁ မိနစ် video = ၁ မိနစ်</span></button>'
++'</div></div>'
 +'<div class="field"><label>📐 Resolution — အတိုဆုံး ဘေး (px)</label><div class="scroll-row aspect-opts" id="'+p+'-expResRow">'
 +'<button class="opt" data-res="640"><b>640</b><span>⚡ အမြန်ဆုံး — ဖိုင် အသေးဆုံး</span></button>'
 +'<button class="opt" data-res="720"><b>720</b><span>HD — အလယ် အလတ်</span></button>'
@@ -1569,6 +1573,131 @@ async function hwEncodeSegment(ed,seg,plan,layers,onProg){
   try{v.removeAttribute('src');v.load()}catch(e){}
  }
 }
+/* the real-time pump's stall budget: if the decoder's media clock
+   does not advance for this long (wall time) while it is meant to be
+   playing, the pump fails loudly instead of hanging forever. A
+   function declaration (not a const) so tests can override it —
+   the same seam hwSeekWait / hwWaitMeta already use. */
+function hwRtStallMs(){return 10000}
+/* V232: the REAL-TIME encode pump (user order 2026-11-14) — the
+   Hardware engine's second frame source, chosen per export in the
+   chooser (SETTINGS.hwPace: 'fast' = hwEncodeSegment above, 'rt' =
+   this one). The fast pump seek-steps every frame (a seek + keyframe
+   decode per frame; on the user's phone a ~1-minute video took up
+   to ~10 minutes). This pump instead PLAYS the hidden decoder
+   through the segment at rate 1 and composites each presented
+   frame, so the export takes the segment's own duration of wall
+   clock — like a screen recording, but frame-exact.
+   Everything downstream of frame acquisition matches the fast pump:
+   same hwEncoderConfig, same canvas compositing (hwDrawFrame), same
+   V229 live-preview mirror, same chunk collection / Annex-B
+   conversion, same cancel token, same bounded-queue backpressure —
+   frames are never dropped: if the encoder queue backs up, playback
+   PAUSES (the media clock pauses with it), so pacing integrity
+   survives a slow encoder.
+   TIMESTAMP PARITY: the encoder is fed the exact grid the fast pump
+   produces — slot i of totalFrames gets
+   ts = hwFrameTs(seg.start, min(seg.start + i/30, seg.end - 0.001),
+   prevTs) and duration frameDurUs, byte-for-byte the fast pump's
+   seek target run through the same helper. PIXELS come from
+   presented frames; TIMESTAMPS come from the grid. Presented frames
+   map onto slots by media time: a slot composites the frame on
+   screen at its slot time, so when the source presents slower than
+   30fps the same frame is encoded again for the next slot
+   (duplicate) — a slot is never skipped and the encoder timeline
+   can never drift from media time, which matters because the audio
+   mix is produced separately from the same segment timing.
+   PACING: driven by the MEDIA clock (v.currentTime plus rVFC
+   mediaTimes), never by wall time; wall time is only the stall
+   watchdog (hwRtStallMs). Without rVFC the pump still paces on
+   currentTime polls alone (the initial positioning uses hwSeekWait,
+   which itself falls back to the seeked event); if the platform
+   cannot pace at all — play() rejected, or the media clock frozen —
+   the watchdog raises a clear error instead of silently producing
+   a wrong-speed file. RENDER SPEED: the HW path never rescales
+   video timing by the render-speed factor (see the parity note
+   above hwSleep), so the decoder plays at playbackRate 1 and media
+   time advances exactly as the plan expects. */
+async function hwEncodeSegmentRt(ed,seg,plan,layers,onProg){
+ const st=expHwStatus();if(!st.ok)throw new Error('Hardware engine မရပါ — '+st.reason);
+ const dur=seg.end-seg.start,fpsOut=30,totalFrames=Math.max(1,Math.round(dur*fpsOut)),frameDurUs=Math.round(1000000/fpsOut);
+ const chkCancel=()=>{if(ed._expCancel&&ed._expCancel.hit)throw expCancelError()};
+ const v=document.createElement('video');v.muted=true;try{v.setAttribute('playsinline','')}catch(e){}v.preload='auto';v.src=ed.url;
+ let enc=null;
+ try{
+  await hwWaitMeta(v);chkCancel();
+  const cv=document.createElement('canvas');cv.width=plan.W;cv.height=plan.H;
+  const ctx=cv.getContext('2d');if(!ctx)throw new Error('Canvas 2D context မရပါ');
+  const cfg=await hwEncoderConfig(plan.W,plan.H,fpsOut,st);chkCancel();
+  const chunks=[];let encErr=null,avcDesc=null;
+  enc=new window.VideoEncoder({
+   output:(chunk,meta)=>{try{const buf=new Uint8Array(chunk.byteLength);chunk.copyTo(buf);chunks.push({buf:buf,type:chunk.type});if(meta&&meta.decoderConfig&&meta.decoderConfig.description&&!avcDesc)avcDesc=new Uint8Array(meta.decoderConfig.description)}catch(e){if(!encErr)encErr=e}},
+   error:e=>{if(!encErr)encErr=e}
+  });
+  try{enc.configure(cfg)}catch(e){throw new Error('Hardware encoder configure မရပါ: '+((e&&e.message)||e))}
+  /* V229 live preview — the same read-only mirror as the fast pump:
+     the preview context only receives drawImage copies of cv */
+  let pctx=null;
+  try{const pv=$('#'+ed.p+'-expPrev');if(pv){pv.width=plan.W;pv.height=plan.H;pctx=pv.getContext('2d');if(pctx)pv.style.display='block'}}catch(e){pctx=null}
+  const fmt=(cfg.avc&&cfg.avc.format)||st.format||'annexb';
+  /* position at the segment start and wait for that frame to be
+     PRESENTED (the same seek the fast pump's first frame uses) */
+  let presentedMt=await hwSeekWait(v,seg.start);chkCancel();
+  if(!isFinite(presentedMt))presentedMt=seg.start;
+  /* track presented frames for the decoder-lag guard below */
+  let tracking=true;
+  const hasRVFC=typeof v.requestVideoFrameCallback==='function';
+  const onPresent=(now,meta)=>{if(!tracking)return;const mt=meta&&isFinite(meta.mediaTime)?meta.mediaTime:v.currentTime;if(isFinite(mt)&&mt>presentedMt)presentedMt=mt;try{v.requestVideoFrameCallback(onPresent)}catch(e){tracking=false}};
+  if(hasRVFC){try{v.requestVideoFrameCallback(onPresent)}catch(e){tracking=false}}
+  let playErr=null,pausedByPump=false;
+  const playV=()=>{try{const pr=v.play();if(pr&&typeof pr.catch==='function')pr.catch(e=>{if(!playErr)playErr=e})}catch(e){if(!playErr)playErr=e}};
+  const pauseV=()=>{try{v.pause()}catch(e){}};
+  try{v.playbackRate=1}catch(e){}
+  playV();
+  let frames=0,prevTs=null;
+  let lastCt=isFinite(v.currentTime)?v.currentTime:seg.start,lastAdvance=Date.now();
+  for(let i=0;i<totalFrames;i++){
+   const target=Math.min(seg.start+i/fpsOut,seg.end-0.001);
+   /* wait until the MEDIA clock reaches this slot; the encoder queue
+      is drained first with playback paused (the media clock pauses
+      with it, so the watchdog budget restarts on resume) */
+   for(;;){
+    chkCancel();if(encErr)throw new Error('Hardware encoder error: '+((encErr&&encErr.message)||encErr));
+    if(playErr)throw new Error('video play မရပါ (real-time): '+((playErr&&playErr.message)||playErr));
+    if(enc.encodeQueueSize>8){if(!pausedByPump){pauseV();pausedByPump=true}await hwSleep(10);continue}
+    if(pausedByPump){playV();pausedByPump=false;lastAdvance=Date.now()}
+    const ct=v.currentTime;
+    if(isFinite(ct)&&ct>lastCt+0.0005){lastCt=ct;lastAdvance=Date.now()}
+    const clockHit=isFinite(ct)?ct>=target-0.001:presentedMt>=target-0.001;
+    /* lag guard: with rVFC, refuse to composite while the presented
+       frame trails the slot by >0.25s (genuine decoder distress —
+       normal frame intervals are far below this); a frozen clock is
+       caught by the watchdog instead */
+    const presHit=!hasRVFC||presentedMt>=target-0.25||!!v.ended;
+    if((clockHit&&presHit)||v.ended)break;
+    if(Date.now()-lastAdvance>hwRtStallMs())throw new Error('video playback ရပ်နေပါတယ် — media clock မတက်ပါ (real-time stall)');
+    await hwSleep(15);
+   }
+   const ts=hwFrameTs(seg.start,target,prevTs);prevTs=ts;
+   hwDrawFrame(ctx,cv,plan,v,layers,ts/1000000);
+   if(pctx){try{pctx.drawImage(cv,0,0)}catch(e){pctx=null}} /* V229 mirror: exact frame about to be encoded */
+   const vf=new window.VideoFrame(cv,{timestamp:ts,duration:frameDurUs});
+   try{enc.encode(vf,{keyFrame:frames===0||frames%150===0})}finally{vf.close()}
+   frames++;
+   if(onProg)onProg(frames/totalFrames,{timeUs:Math.round(frames/fpsOut*1000000)});
+  }
+  tracking=false;
+  chkCancel();
+  try{await enc.flush()}catch(e){if(!encErr)encErr=e}
+  if(encErr)throw new Error('Hardware encoder error: '+((encErr&&encErr.message)||encErr));
+  if(!frames)throw new Error('frame တစ်ပုံမှ မရပါ');
+  return{stream:hwChunksToAnnexB(chunks,avcDesc,fmt),frames:frames,format:fmt};
+ }finally{
+  if(enc){try{enc.close()}catch(e){}}
+  try{v.pause()}catch(e){}
+  try{v.removeAttribute('src');v.load()}catch(e){}
+ }
+}
 /* the mixed audio track, produced by an audio-only ffmpeg run over
    the SAME mix math as exportOne's fcMix (mixGains, apad/atrim,
    amix) — or, in original mode, the same copy-then-AAC order as
@@ -1623,7 +1752,8 @@ async function exportOneHw(ff,ed,seg,idx,total,log,progs){
  prepStep('🎙️ အသံ ပြင်နေပါတယ်…');
  log('Video ထုတ်နေပါတယ် ('+(idx+1)+'/'+total+') — '+dur.toFixed(1)+' စက္ကန့် (Hardware)…');
  if(runP)runP(0,'🎬 Hardware နဲ့ ထုတ်နေပါတယ် ('+(idx+1)+'/'+total+')');
- const enc=await hwEncodeSegment(ed,seg,plan,layers,runP?(f,info)=>runP(f*0.9,info):null);
+ const hwPump=(ed._expOpts&&ed._expOpts.hwPace==='rt')?hwEncodeSegmentRt:hwEncodeSegment; /* V232: per-export pacing choice (chooser → SETTINGS.hwPace → _expOpts snapshot); absent = Fast */
+ const enc=await hwPump(ed,seg,plan,layers,runP?(f,info)=>runP(f*0.9,info):null);
  await ff.writeFile('hw_v'+idx+'.h264',enc.stream);
  const fpsStr=(enc.frames/Math.max(0.01,dur)).toFixed(3);
  const code=await ffExecP(ff,hwMuxArgs(fpsStr,mixFile,idx),3600000,dur,runP?(f,info)=>runP(0.9+0.1*f,info):null);
@@ -3460,6 +3590,7 @@ function cueSigFor(ed){
  function expBestEngine(){return expHwStatus().ok?'hw':(expMtStatus().ok?'mt':'st')}
  function expChosenEngine(){const w=SETTINGS.expEngine;if(w==='hw'||w==='mt'||w==='st')return expEngineStatus(w).ok?w:expBestEngine();return expBestEngine()}
  function expChosenRes(){return (SETTINGS.expRes===640||SETTINGS.expRes===720)?SETTINGS.expRes:1080}
+ function expChosenPace(){return SETTINGS.hwPace==='rt'?'rt':'fast'} /* V232: Hardware pacing — persisted like expEngine/expRes; anything but 'rt' is Fast */
  function renderExpSetup(){
   const box=E('expEngines');if(!box)return;
   if(_hwStatus.probing)hwProbe();
@@ -3468,6 +3599,12 @@ function cueSigFor(ed){
   box.querySelectorAll('.opt').forEach(b=>{b.onclick=()=>{const id=b.dataset.eng,st=expEngineStatus(id);if(!st.ok){showNotice('⚠️ '+(EXP_ENGINES.find(e=>e.id===id)||{}).label+' မရပါ — '+st.reason,'err');return}SETTINGS.expEngine=id;saveSettings();renderExpSetup()}});
   const res=expChosenRes();
   $$('#'+p+'-expResRow .opt').forEach(b=>{b.classList.toggle('sel',parseInt(b.dataset.res,10)===res);b.onclick=()=>{SETTINGS.expRes=parseInt(b.dataset.res,10)||1080;saveSettings();renderExpSetup()}});
+  /* V232: the pacing row belongs to the Hardware engine only — shown
+     when Hardware is the chosen engine, hidden otherwise (the stored
+     choice is kept and simply ignored by the other engines) */
+  const paceRow=E('expPaceRow');if(paceRow)paceRow.style.display=chosen==='hw'?'':'none';
+  const pace=expChosenPace();
+  $$('#'+p+'-expPaceOpts .opt').forEach(b=>{b.classList.toggle('sel',b.dataset.pace===pace);b.onclick=()=>{SETTINGS.hwPace=b.dataset.pace==='rt'?'rt':'fast';saveSettings();renderExpSetup()}});
   const hasTitle=E('titleTgl').classList.contains('on')&&!!(E('title').value||'').trim();
   const tRow=E('expIncTitleRow'),lRow=E('expIncLogoRow'),tTgl=E('expIncTitle'),lTgl=E('expIncLogo');
   if(tRow)tRow.style.display=hasTitle?'':'none';
@@ -3479,10 +3616,10 @@ function cueSigFor(ed){
  }
  window.__recapExpSetup=()=>renderExpSetup();
  const expStartBtn=E('expStart');if(expStartBtn)expStartBtn.onclick=()=>{
-  ed._expOpts={engine:expChosenEngine(),res:expChosenRes(),incTitle:!(E('expIncTitle')&&!E('expIncTitle').classList.contains('on')),incLogo:!(E('expIncLogo')&&!E('expIncLogo').classList.contains('on'))};
+  ed._expOpts={engine:expChosenEngine(),res:expChosenRes(),hwPace:expChosenPace(),incTitle:!(E('expIncTitle')&&!E('expIncTitle').classList.contains('on')),incLogo:!(E('expIncLogo')&&!E('expIncLogo').classList.contains('on'))};
   runExport(ed)};
  const expSetupResetBtn=E('expSetupReset');if(expSetupResetBtn)expSetupResetBtn.onclick=()=>{
-  SETTINGS.expEngine=expBestEngine();SETTINGS.expRes=1080;saveSettings();
+  SETTINGS.expEngine=expBestEngine();SETTINGS.expRes=1080;SETTINGS.hwPace='fast';saveSettings();
   const tTgl=E('expIncTitle'),lTgl=E('expIncLogo');if(tTgl)tTgl.classList.add('on');if(lTgl)lTgl.classList.add('on');
   renderExpSetup();showNotice('↺ Export ရွေးချယ်မှု မူလ ပြန်ထားပါပြီ','info')};
  /* ================= V230 Main-page quick toggles =================

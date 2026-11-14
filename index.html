@@ -323,7 +323,19 @@ input[type=range].vs-range::-moz-range-track{height:9px}
    the pinned frame and the timeline: the Original/New mode buttons +
    style chips (moved out of the Script sheet) and the SRT / Voice
    quick toggles, all in the slim compact chrome. */
-.col-spacer{flex:1 1 auto;min-height:0}
+.col-spacer{flex:1 1 auto;min-height:0;display:flex;align-items:center;justify-content:center}
+/* V236: Script-generation LIVE progress block — lives INSIDE the
+   spacer (the empty area between the timeline and the toolbar the
+   user circled, 2026-11-14). The spacer stays a flex child of the
+   column exactly as before (flex:1 1 auto absorbs the slack, the
+   toolbar stays pinned); the block is display:none except during a
+   Create run, so an idle app shows the same empty area as always. */
+.gen-prog{width:min(430px,88%);text-align:center;padding:8px 4px}
+.gen-prog-pct{font-size:46px;font-weight:800;color:#FBBF24;line-height:1.05;font-variant-numeric:tabular-nums}
+.gen-prog-bar{height:6px;border-radius:99px;background:#2C2C35;overflow:hidden;margin:10px 0 8px}
+.gen-prog-fill{height:100%;width:0%;border-radius:99px;background:linear-gradient(90deg,#F59E0B,#FBBF24);transition:width .25s ease}
+.gen-prog-meta{display:flex;gap:8px;justify-content:center;align-items:baseline;font-size:12.5px;font-weight:600;color:#C9C9D2}
+.gen-prog-unit{color:#9A9AA5;font-weight:700;font-variant-numeric:tabular-nums}
 .main-row{flex:0 0 auto;background:#101014;border-top:1px solid #26262E;padding:7px 10px 8px}
 .main-row .style-row{margin-top:6px}
 .quick-row{display:flex;align-items:center;gap:7px;margin-top:7px}
@@ -653,9 +665,9 @@ const timelineInner='<div class="tl-wrap" id="'+p+'-timeline"><div class="tl-scr
    toolbar below it is pinned to the very bottom of the viewport. */
 const mainRowInner='<div class="main-row" id="'+p+'-mainRow">'
 +modeInner
-+'<div class="quick-row"><button type="button" class="qtgl on" id="'+p+'-qtSrt">🎨 SRT</button><button type="button" class="qtgl" id="'+p+'-qtVoice">🎙️ Voice</button><button type="button" class="qtgl" id="'+p+'-qtExport"><span class="wave"><i></i><i></i><i></i><i></i><i></i></span><span class="btn-label">🎬 Export</span></button><span class="create-mini"><span class="dot"></span><span id="'+p+'-createStatus">အသင့်ဖြစ်ပါပြီ</span></span></div>'
++'<div class="quick-row"><button type="button" class="qtgl on" id="'+p+'-qtSrt">🎨 SRT</button><button type="button" class="qtgl" id="'+p+'-qtVoice">🎙️ Voice</button><button type="button" class="qtgl" id="'+p+'-qtExport"><span class="wave"><i></i><i></i><i></i><i></i><i></i></span><span class="btn-label">🎬 Export</span></button><button type="button" class="qtgl" id="'+p+'-qtChange">🎬 Video လဲ</button><span class="create-mini"><span class="dot"></span><span id="'+p+'-createStatus">အသင့်ဖြစ်ပါပြီ</span></span></div>'
 +'</div>';
-const spacerInner='<div class="col-spacer" aria-hidden="true"></div>';
+const spacerInner='<div class="col-spacer" id="'+p+'-spacer"><div class="gen-prog" id="'+p+'-genProg" style="display:none"><div class="gen-prog-pct" id="'+p+'-genProgPct">0%</div><div class="gen-prog-bar"><div class="gen-prog-fill" id="'+p+'-genProgFill"></div></div><div class="gen-prog-meta"><span id="'+p+'-genProgLabel"></span><span class="gen-prog-unit" id="'+p+'-genProgUnit"></span></div></div></div>';
 function tb(id,ic,t){return '<button class="tool-btn" id="'+p+'-tool'+id+'"><span class="tic">'+ic+'</span>'+t+'</button>'}
 const toolbarInner='<nav class="toolbar" id="'+p+'-toolbar">'
 +tb('Script','📝','Script')+tb('Subs','🎨','စာတန်း')+tb('Voice','🎙️','Voice Create')+tb('Mixer','🔊','Mixer')+tb('Trim','✂️','Trim')+tb('Aspect','🌫️','Aspect')+tb('Title','📝','Title')+tb('Text','➕','Text')+tb('Logo','🛡️','Logo')+tb('Border','📐','Border')+tb('Blur','🫥','Blur')
@@ -747,8 +759,19 @@ function makeEditor(p){
  const E=id=>$('#'+p+'-'+id);
  function refreshLabels(){$$('#'+p+'-aspectOpts .opt').forEach(o=>o.classList.toggle('sel',o.dataset.v===ed.aspect));E('blurVal').textContent=ed.blur;E('blur').value=ed.blur;const vfl=E('voiceFieldLabel');if(vfl)vfl.textContent=voiceFieldLabelOf(ed);const s=parseFloat(E('start').value)||0,en=parseFloat(E('end').value)||0;E('durinfo').textContent=ed.duration?fmtDur(Math.max(0,en-s))+' (မူရင်း '+fmtDur(ed.duration)+')':'—';if(window.__refreshFeatureSummaries)window.__refreshFeatureSummaries()}
  ed.refresh=refreshLabels;
- E('pick').onclick=()=>E('file').click();const phB=E('ph');if(phB)phB.onclick=()=>E('file').click();
- E('file').addEventListener('change',()=>{const f=E('file').files[0];if(!f)return;ed.file=f;if(ed.url)URL.revokeObjectURL(ed.url);ed.url=URL.createObjectURL(f);const v=E('video');v.src=ed.url;v.style.display='block';const ph0=E('ph');if(ph0)ph0.style.display='none';E('fileinfo').textContent=f.name+' · '+fmtSize(f.size);if(f.size>200*1048576)showNotice('⚠️ ဖိုင် 200 MB ထက် ကြီးနေပါတယ် ('+fmtSize(f.size)+') — browser ထဲတွင် Export ကြာနိုင် / မအောင်မြင်နိုင်ပါတယ်။ ဖိုင် သေးတာ သုံးရန် အကြံပြုပါတယ်။','info');v.onloadedmetadata=()=>{if(ed.url&&v.src!==ed.url)return; /* an inserted-voice preview is loaded, not a new source file */ ed.duration=v.duration;ed.videoW=v.videoWidth||0;ed.videoH=v.videoHeight||0;E('start').value=0;E('end').value=Math.floor(v.duration*10)/10;E('rstart').max=v.duration;E('rend').max=v.duration;E('rstart').value=0;E('rend').value=v.duration;refreshLabels();if(window.__recapNavRefresh)window.__recapNavRefresh();showNotice('✅ Video တင်ပြီးပါပြီ — ကြာချိန် '+fmtDur(v.duration),'ok');if(ed.pendingCreate&&ed.modeChosen){ed.pendingCreate=false;if(window.__recapPendingCreate)window.__recapPendingCreate()}}});
+ E('pick').onclick=()=>{ed._changeWipe=false;E('file').click()};const phB=E('ph');if(phB)phB.onclick=()=>{ed._changeWipe=false;E('file').click()};
+ /* V236: 🎬 Video လဲ (Main quick row) — the SAME picker as the
+    initial load, but the selection it produces is a deliberate
+    CHANGE: the old project is fully wiped first (wipeForChange,
+    run inside the change handler below while ed.file is still the
+    old file). Clearing the input's value first makes re-picking
+    the SAME file fire 'change' too (a same-file change still
+    wipes). Cancelling the picker fires no change event, so
+    nothing is wiped; and the pick/placeholder buttons above clear
+    the flag, so a change armed here can never leak into a later
+    ordinary pick. */
+ const chBtn=E('qtChange');if(chBtn)chBtn.onclick=()=>{ed._changeWipe=true;try{E('file').value=''}catch(e){}E('file').click()};
+ E('file').addEventListener('change',()=>{const f=E('file').files[0];if(!f)return;const wasChange=!!ed._changeWipe;ed._changeWipe=false;if(wasChange&&ed.file&&window.__recapWipeForChange)window.__recapWipeForChange();ed.file=f;if(ed.url)URL.revokeObjectURL(ed.url);ed.url=URL.createObjectURL(f);const v=E('video');v.src=ed.url;v.style.display='block';const ph0=E('ph');if(ph0)ph0.style.display='none';E('fileinfo').textContent=f.name+' · '+fmtSize(f.size);if(f.size>200*1048576)showNotice('⚠️ ဖိုင် 200 MB ထက် ကြီးနေပါတယ် ('+fmtSize(f.size)+') — browser ထဲတွင် Export ကြာနိုင် / မအောင်မြင်နိုင်ပါတယ်။ ဖိုင် သေးတာ သုံးရန် အကြံပြုပါတယ်။','info');v.onloadedmetadata=()=>{if(ed.url&&v.src!==ed.url)return; /* an inserted-voice preview is loaded, not a new source file */ ed.duration=v.duration;ed.videoW=v.videoWidth||0;ed.videoH=v.videoHeight||0;E('start').value=0;E('end').value=Math.floor(v.duration*10)/10;E('rstart').max=v.duration;E('rend').max=v.duration;E('rstart').value=0;E('rend').value=v.duration;refreshLabels();if(window.__recapNavRefresh)window.__recapNavRefresh();showNotice(wasChange?'🎬 Video လဲပြီးပါပြီ — အရင် project အကုန် ရှင်းပြီးပါပြီ':'✅ Video တင်ပြီးပါပြီ — ကြာချိန် '+fmtDur(v.duration),'ok');if(ed.pendingCreate&&ed.modeChosen){ed.pendingCreate=false;if(window.__recapPendingCreate)window.__recapPendingCreate()}}});
  [['start','rstart'],['end','rend']].forEach(([a,b])=>{E(a).addEventListener('input',()=>{E(b).value=E(a).value;refreshLabels()});E(b).addEventListener('input',()=>{E(a).value=E(b).value;refreshLabels()})});
  /* V216 WYSIWYG aspect stage: morph .vid-wrap to the chosen OUTPUT
     canvas (classes stg-916 / stg-169 / stg-11 / stg-orig, plus
@@ -931,6 +954,30 @@ function subBlockHFor(text,W,opts){
  const lay=subLayoutFor(x,text,W,opts);
  return Math.round(lay.nLines*lay.lh+(opts.band?Math.round(lay.fs*0.38)*2:0));
 }
+/* V236 (Fix 3): the subtitle PLATE spec — ONE geometry shared with
+   the stage preview. The preview plate (renderSubOverlay, on the
+   overlay's .sub-inner) is: fill rgba(0,0,0,0.55); padding 6px 12px;
+   border-radius 10px; NO border; and the inner div spans the
+   .sub-overlay box, which the CSS insets at left:4% / right:4% of
+   the frame. textPNG mirrors exactly that, expressed in the
+   quantities that scale identically in both renderers:
+   - inset: plate x = 4% of W, plate width = 92% of W (the CSS %).
+   - radius: the CSS 10px sits against the preview's stage font
+     (clamp(15px,4.4vw,25px) ≈ 17px on the user's phone), i.e. the
+     radius is ≈ 26% of the one-line plate height — r = 0.58·fs
+     keeps that proportion at any export size.
+   - vertical: the plate hugs the text block + 2·padY (padY =
+     0.38·fs, the V234 block relationship in subBlockHFor) — the
+     preview's 6px vertical padding against its ~17px font is the
+     same ≈0.35–0.38·fs proportion. Block heights are UNCHANGED, so
+   the layout cache keys (text, W, size, colours, band, …) stay
+   correct: the plate geometry is a pure function of them. */
+function subPlatePath(x,px,py,pw,ph,r){
+ x.beginPath();
+ if(r>0&&x.roundRect){x.roundRect(px,py,pw,ph,r);return}
+ if(x.rect){x.rect(px,py,pw,ph);return}
+ x.moveTo(px,py);x.lineTo(px+pw,py);x.lineTo(px+pw,py+ph);x.lineTo(px,py+ph);if(x.closePath)x.closePath();
+}
 function textPNG(text,W,H,opts){opts=opts||{};const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');x.textAlign=opts.align==='left'?'left':'center';x.textBaseline='middle';
 /* V234: the layout comes from subTextLayout — the SAME function
    subBlockHFor measures with, so the drawn block and the geometry's
@@ -939,8 +986,12 @@ function textPNG(text,W,H,opts){opts=opts||{};const c=document.createElement('ca
    block height is not laid out a second time here. */
 const _lay=subLayoutFor(x,text,W,opts);const fs=_lay.fs,hasKw=_lay.hasKw,lines=_lay.lines,kwLines=_lay.kwLines;
 const nLines=_lay.nLines;const lh=_lay.lh;const y0=H/2-((nLines-1)*lh)/2;
-/* V217 subtitle band: a translucent black plate behind the text block */
-if(opts.band){const padY=Math.round(fs*0.38),padX=Math.round(W*0.02);const bh=nLines*lh+padY*2,by=Math.max(0,y0-lh/2-padY);x.fillStyle='rgba(0,0,0,0.55)';x.fillRect(padX,by,W-padX*2,Math.min(H-by,bh))}
+/* V217 subtitle band -> V236 (Fix 3): a translucent black plate
+   behind the text block, drawn as the preview's INSET ROUNDED box
+   (see subPlatePath's spec note) — it used to be a full-width
+   square band (x = 2% of W, fillRect), which the user caught
+   differing from the stage preview (2026-11-14). */
+if(opts.band){const padY=Math.round(fs*0.38),plX=Math.round(W*0.04),plW=W-plX*2,bh=nLines*lh+padY*2,by=Math.max(0,y0-lh/2-padY),ph=Math.min(H-by,bh),pr=Math.max(0,Math.min(Math.round(fs*0.58),ph/2,plW/2));x.fillStyle='rgba(0,0,0,0.55)';subPlatePath(x,plX,by,plW,ph,pr);x.fill()}
 /* draw x: left-aligned (logo) at opts.pad, else centred — optionally shifted by opts.cx (0..1 frame fraction, free-text overlay) */
 const txOf=()=>opts.align==='left'?(opts.pad||24):(W/2+((opts.cx!=null)?(opts.cx-0.5)*W:0));
 /* V235 (the 4-seconds-per-PNG fix): the old draw set shadowBlur=6 on
@@ -2529,9 +2580,9 @@ async function poolMap(items,limit,worker){
    audio bytes; it is only called for chunks with no cached result. */
 const AI_NO_AUDIO='AI_NO_AUDIO';
 const TRANSCRIBE_PROMPT='Transcribe ALL of the speech in this audio clip exactly, in its original language, from the very beginning to the very end. Every sentence, in the order spoken — do NOT skip, shorten, summarize or stop early, even if the clip is long. One sentence per line. If a word is unclear, write your best hearing of it and keep going until the end of the audio. Output ONLY the transcript lines — no translation, no labels, no commentary.';
-async function transcribeChunksPiped(key,total,extractOne,statusFn,sig,seeded){
+async function transcribeChunksPiped(key,total,extractOne,statusFn,sig,seeded,progFn){
  let done=0;for(let i=0;i<total;i++)if(seeded[i]!=null)done++;
- const report=()=>{if(statusFn)statusFn('🎧 နားထောင်/စာဖော်: အပိုင်း '+done+'/'+total+' ✓')};
+ const report=()=>{if(statusFn)statusFn('🎧 နားထောင်/စာဖော်: အပိုင်း '+done+'/'+total+' ✓');if(progFn)progFn(done,total)};
  if(total>1&&done>0)report();
  const jobs=[];const waiters=[];let closed=false,firstErr=null;
  const push=j=>{if(waiters.length)waiters.shift()(j);else jobs.push(j)};
@@ -2569,13 +2620,13 @@ function translatePrompt(group){
    both slow and prone to truncated output; a group whose line count drifts
    gets ONE retry, then its first result is kept (same tolerance as the old
    single call). Completed groups are cached by content hash (see above). */
-async function translateFaithful(key,transcript,statusFn,sig){
+async function translateFaithful(key,transcript,statusFn,sig,progFn){
  const lines=cleanLines(transcript);
  if(!lines.length)return '';
  const GROUP=15;const groups=[];
  for(let i=0;i<lines.length;i+=GROUP)groups.push(lines.slice(i,i+GROUP));
  const total=groups.length;let done=0;
- const report=()=>{if(statusFn)statusFn('🌐 ဘာသာပြန်: အပိုင်း '+done+'/'+total+' ✓')};
+ const report=()=>{if(statusFn)statusFn('🌐 ဘာသာပြန်: အပိုင်း '+done+'/'+total+' ✓');if(progFn)progFn(done,total)};
  if(total>1)report();
  const outs=await poolMap(groups,3,async group=>{
   const ck='tr:'+strHash(group.join('\n'));
@@ -2984,6 +3035,12 @@ function cueSigFor(ed){
    setTimeout(()=>fin(null),4000);
   });
  }
+ /* V236: delete one file's cached peaks (Change-video wipe) —
+    fire-and-forget and fail-soft, exactly like the reads/writes. */
+ function peaksIdbDelete(sig){
+  if(typeof indexedDB==='undefined'||!sig)return;
+  try{openDB().then(db=>{try{db.transaction('peaks','readwrite').objectStore('peaks').delete(sig)}catch(e){}}).catch(()=>{})}catch(e){}
+ }
  async function ensureWavePeaks(){
   const f=ed.file;if(!f||!ed.duration)return;
   const sig=waveSigOf(f);
@@ -3222,6 +3279,26 @@ function cueSigFor(ed){
  window.__recapNavRefresh=()=>{if(previewMode)exitPreview(true);ed.cues=[];ed.cuesSig='';ed.cuesManual=false;renderCueList();updateCueCount();renderSteps();renderTimeline()};
  /* ================= shared helpers ================= */
  function setCreateStatus(t){const s=E('createStatus');if(s)s.textContent=t}
+ /* ================= V236: Script-generation LIVE % (spacer block) ===
+    The block in the spacer (timeline ↔ toolbar empty area) mirrors
+    the Create pipeline's REAL work units — never an animation:
+      stage A (transcription) owns 0–65%: (chunks done / N chunks),
+        counted inside transcribeChunksPiped (seeded/cached chunks
+        count as done, exactly as its status line reports them);
+      stage B (script writing) owns 65–99%: faithful = translation
+        groups done / total groups (translateFaithful's own counts);
+        scene = 2 units (frames sampled, then the one script call).
+    The % is monotonic (a high-water mark is kept), capped at 99
+    until runCreate has actually APPLIED the script to the editor —
+    only then does it show 100, hold ~600ms, and hide. On any error
+    or early exit it hides at once (the Main-row status + notices
+    keep surfacing the error exactly as before). */
+ let genProgMax=0,genProgCompleted=false,genProgHideT=null;
+ function genProgPaint(pct,label,unit){const pe=E('genProgPct');if(pe)pe.textContent=pct+'%';const fe=E('genProgFill');if(fe)fe.style.width=pct+'%';if(label!=null){const le=E('genProgLabel');if(le)le.textContent=label}const ue=E('genProgUnit');if(ue)ue.textContent=unit||''}
+ function genProgBegin(){genProgMax=0;genProgCompleted=false;if(genProgHideT){clearTimeout(genProgHideT);genProgHideT=null}const b=E('genProg');if(b)b.style.display='block';genProgPaint(0,'🎙️ အသံကို စာသား ပြောင်းနေပါတယ်','')}
+ function genProgSet(frac,label,unit){if(genProgCompleted)return;let pct=Math.round(Math.min(0.99,Math.max(0,frac||0))*100);if(pct<genProgMax)pct=genProgMax;genProgMax=pct;genProgPaint(pct,label,unit)}
+ function genProgComplete(){genProgCompleted=true;genProgMax=100;genProgPaint(100,null,'');if(genProgHideT)clearTimeout(genProgHideT);genProgHideT=setTimeout(()=>{const b=E('genProg');if(b)b.style.display='none'},600)}
+ function genProgHide(){if(genProgCompleted)return;const b=E('genProg');if(b)b.style.display='none'}
  /* every Create-pipeline stage reports on the step-1 status line */
  function setTxStatus(t){setCreateStatus(t)}
  function setStatus(t){setCreateStatus(t)}
@@ -3251,7 +3328,7 @@ function cueSigFor(ed){
     error and never stop silently. */
  function modeLabel(){return ed.aiMode==='scene'?'✨ New Recaps':'🎧 Original Recaps'}
  function txSignature(v){return (ed.file?ed.file.name+'|'+ed.file.size:'')+'|'+v.start+'|'+v.end}
- async function transcribeStage(v){
+ async function transcribeStage(v,tp){
   const ff=await getFFmpeg(()=>{});
   const sig=txSignature(v);
   let N=0;for(let s=v.start;s<v.end-0.05;s+=60)N++;
@@ -3262,6 +3339,7 @@ function cueSigFor(ed){
   for(let i=0;i<N;i++){const c=chunkCacheGet(sig,'tx',i);if(c!=null){seeded[i]=c;cachedN++}}
   if(cachedN===N){
    setCreateStatus('✅ စာသား အပိုင်းများ ရှိပြီးသား — ပြန်သုံးပါတယ် ('+N+'/'+N+')');
+   if(tp)tp(N,N); /* V236: a fully cached transcription completes its stage at once */
   }else{
    if(cachedN>0)setCreateStatus('↩️ ပြီးသား အပိုင်း '+cachedN+'/'+N+' ပြန်သုံးပါတယ် — ကျန်တာ ဆက်ထုတ်နေတယ်…');
    else setCreateStatus('🔊 အသံ ထုတ်နေပါတယ်…');
@@ -3275,7 +3353,7 @@ function cueSigFor(ed){
      if(code!==0){if(i===0)throw new Error(AI_NO_AUDIO);throw new Error('အသံ ထုတ်ရာတွင် ffmpeg exit code '+code)}
      const data=await ff.readFile(fn);try{await ff.deleteFile(fn)}catch(e2){}
      return data;
-    },setCreateStatus,sig,seeded);
+    },setCreateStatus,sig,seeded,tp);
    }catch(ae){pipeErr=ae}
    try{await ff.deleteFile('ai_in.mp4')}catch(e3){}
    if(pipeErr){
@@ -3290,17 +3368,19 @@ function cueSigFor(ed){
   ed.txSig=sig;
   return 'ok';
  }
- async function convertStage(v,mode,transcript){
+ async function convertStage(v,mode,transcript,cp){
   let lines=[];
   if(mode==='faithful'){
    if(!transcript)return null;
-   lines=cleanLines(await translateFaithful(v.key,transcript,setCreateStatus,txSignature(v)));
+   lines=cleanLines(await translateFaithful(v.key,transcript,setCreateStatus,txSignature(v),cp));
   }else{
    setCreateStatus('🎞️ Scene ပုံများ ယူနေပါတယ်…');
    const frames=await sampleFrames(ed,v.start,v.end);
+   if(cp)cp(1,2); /* V236: scene mode = 2 units — frames, then the script call */
    if(!frames.length&&!transcript)throw new Error('Scene ပုံများ ယူမရပါ — video ကို ခဏ play လုပ်ထားပြီး ပြန် ကြိုးစားပါ');
    setCreateStatus('✍️ New Recaps script ရေးနေပါတယ်…');
    lines=cleanLines(await writeSceneScript(v.key,frames,transcript,v.end-v.start,setCreateStatus,ed.recapStyle));
+   if(cp)cp(2,2);
   }
   if(!lines.length)throw new Error('AI မှ script ပြန်မရပါ — ပြန် ကြိုးစားကြည့်ပါ');
   return lines;
@@ -3311,6 +3391,7 @@ function cueSigFor(ed){
   const v=validCommon();if(!v)return;
   const mode=ed.aiMode;
   ed.aiBusy=true;[E('modeOrig'),E('modeNew')].forEach(b=>{if(b)b.disabled=true});
+  genProgBegin(); /* V236: the spacer block tracks this run's real units */
   try{
    showNotice('▶️ Recaps ဖန်တီးခြင်း စတင်ပါပြီ — '+modeLabel(),'info');
    /* stage (a): transcript \u2014 reuse when this exact video+trim already has one */
@@ -3318,16 +3399,17 @@ function cueSigFor(ed){
    if(ed.txSig===txSignature(v)&&(E('transcript').value||'').trim()){
     transcript=(E('transcript').value||'').trim();
     setCreateStatus('✅ မူရင်း စာသား ရှိပြီးသား — ပြန်သုံးပါတယ်');
+    genProgSet(0.65,'🎙️ အသံကို စာသား ပြောင်းနေပါတယ်',''); /* V236: reused transcript = stage A done at once */
    }else{
     setCreateStatus('📝 စာသား ထုတ်နေတယ်…');
-    const r=await transcribeStage(v);
+    const r=await transcribeStage(v,(d,t)=>genProgSet(0.65*(t?d/t:0),'🎙️ အသံကို စာသား ပြောင်းနေပါတယ်',(t>1?d+'/'+t:'')));
     if(r==='ok'){transcript=(E('transcript').value||'').trim()}
     else if(mode==='faithful'){showNotice('⚠️ မူရင်း စာသား ထုတ်မရပါ — "Original Recaps" ပုံစံအတွက် အသံထဲ စကားပြော လိုပါတယ်','err');return}
     /* scene mode with no audible speech: continue from frames alone */
    }
    /* stage (b): Myanmar script in the chosen mode */
    setCreateStatus('🌐 မြန်မာ Script ပြင်နေတယ်…');
-   const lines=await convertStage(v,mode,transcript);
+   const lines=await convertStage(v,mode,transcript,(d,t)=>genProgSet(0.65+0.34*(t?d/t:0),'📝 Script ရေးနေပါတယ်',(t>1?d+'/'+t:'')));
    if(!lines){setCreateStatus('⚠️ မူရင်း စာသား မရှိပါ');showNotice('⚠️ "Original Recaps" ပုံစံအတွက် မူရင်း စာသား အရင် လိုပါတယ်','err');return}
    E('subs').value=lines.join('\n');
    const st=E('subTgl');if(st&&!st.classList.contains('on'))st.classList.add('on');
@@ -3337,10 +3419,11 @@ function cueSigFor(ed){
    rebuildCues();updateCueCount();refreshVoiceGate();checkVoiceStale();
    doneStep(0);
    setCreateStatus('✅ Recaps ရပါပြီ — စာတန်း '+lines.length+' ကြောင်း');
+   genProgComplete(); /* V236: 100 only now — the script is applied to the editor */
    showNotice('✅ Recaps ရပါပြီ — စာတန်းကို video ပေါ်မှာ စစ်ပြီး စိတ်ကြိုက် ပြင်နိုင်ပါတယ်','ok');
    goStep(1);
   }catch(err){console.error(err);setCreateStatus('❌ '+humanErr(err));showNotice('❌ Recaps လုပ်မရပါ: '+humanErr(err),'err')}
-  finally{ed.aiBusy=false;[E('modeOrig'),E('modeNew')].forEach(b=>{if(b)b.disabled=false})}
+  finally{genProgHide();ed.aiBusy=false;[E('modeOrig'),E('modeNew')].forEach(b=>{if(b)b.disabled=false})}
  }
  /* A deck mode-button tap = the Create run starts IMMEDIATELY (no second
     tap; the old Mode band and its sheet were removed in V208 — the two
@@ -3394,16 +3477,11 @@ function cueSigFor(ed){
     chunk. The video file, trim, mode and style selections are untouched. */
  let clearArmTimer=null;
  function disarmClear(){const b=E('clearAll');if(b){b.textContent='🗑️ Script + စာတန်း အကုန် ဖျက်';b.classList.remove('armed');if(b.dataset)b.dataset.armed=''}if(clearArmTimer){clearTimeout(clearArmTimer);clearArmTimer=null}}
- const clearBtn=E('clearAll');
- if(clearBtn)clearBtn.onclick=()=>{
-  if(!(clearBtn.dataset&&clearBtn.dataset.armed==='1')){
-   if(clearBtn.dataset)clearBtn.dataset.armed='1';
-   clearBtn.textContent='တကယ် ဖျက်မလား? ထပ်နှိပ်ပါ';clearBtn.classList.add('armed');
-   if(clearArmTimer)clearTimeout(clearArmTimer);
-   clearArmTimer=setTimeout(disarmClear,4000);
-   return;
-  }
-  disarmClear();
+ /* V236: the clear-all EXECUTION, extracted verbatim from the
+    button handler below so the Change-video wipe runs the SAME
+    code — one implementation, two callers. quiet=true suppresses
+    the toast (the change flow confirms with its own after load). */
+ function clearScriptAll(quiet){
   const sb=E('subs');sb.value='';if(sb.dispatchEvent)sb.dispatchEvent(new Event('input'));
   ed.cues=[];ed.cuesSig='';ed.cuesManual=false;renderCueList();updateCueCount();
   const txEl=E('transcript');if(txEl)txEl.value='';const txW=E('aiTxWrap');if(txW)txW.style.display='none';
@@ -3419,8 +3497,48 @@ function cueSigFor(ed){
   setVoiceStatus('');
   const adl9=E('audioDl');if(adl9)adl9.classList.add('off');
   renderTimeline();checkVoiceStale();refreshVoiceGate();updateVoiceWarn();updateOverlay(true);refreshSummaries();
-  showNotice('🗑️ အကုန် ဖျက်ပြီးပါပြီ','ok');
+  if(!quiet)showNotice('🗑️ အကုန် ဖျက်ပြီးပါပြီ','ok');
+ }
+ const clearBtn=E('clearAll');
+ if(clearBtn)clearBtn.onclick=()=>{
+  if(!(clearBtn.dataset&&clearBtn.dataset.armed==='1')){
+   if(clearBtn.dataset)clearBtn.dataset.armed='1';
+   clearBtn.textContent='တကယ် ဖျက်မလား? ထပ်နှိပ်ပါ';clearBtn.classList.add('armed');
+   if(clearArmTimer)clearTimeout(clearArmTimer);
+   clearArmTimer=setTimeout(disarmClear,4000);
+   return;
+  }
+  disarmClear();
+  clearScriptAll(false);
  };
+ /* ================= V236: Change-video wipe =================
+    The 🎬 Video လဲ button's full wipe: clearScriptAll (script,
+    transcript, cues, voice + its caches, the current file's chunk
+    caches) PLUS what clear-all deliberately keeps — the trim
+    window (zeroed here; the load handler refills it to the new
+    file's full range on loadedmetadata), the blur regions (they
+    persist through SETTINGS, so they are cleared through
+    persistBlur), the old file's waveform peaks (IndexedDB 'peaks',
+    keyed by waveSigOf) and the playback position / wave state.
+    User SETTINGS are never touched: Gemini key, voice engine and
+    voice choice, subtitle colours/size/position, custom logo,
+    aspect and export choices all survive the swap. Runs BEFORE
+    ed.file is replaced, while the old file's signature, trim and
+    txSig still describe the old project. */
+ function wipeForChange(){
+  clearScriptAll(true);
+  ed.blurRegions=[];ed.blurSel=null;persistBlur();syncBlurLayer();blurListRender();blurCtlSync();
+  const osig=waveSigOf(ed.file);if(osig)peaksIdbDelete(osig);
+  ed.wavePeaks=null;ed.waveSig='';ed.waveState='idle';
+  const st0=E('start'),en0=E('end'),rs0=E('rstart'),re0=E('rend');
+  if(st0)st0.value=0;if(en0)en0.value=0;if(rs0)rs0.value=0;if(re0)re0.value=0;
+  try{vidEl.pause()}catch(e){}
+  try{vidEl.currentTime=0}catch(e){}
+ }
+ /* the wipe lives in THIS closure (with clearScriptAll and the blur
+    helpers); makeEditor's file handler reaches it through the same
+    window bridge the nav refresh uses (window.__recapNavRefresh) */
+ window.__recapWipeForChange=wipeForChange;
  /* ================= voiceover (gated on script, engine choice, cache + mini player) ================= */
  function effVoice(){return ed.ttsEngine==='edge'?ed.edgeVoice:ed.voice}
  function voiceFresh(){const c=ed.voiceCache;if(!c||c.asm!==VOICE_ASM||c.engine!==ed.ttsEngine||c.voice!==effVoice())return false;/* V219: freshness is judged on the canonical line list the voice actually spoke */if(c.linesSig!=null)return c.linesSig===canonicalLines(ed).join('\n');return c.text===scriptText()}

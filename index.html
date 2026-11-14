@@ -224,6 +224,8 @@ body.locked{overflow:hidden}
    per-cue pop-up (text / start / end / save / delete live there) */
 .cue-row{display:flex;gap:8px;align-items:center;padding:8px;border:1.5px solid #2C2C35;border-radius:12px;margin-bottom:8px;background:#1B1B21}
 .cue-row.cur{border-color:#F59E0B;background:rgba(245,158,11,.12)}
+.cue-row .cue-del{flex:none;margin-left:auto;background:rgba(229,57,53,.14);border:1.5px solid rgba(229,57,53,.55);color:#FF8A80;border-radius:10px;padding:7px 11px;font-size:15px;line-height:1;cursor:pointer;font-family:inherit}
+.cue-row .cue-del:active{background:rgba(229,57,53,.32)}
 .cue-main{flex:1;min-width:0;cursor:pointer}
 .cue-txt{display:block;font-size:13px;line-height:1.5;color:#F2F2F5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cue-when{display:block;font-size:11px;color:#9A9AA5;margin-top:1px}
@@ -470,6 +472,7 @@ const scriptHome=subsFieldRecap
 const subsHome=subToggleRow
 +'<p style="margin:8px 0 10px">Cue တစ်ကြောင်းကို နှိပ်ရင် ပြင်/Save လုပ်နိုင်သော pop-up ပွင့်ပါမယ် (Timeline ပေါ်က cue block ကို နှိပ်ရင်လည်း အတူတူပါပဲ)။ ▶ ကို နှိပ်ရင် video က အဲဒီ နေရာသို့ ရောက်သွားပါမယ်။</p>'
 +'<div class="field"><label>စာတန်း နေရာ (အပေါ်/အောက်) — <span id="'+p+'-subPosVal">81%</span></label><input type="range" id="'+p+'-subPos" min="4" max="88" step="1" value="81"><p class="hint">စာတန်း band တစ်ခုလုံး frame အထဲမှာ ဝင်အောင် 4%–88% အတွင်းသာ ရွှေ့လို့ရပါတယ်။ Video ပေါ်က စာတန်းကို ဖိဆွဲပြီးလည်း ရွှေ့နိုင်ပါတယ် (Export မှာပါ ဒီ နေရာ သုံးပါမယ်)</p></div>'
++'<div class="field vs-field"><div class="vs-head"><label>စာတန်း အရွယ်အစား (Size)</label><span class="vs-val" id="'+p+'-subSizeVal">100%</span></div><input type="range" class="vs-range" id="'+p+'-subSize" min="50" max="200" step="5" value="100"><p class="hint">စာတန်း စာလုံး အရွယ် — 100% = မူရင်း အရွယ်။ အရွယ် ပြောင်းရင် cue များ အလိုအလျောက် ပြန်ခွဲပါမည် (အသံ ထုတ်ထားပြီးသား ဖြစ်ရင် အသံ အသစ် ပြန်ထုတ်ရပါမည်)</p></div>'
 +'<div class="field"><label>စာတန်း အရောင်</label><div class="style-row" id="'+p+'-subColors"><button class="style-chip" data-v="white">🤍 အဖြူ</button><button class="style-chip" data-v="gold">💛 ရွှေ</button></div><p class="hint">«» ဖြင့် မှတ်ထားသော အဓိက စာလုံးများသည် ဆန့်ကျင်ဘက် အရောင် ဖြစ်ပါမည် (အဖြူ ဆိုရင် ရွှေ၊ ရွှေ ဆိုရင် အဖြူ)</p></div>'
 +'<div class="switch-row"><div><b style="font-size:14px">နောက်ခံ Band</b><div style="font-size:12px;color:#527884">စာတန်း နောက်တွင် အမည်း ပြား ခံပေးမည် — ဖတ်ရ ပိုလွယ်သည်</div></div><div class="tgl" id="'+p+'-subBandTgl"></div></div>'
 +'<div class="picker-row" style="margin-bottom:10px;align-items:center"><button class="btn light small" id="'+p+'-subPosReset">↺ အလယ် ပြန်ထား</button><button class="btn light small" id="'+p+'-cueRebuild">↻ Script မှ အချိန် ပြန်ခွဲ</button><button class="btn light small" id="'+p+'-cueAdd">➕ Cue ထည့်</button></div>'
@@ -764,7 +767,16 @@ return new Promise(res=>c.toBlob(b=>b.arrayBuffer().then(ab=>res(new Uint8Array(
 /* V217: the ONE place subtitle PNG params are derived from the editor —
    body colour + contrasting «keyword» colour + band flag (used by
    exportOne and asserted by the harness) */
-function subPngOpts(ed,S){const gold=!!ed&&ed.subColor==='gold';return{size:Math.round(46*S),color:gold?'#FFD740':'#FFFFFF',kw:gold?'#FFFFFF':'#FFD740',band:!!(ed&&ed.subBand)}}
+/* V224: subtitle SIZE factor — the single source of truth for the
+   🎨 စာတန်း sheet's size slider. ed.subSize is a percent (50–200,
+   default 100); subLineFs (the V219 canonical one-line split),
+   subPngOpts (both export engines' subtitle PNGs) and renderSubOverlay
+   (the on-stage preview) ALL scale from here, so at any slider value a
+   cue still fits one line in preview and PNG alike — and at 100% every
+   value is exactly the pre-V224 number, so untouched projects render
+   byte-identical subtitle PNGs and export graphs. */
+function subSizeFactor(ed){const v=ed?ed.subSize:null;return (typeof v==='number'&&isFinite(v)&&v>=50&&v<=200)?v/100:1}
+function subPngOpts(ed,S){const gold=!!ed&&ed.subColor==='gold';return{size:Math.round(46*S*subSizeFactor(ed)),color:gold?'#FFD740':'#FFFFFF',kw:gold?'#FFFFFF':'#FFD740',band:!!(ed&&ed.subBand)}}
 /* V217: effective mixer gains WITH the per-track mutes applied — one
    derivation shared by exportOne and the insert render */
 function mixGains(ed){return{bgm:(ed&&ed.bgmMute)?0:Math.max(0,Math.min(100,(ed&&ed.bgmVol)||0))/100,voice:(ed&&ed.voiceMute)?0:Math.max(0,Math.min(300,(ed&&ed.voiceVol==null?100:ed.voiceVol)))/100}}
@@ -835,7 +847,59 @@ async function edgeTTSLong(text,voiceName,statusFn){
    silence pause between lines; the measured per-chunk durations +
    that pause are what the subtitle timings are derived from, so the
    cues and the speech share one timeline by construction. */
-const VOICE_LINE_PAUSE=0.35;
+const VOICE_LINE_PAUSE=0.12;
+/* V224: voice-assembly schema. v1 (no marker) = untrimmed chunks +
+   the old 0.35s pause; v2 = precisely trimmed chunks + 0.12s pause.
+   voiceFresh, the export reuse gate and unifiedCues all require the
+   current marker, so a voice cached by older code is regenerated
+   instead of silently keeping its ~0.7s inter-line gaps. The per-line
+   RAW chunk cache (ttsLineCache) needs no bump: trimming happens at
+   assembly time, on whatever raw chunk the cache returns. */
+const VOICE_ASM=2;
+/* V224 precise per-chunk silence trim. Raw TTS chunks carry baked-in
+   head/tail silence (≈0.35s per chunk, measured on the user's own
+   app-generated voice), which the old assembly kept whole — stacked
+   on the inserted pause, consecutive lines sat ~0.7s apart and the
+   narration felt stop-start. RMS over 10ms windows with the threshold
+   at −42dB under the chunk's own peak; speech opens/closes only on 3
+   CONSECUTIVE above-threshold windows (a lone spike — a Gemini start
+   click — never counts); ~40ms of pad is kept at both ends.
+   Burst guard: a short (≤0.75s) final segment that is noise-like
+   (mean zero-crossing rate ≥0.08) and detached from the speech by a
+   ≥80ms gap under −50dB is the Gemini tail hiss — it is dropped, so
+   a trimmed chunk ENDS in speech + pad, never in hiss. Returns the
+   [s0, s1) sample range of d (channel-0 samples at sample rate sr). */
+function voiceTrimRange(d,sr){
+ const n=d.length;if(!n||!sr)return[0,n];
+ const win=Math.max(1,Math.round(sr*0.01)),nw=Math.ceil(n/win);
+ let peak=0;for(let i=0;i<n;i++){const a=Math.abs(d[i]);if(a>peak)peak=a}
+ if(peak<=0)return[0,n];
+ const thr=peak*Math.pow(10,-42/20),sil=peak*Math.pow(10,-50/20);
+ const rms=new Float32Array(nw),above=new Uint8Array(nw);
+ for(let w=0;w<nw;w++){const s=w*win,e=Math.min(n,s+win);let sum=0;for(let i=s;i<e;i++)sum+=d[i]*d[i];rms[w]=Math.sqrt(sum/Math.max(1,e-s));above[w]=rms[w]>thr?1:0}
+ let on=-1;for(let w=0;w+2<nw;w++){if(above[w]&&above[w+1]&&above[w+2]){on=w;break}}
+ if(on<0){for(let w=0;w<nw;w++){if(above[w]){on=w;break}}}
+ if(on<0)return[0,n];
+ let off=-1,endW=nw-1,guard=0;
+ while(guard++<8){
+  let cand=-1;for(let w=endW;w>=2;w--){if(above[w]&&above[w-1]&&above[w-2]){cand=w;break}}
+  if(cand<0){off=endW;break}
+  let segS=cand,gap=0;for(let w=cand;w>=0;w--){if(above[w]){segS=w;gap=0}else if(++gap>=3)break}
+  if(segS<=on){off=cand;break}
+  let gapN=0;for(let w=segS-1;w>=0;w--){if(rms[w]<sil)gapN++;else break}
+  let burst=false;
+  if(gapN*win/sr>=0.08&&(cand-segS+1)*win/sr<=0.75){let zc=0,cnt=0;const s0=segS*win,s1=Math.min(n,(cand+1)*win);for(let i=s0+1;i<s1;i++){if((d[i-1]<0)!==(d[i]<0))zc++;cnt++}burst=cnt>0&&(zc/cnt)>=0.08}
+  if(!burst){off=cand;break}
+  endW=segS-gapN-1;off=endW; /* drop the burst segment; endW (the last
+     window before its silence gap) is a safe offset — the loop then
+     refines it against the previous segment, which may itself be a
+     burst and get dropped the same way */
+ }
+ if(off<0)off=nw-1;
+ const pad=Math.round(0.04*sr);
+ const s0=Math.max(0,on*win-pad),s1=Math.min(n,(off+1)*win+pad);
+ return s1>s0?[s0,s1]:[0,n];
+}
 const ttsLineCache=new Map();
 function ttsLineKey(ed,text){return strHash([ed.ttsEngine,ed.ttsEngine==='edge'?ed.edgeVoice:ed.voice,genSpeedFactor(ed.p).toFixed(3),String(text).length,String(text)].join('|'))}
 async function synthLine(ed,text,statusFn){
@@ -849,15 +913,19 @@ async function assembleLineChunks(raws){
   for(const r of raws){const ab=r.bytes.buffer.slice(r.bytes.byteOffset||0,(r.bytes.byteOffset||0)+r.bytes.byteLength);bufs.push(await ctx.decodeAudioData(ab))}
   if(!bufs.length)throw new Error('အသံ chunk မရှိပါ');
   const sr=bufs[0].sampleRate||24000,pauseN=Math.round(VOICE_LINE_PAUSE*sr);
-  const total=bufs.reduce((a,b)=>a+b.length,0)+pauseN*Math.max(0,bufs.length-1);
+  /* V224: trim every chunk's baked-in head/tail silence BEFORE the
+     concat; the TRIMMED durations are the chunk durations everywhere
+     downstream, so voiceCueTimings keeps the subtitles sample-exact
+     on the tightened timeline. */
+  const trims=bufs.map(b=>{const d=b.getChannelData(0);const rate=b.sampleRate||sr;const rg=voiceTrimRange(d,rate);return{d,s0:rg[0],s1:rg[1],rate}});
+  const total=trims.reduce((a,t)=>a+(t.s1-t.s0),0)+pauseN*Math.max(0,bufs.length-1);
   const pcm=new Uint8Array(total*2);const dv=new DataView(pcm.buffer);let off=0;
-  bufs.forEach((b,bi)=>{
-   const d=b.getChannelData(0);const n=Math.min(b.length,d.length);
-   for(let i=0;i<n;i++){const s=Math.max(-1,Math.min(1,d[i]));dv.setInt16(off,s<0?s*0x8000:s*0x7FFF,true);off+=2}
-   off+=(b.length-n)*2;
-   if(bi<bufs.length-1)off+=pauseN*2;
+  trims.forEach((t,bi)=>{
+   const n=t.s1-t.s0;
+   for(let i=0;i<n;i++){const s=Math.max(-1,Math.min(1,t.d[t.s0+i]));dv.setInt16(off,s<0?s*0x8000:s*0x7FFF,true);off+=2}
+   if(bi<trims.length-1)off+=pauseN*2;
   });
-  return{bytes:pcmBytesToWav(pcm,sr),ext:'wav',chunkDurs:bufs.map(b=>b.duration),pause:VOICE_LINE_PAUSE};
+  return{bytes:pcmBytesToWav(pcm,sr),ext:'wav',chunkDurs:trims.map(t=>(t.s1-t.s0)/t.rate),pause:VOICE_LINE_PAUSE};
  }catch(e){
   /* decode fallback: plain byte concatenation (the old assembly) with
      per-chunk durations probed; the recorded pause is 0 because the
@@ -1628,10 +1696,10 @@ async function runExport(ed){
       block with both durations + the speed needed (instructive error). */
    const vid=(ed.ttsEngine==='edge'?ed.edgeVoice:ed.voice);
    const canon=canonicalLines(ed);
-   let vc=(ed.voiceCache&&ed.voiceCache.engine===ed.ttsEngine&&ed.voiceCache.voice===vid&&(ed.voiceCache.linesSig!=null?ed.voiceCache.linesSig===canon.join('\n'):ed.voiceCache.text===lines.join(' ')))?ed.voiceCache:null;
+   let vc=(ed.voiceCache&&ed.voiceCache.asm===VOICE_ASM&&ed.voiceCache.engine===ed.ttsEngine&&ed.voiceCache.voice===vid&&(ed.voiceCache.linesSig!=null?ed.voiceCache.linesSig===canon.join('\n'):ed.voiceCache.text===lines.join(' ')))?ed.voiceCache:null;
    let pristine,pext;
    if(vc){pristine=vc.bytes;pext=vc.ext;log('✅ အသံ အပိုင်းမှာ ထုတ်ထားသော အသံကို ပြန်သုံးပါတယ်')}
-   else{log('အသံ ထုတ်နေပါတယ်…');GEN_W=Math.min(30,3*Math.max(1,canon.length));expTotal+=GEN_W;expCeil(LOAD_W+GEN_W,'🎙️ အသံ ထုတ်နေပါတယ်…');const gv=await generateVoiceLines(ed,canon,log,(i,n)=>expSet(LOAD_W+GEN_W*(n?i/n:1),'🎙️ အသံ ထုတ်နေပါတယ်… ('+i+'/'+n+')'));pristine=gv.bytes;pext=gv.ext;vc={text:lines.join(' '),lines:canon.slice(),linesSig:canon.join('\n'),engine:ed.ttsEngine,voice:vid,bytes:pristine,ext:pext,genSpeed:genSpeedFactor(p),chunkDurs:gv.chunkDurs,pause:gv.pause||0,dur:0};ed.voiceCache=vc}
+   else{log('အသံ ထုတ်နေပါတယ်…');GEN_W=Math.min(30,3*Math.max(1,canon.length));expTotal+=GEN_W;expCeil(LOAD_W+GEN_W,'🎙️ အသံ ထုတ်နေပါတယ်…');const gv=await generateVoiceLines(ed,canon,log,(i,n)=>expSet(LOAD_W+GEN_W*(n?i/n:1),'🎙️ အသံ ထုတ်နေပါတယ်… ('+i+'/'+n+')'));pristine=gv.bytes;pext=gv.ext;vc={asm:VOICE_ASM,text:lines.join(' '),lines:canon.slice(),linesSig:canon.join('\n'),engine:ed.ttsEngine,voice:vid,bytes:pristine,ext:pext,genSpeed:genSpeedFactor(p),chunkDurs:gv.chunkDurs,pause:gv.pause||0,dur:0};ed.voiceCache=vc}
    if(!vc.dur)vc.dur=(vc.chunkDurs&&vc.chunkDurs.length)?vc.chunkDurs.reduce((a,b)=>a+b,0)+(vc.pause||0)*Math.max(0,vc.chunkDurs.length-1):await probeAudioDur(pristine,pext);
    const eff=effSpeedOf(ed),effDur=vc.dur?vc.dur/eff:0;
    if(vc.dur&&effDur>dur+0.05){
@@ -1906,7 +1974,7 @@ function downloadText(name,text){const b=new Blob([text],{type:'text/plain;chars
    original-audio mode they are the char-weighted spread over the trim,
    as before. */
 function exportMaxW(ed){return canvasGeom(ed).W-40}
-function subLineFs(ed){const W=canvasGeom(ed).W;return Math.round(46*(W/720))}
+function subLineFs(ed){const W=canvasGeom(ed).W;return Math.round(46*(W/720)*subSizeFactor(ed))}
 function canonicalSplit(ed){
  const raw=($('#'+ed.p+'-subs').value||'').split('\n').map(s=>s.trim()).filter(Boolean);
  const maxW=canvasGeom(ed).W-40,fs=subLineFs(ed);
@@ -1941,7 +2009,7 @@ function unifiedCues(ed){
  const lines=canonicalLines(ed);
  if(!lines.length)return[];
  const vc=ed.voiceCache;
- if(ed.audioMode==='voice'&&vc&&vc.chunkDurs&&vc.chunkDurs.length===lines.length&&vc.linesSig===lines.join('\n')&&vc.engine===ed.ttsEngine&&vc.voice===(ed.ttsEngine==='edge'?ed.edgeVoice:ed.voice)){
+ if(ed.audioMode==='voice'&&vc&&vc.asm===VOICE_ASM&&vc.chunkDurs&&vc.chunkDurs.length===lines.length&&vc.linesSig===lines.join('\n')&&vc.engine===ed.ttsEngine&&vc.voice===(ed.ttsEngine==='edge'?ed.edgeVoice:ed.voice)){
   const ts=voiceCueTimings(vc.chunkDurs,vc.pause||0,start,effSpeedOf(ed),end);
   ed._cueSrc='voice';
   return lines.map((text,i)=>({text,start:ts[i].start,end:ts[i].end}));
@@ -2123,13 +2191,20 @@ function cueSigFor(ed){
  function renderSubOverlay(txt){
   /* V217: body colour + «keyword» accent spans + optional band — the
      preview twin of subPngOpts/textPNG, re-rendered only on change */
-  const key=txt+'|'+ed.subColor+'|'+(ed.subBand?1:0);
+  const key=txt+'|'+ed.subColor+'|'+(ed.subBand?1:0)+'|'+subSizeFactor(ed);
   if(key===subRenderKey)return;subRenderKey=key;
   const gold=ed.subColor==='gold',body=gold?'#FFD740':'#FFFFFF',kw=gold?'#FFFFFF':'#FFD740';
   overlayEl.style.color=body;
   overlayEl.style.background=ed.subBand?'rgba(0,0,0,0.55)':'';
   overlayEl.style.padding=ed.subBand?'6px 12px':'';
   overlayEl.style.borderRadius=ed.subBand?'10px':'';
+  /* V224: preview size — the CSS clamp() size is the 100% base; the
+     slider factor multiplies it live (clear first, read the computed
+     base, then set the scaled px, so repeated renders never compound).
+     At 100% the inline size is simply removed — today's exact look. */
+  const sf=subSizeFactor(ed);
+  if(sf===1){overlayEl.style.fontSize=''}
+  else{overlayEl.style.fontSize='';const base=parseFloat(getComputedStyle(overlayEl).fontSize)||17;overlayEl.style.fontSize=(base*sf).toFixed(1)+'px'}
   overlayEl.innerHTML=parseKwRuns(txt).map(r=>r.kw?'<span style="color:'+kw+'">'+escapeHtml(r.t)+'</span>':escapeHtml(r.t)).join('');
  }
  function updateOverlay(){
@@ -2589,7 +2664,7 @@ function cueSigFor(ed){
  };
  /* ================= voiceover (gated on script, engine choice, cache + mini player) ================= */
  function effVoice(){return ed.ttsEngine==='edge'?ed.edgeVoice:ed.voice}
- function voiceFresh(){const c=ed.voiceCache;if(!c||c.engine!==ed.ttsEngine||c.voice!==effVoice())return false;/* V219: freshness is judged on the canonical line list the voice actually spoke */if(c.linesSig!=null)return c.linesSig===canonicalLines(ed).join('\n');return c.text===scriptText()}
+ function voiceFresh(){const c=ed.voiceCache;if(!c||c.asm!==VOICE_ASM||c.engine!==ed.ttsEngine||c.voice!==effVoice())return false;/* V219: freshness is judged on the canonical line list the voice actually spoke */if(c.linesSig!=null)return c.linesSig===canonicalLines(ed).join('\n');return c.text===scriptText()}
  function checkVoiceStale(){
   const has=!!ed.voiceCache,fresh=voiceFresh();
   const st=E('voiceStale');if(st)st.style.display=(has&&!fresh)?'block':'none';
@@ -2698,7 +2773,7 @@ function cueSigFor(ed){
       display line) — the same list the cues are built from */
    const lines=canonicalLines(ed);
    const gv=await generateVoiceLines(ed,lines,setVoiceStatus);
-   ed.voiceCache={text:txt,lines:lines.slice(),linesSig:lines.join('\n'),engine:ed.ttsEngine,voice:effVoice(),bytes:gv.bytes,ext:gv.ext,genSpeed:genSpeedFactor(p),chunkDurs:gv.chunkDurs,pause:gv.pause||0,dur:0};
+   ed.voiceCache={asm:VOICE_ASM,text:txt,lines:lines.slice(),linesSig:lines.join('\n'),engine:ed.ttsEngine,voice:effVoice(),bytes:gv.bytes,ext:gv.ext,genSpeed:genSpeedFactor(p),chunkDurs:gv.chunkDurs,pause:gv.pause||0,dur:0};
    ed._effVoice=null;ed.renderUrl=null;
    ed.adjSpeed=1;const asEl=E('adjSpeed');if(asEl){asEl.value=0;E('adjSpeedVal').textContent='0%'}
    if(ed.voiceUrl)URL.revokeObjectURL(ed.voiceUrl);
@@ -2898,6 +2973,15 @@ function cueSigFor(ed){
    const row=document.createElement('div');row.className='cue-row'+(r.id===ed.blurSel?' sel':'');
    const when=r.full?'တစ်လျှောက်လုံး':(((+r.start)||0)+'s – '+((+r.end)||0)+'s');
    row.innerHTML='<span class="ct">အကွက် '+(i+1)+' · '+(r.type==='mosaic'?'🔲 Mosaic':'🌫️ Blur')+' · အား '+(r.strength||40)+' · '+when+(r.on?'':' · ပိတ်ထား')+'</span>';
+   /* V224: a delete button ON THE ROW — the only delete used to be the
+      last control of the selected region's editor, far below the fold
+      of the scrolling sheet body, so users could not find a way to
+      remove a region at all (user report 2026-11-14). One tap, no
+      confirmation (same as the editor's delete); removing a region is
+      recoverable by re-adding it, and the row tap still only selects. */
+   const db=document.createElement('button');db.type='button';db.className='cue-del';db.textContent='🗑️';db.title='ဒီ အကွက် ဖျက်';db.setAttribute('aria-label','ဒီ အကွက် ဖျက်');
+   db.onclick=ev=>{ev.stopPropagation();ed.blurRegions=(ed.blurRegions||[]).filter(x=>x.id!==r.id);if(ed.blurSel===r.id)ed.blurSel=ed.blurRegions.length?ed.blurRegions[0].id:null;persistBlur();syncBlurLayer();blurListRender();blurCtlSync();showNotice('🗑️ အကွက် ဖျက်ပြီးပါပြီ','info')};
+   row.appendChild(db);
    row.onclick=()=>selectBlurRegion(r.id);
    list.appendChild(row);
   });
@@ -2952,13 +3036,13 @@ function cueSigFor(ed){
  /* V217 completed-settings state: subs colour/band, title size+pos,
     logo source/size/opacity/pos, border width/colour, blur regions —
     all persisted through persistOvl / persistBlur below */
- ed.subColor=(SETTINGS.subColor==='gold')?'gold':'white';ed.subBand=!!SETTINGS.subBand;
+ ed.subColor=(SETTINGS.subColor==='gold')?'gold':'white';ed.subBand=!!SETTINGS.subBand;ed.subSize=(typeof SETTINGS.subSize==='number'&&SETTINGS.subSize>=50&&SETTINGS.subSize<=200)?SETTINGS.subSize:100;
  ed.titleSize=SETTINGS.titleSize||52;ed.titleX=(typeof SETTINGS.titleX==='number'?SETTINGS.titleX:0.5);ed.titleY=(typeof SETTINGS.titleY==='number'?SETTINGS.titleY:0.15);
  ed.logoSrc=(SETTINGS.logoSrc==='image')?'image':'brand';ed.logoSize=SETTINGS.logoSize||14;ed.logoOpacity=(typeof SETTINGS.logoOpacity==='number'?SETTINGS.logoOpacity:90);ed.logoX=(typeof SETTINGS.logoX==='number'?SETTINGS.logoX:0.10);ed.logoY=(typeof SETTINGS.logoY==='number'?SETTINGS.logoY:0.08);ed.logoImgData=null;try{ed.logoImgData=localStorage.getItem('recaps_logo_img')||null}catch(e){}
  ed.borderW=SETTINGS.borderW||6;ed.borderColor=SETTINGS.borderColor||'#FFE92E';
  ed.blurRegions=[];try{const _br=SETTINGS.blurRegions;if(Array.isArray(_br))ed.blurRegions=JSON.parse(JSON.stringify(_br)).filter(r=>r&&typeof r.x==='number'&&typeof r.y==='number')}catch(e){}
  ed.blurSel=ed.blurRegions.length?ed.blurRegions[0].id:null;
- function persistOvl(){SETTINGS.textOn=ed.textOn;SETTINGS.textStr=ed.textStr;SETTINGS.textSize=ed.textSize;SETTINGS.textX=ed.textX;SETTINGS.textY=ed.textY;SETTINGS.logoOn=ed.logoOn;SETTINGS.logoText=ed.logoText;SETTINGS.borderOn=ed.borderOn;SETTINGS.titleSize=ed.titleSize;SETTINGS.titleX=ed.titleX;SETTINGS.titleY=ed.titleY;SETTINGS.logoSrc=ed.logoSrc;SETTINGS.logoSize=ed.logoSize;SETTINGS.logoOpacity=ed.logoOpacity;SETTINGS.logoX=ed.logoX;SETTINGS.logoY=ed.logoY;SETTINGS.borderW=ed.borderW;SETTINGS.borderColor=ed.borderColor;SETTINGS.subColor=ed.subColor;SETTINGS.subBand=ed.subBand;saveSettings()}
+ function persistOvl(){SETTINGS.textOn=ed.textOn;SETTINGS.textStr=ed.textStr;SETTINGS.textSize=ed.textSize;SETTINGS.textX=ed.textX;SETTINGS.textY=ed.textY;SETTINGS.logoOn=ed.logoOn;SETTINGS.logoText=ed.logoText;SETTINGS.borderOn=ed.borderOn;SETTINGS.titleSize=ed.titleSize;SETTINGS.titleX=ed.titleX;SETTINGS.titleY=ed.titleY;SETTINGS.logoSrc=ed.logoSrc;SETTINGS.logoSize=ed.logoSize;SETTINGS.logoOpacity=ed.logoOpacity;SETTINGS.logoX=ed.logoX;SETTINGS.logoY=ed.logoY;SETTINGS.borderW=ed.borderW;SETTINGS.borderColor=ed.borderColor;SETTINGS.subColor=ed.subColor;SETTINGS.subBand=ed.subBand;SETTINGS.subSize=ed.subSize;saveSettings()}
  function persistBlur(){try{SETTINGS.blurRegions=JSON.parse(JSON.stringify(ed.blurRegions||[]))}catch(e){SETTINGS.blurRegions=ed.blurRegions||[]}saveSettings()}
  let pillTimer=null;
  function showModePill(){const mp=E('modePill');if(!mp)return;mp.classList.remove('hide');if(pillTimer)clearTimeout(pillTimer);pillTimer=setTimeout(()=>{mp.classList.add('hide')},3000)}
@@ -2999,19 +3083,22 @@ function cueSigFor(ed){
   o.style.display=show?'block':'none';
   const wrap=o.parentElement;
   if(wrap&&(o.offsetWidth||o.offsetHeight)){const r=wrap.getBoundingClientRect();if(r.width>0&&r.height>0){
-   /* V221: clamp by the RENDERED lockup, not just the CSS box — the
-      wordmark (.logo-word, white-space:nowrap) can be WIDER than the
-      badge box, so the old offsetWidth-only measurement understated
-      the half-width and the badge could slide partly OUT of the
-      frame, its text clipped at the edge (live test on bc58797).
-      The wordmark's true extent comes from a text Range rect measured
-      against the overlay's own centre; if Range is unavailable the
-      scroll size is the fallback. */
-   let hw=o.offsetWidth/2/r.width,hh=o.offsetHeight/2/r.height;
-   try{const orc=o.getBoundingClientRect();const word=o.querySelector('.logo-word');
-    if(word&&word.textContent){const rg=document.createRange();rg.selectNodeContents(word);const wr=rg.getBoundingClientRect();
-     if(wr.width>0){const ccx=orc.left+orc.width/2,ccy=orc.top+orc.height/2;hw=Math.max(hw,Math.max(Math.abs(wr.left-ccx),Math.abs(wr.right-ccx))/r.width);hh=Math.max(hh,Math.max(Math.abs(wr.top-ccy),Math.abs(wr.bottom-ccy))/r.height)}}}
-   catch(e){const sw=Math.max(o.offsetWidth,o.scrollWidth||0);if(sw)hw=sw/2/r.width}
+   /* V224: clamp by the BADGE box (the overlay's own offset size) —
+      the same extent the export uses: buildLogoPNG's PNG is the badge
+      image only, and exportOne clamps its centre to [w/2, W−w/2], so
+      preview travel and export placement now agree exactly and the
+      badge can be dragged until its edge touches either frame edge.
+      The V221 Range measurement of the wordmark is REMOVED: the word
+      ("old.burma.com" at 15px ≈ 110px wide) is far wider than the
+      badge box (14% of a stage that is only ~200–260px wide on a
+      phone), so clamping by the word's extent pinned the centre to
+      roughly [0.27, 0.73] — the logo sat near the middle and could
+      not be dragged to the left/right edges at all (user recordings,
+      2026-11-14). The word stays centred on the badge and is not part
+      of the exported PNG, so its overflow no longer eats the travel
+      range; vertically the box height includes the word line, so the
+      whole visible lockup still stays inside the top/bottom edges. */
+   const hw=o.offsetWidth/2/r.width,hh=o.offsetHeight/2/r.height;
    let cx=(typeof ed.logoX==='number')?ed.logoX:0.10,cy=(typeof ed.logoY==='number')?ed.logoY:0.08;if(hw<0.5)cx=Math.max(hw,Math.min(1-hw,cx));if(hh<0.5)cy=Math.max(hh,Math.min(1-hh,cy));ed.logoX=cx;ed.logoY=cy}}
   o.style.left=(((typeof ed.logoX==='number')?ed.logoX:0.10)*100)+'%';o.style.top=(((typeof ed.logoY==='number')?ed.logoY:0.08)*100)+'%'}
  function syncBorderOvl(){const o=E('borderOvl');if(!o)return;o.style.display=ed.borderOn?'block':'none';o.style.borderWidth=Math.max(1,Math.round(((ed.borderW||6))*0.5))+'px';o.style.borderColor=ed.borderColor||'#FFE92E'}
@@ -3317,7 +3404,16 @@ function cueSigFor(ed){
  syncSubChips();
  if(scWrap)scWrap.addEventListener('click',e=>{const b=e.target.closest('.style-chip');if(!b)return;ed.subColor=b.dataset.v;SETTINGS.subColor=ed.subColor;saveSettings();syncSubChips();subRenderKey='';updateOverlay();refreshSummaries()});
  const sbT=E('subBandTgl');if(sbT){sbT.classList.toggle('on',!!ed.subBand);sbT.onclick=()=>{ed.subBand=!ed.subBand;SETTINGS.subBand=ed.subBand;saveSettings();sbT.classList.toggle('on',ed.subBand);subRenderKey='';updateOverlay();refreshSummaries()}}
- const subR=E('subReset');if(subR)subR.onclick=()=>{ed.subColor='white';ed.subBand=false;SETTINGS.subColor='white';SETTINGS.subBand=false;saveSettings();syncSubChips();if(sbT)sbT.classList.remove('on');subRenderKey='';E('subPosReset').click();updateOverlay();refreshSummaries();showNotice('↺ စာတန်း Setting မူလ ပြန်ထားပါပြီ','info')};
+ /* V224: subtitle SIZE slider — 'input' scales the preview live and
+    persists; 'change' (release) re-derives the cues from the new
+    canonical split (hand-edited cues are kept, per ensureCues' rule)
+    and lets the stale-voice machinery flag any existing voice, since
+    canonicalLines changed exactly as a script edit would change it */
+ const ssI=E('subSize'),ssV=E('subSizeVal');
+ if(ssI){ssI.value=ed.subSize||100;if(ssV)ssV.textContent=(ed.subSize||100)+'%';
+  ssI.addEventListener('input',()=>{ed.subSize=parseInt(ssI.value,10)||100;if(ssV)ssV.textContent=ed.subSize+'%';persistOvl();subRenderKey='';updateOverlay()});
+  ssI.addEventListener('change',()=>{if(!ed.cuesManual&&scriptLines().length)rebuildCues();checkVoiceStale();refreshSummaries()})}
+ const subR=E('subReset');if(subR)subR.onclick=()=>{ed.subColor='white';ed.subBand=false;ed.subSize=100;SETTINGS.subColor='white';SETTINGS.subBand=false;SETTINGS.subSize=100;saveSettings();syncSubChips();if(sbT)sbT.classList.remove('on');if(ssI){ssI.value=100;if(ssV)ssV.textContent='100%'}subRenderKey='';E('subPosReset').click();updateOverlay();if(!ed.cuesManual&&scriptLines().length)rebuildCues();checkVoiceStale();refreshSummaries();showNotice('↺ စာတန်း Setting မူလ ပြန်ထားပါပြီ','info')};
  /* V217 Title completion: size slider + page Reset (the drag lives
     with the overlay drags above) */
  const tiSize=E('titleSize');if(tiSize){tiSize.value=ed.titleSize||52;E('titleSizeVal').textContent=ed.titleSize||52;tiSize.addEventListener('input',()=>{ed.titleSize=parseInt(tiSize.value,10)||52;E('titleSizeVal').textContent=ed.titleSize;persistOvl();syncTitleOvl()})}

@@ -25,7 +25,7 @@ body{font-family:'Inter','Padauk','Noto Sans Myanmar',system-ui,sans-serif;color
 #page-recap{display:flex;flex-direction:column;height:100%}
 /* V212: no top app bar — only the sheet offset var remains (the sheet
    wrap starts at the preview frame's bottom edge, measured live) */
-:root{--sheetTop:64px}
+:root{--sheetTop:50dvh}
 .icon-btn{width:38px;height:38px;flex:0 0 38px;border-radius:11px;border:1.5px solid #2C2C35;background:#1E1E24;font-size:16px;cursor:pointer;color:#F2F2F5;display:flex;align-items:center;justify-content:center;font-family:inherit}
 .pill-btn{padding:8px 9px;border-radius:999px;border:1.5px solid #2C2C35;background:#1E1E24;font-family:inherit;font-size:12.5px;font-weight:700;color:#F2F2F5;cursor:pointer;white-space:nowrap}
 .pill-btn:disabled{opacity:.55}
@@ -65,7 +65,7 @@ input[type=checkbox]{width:19px;height:19px;accent-color:#22A06B;cursor:pointer}
 .tgl::after{content:'';position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:all .18s}
 .tgl.on{background:#F59E0B}.tgl.on::after{left:25px}
 video.preview{width:100%;border-radius:12px;background:#000}
-video.preview.framed{max-height:40vh;object-fit:contain}
+video.preview.framed{max-height:40vh;max-height:40dvh;object-fit:contain}
 .file-info{font-size:12.5px;color:#9A9AA5;margin-top:6px;word-break:break-all}
 /* waveform loading */
 .wave{display:none;align-items:flex-end;gap:2.5px;height:16px}
@@ -80,7 +80,7 @@ body.locked{overflow:hidden}
 .sheet-wrap{position:fixed;left:0;right:0;bottom:0;top:var(--sheetTop,0px);z-index:100;display:none}
 .sheet-wrap.open{display:block}
 .sheet-bg{position:absolute;inset:0;background:rgba(5,5,8,.5)}
-.sheet{position:absolute;left:0;right:0;bottom:0;max-width:640px;margin:0 auto;background:#17171C;border-radius:24px 24px 0 0;padding:16px 18px 14px;color:#F2F2F5;max-height:min(68vh,100%);display:flex;flex-direction:column;overflow:hidden}
+.sheet{position:absolute;left:0;right:0;bottom:0;max-width:640px;margin:0 auto;background:#17171C;border-radius:24px 24px 0 0;padding:16px 18px 14px;color:#F2F2F5;height:50vh;height:50dvh;max-height:100%;display:flex;flex-direction:column;overflow:hidden}
 .sheet h3{font-size:16px;font-weight:800;margin:0}
 /* V214: the close controls live in the sheet FRAME, not the content —
    a sticky header row (title + ✕) and a footer (✓ ပြီး) bracket the
@@ -93,9 +93,12 @@ body.locked{overflow:hidden}
 .sheet-foot{flex:none;padding-top:12px}
 .sheet-foot .btn{width:100%}
 /* V213: EVERY feature pop-up (the Burmese Voice app pattern) shares the
-   same cap — the wrap starts below the preview frame, so 100% of the
-   wrap height is the hard limit and the video stays visible above */
-.sheet-wrap.voicePop .sheet{max-height:min(68vh,100%)}
+   same size — the wrap starts at the middle of the viewport, so the
+   sheet fills the wrap exactly. V231 (user order): every sheet is
+   EXACTLY the bottom 50dvh of the viewport (vh fallback first), the
+   body scrolls internally, header/footer stay pinned by the flex
+   column. */
+.sheet-wrap.voicePop .sheet{height:50vh;height:50dvh;max-height:100%}
 .opt{width:100%;text-align:left;padding:14px;border-radius:14px;border:1.5px solid #2C2C35;background:#1B1B21;margin-bottom:9px;cursor:pointer;font-family:inherit;color:#F2F2F5}
 .opt b{display:block;font-size:14px;color:#F2F2F5}.opt span{font-size:12.5px;color:#9A9AA5}
 .opt.sel{border-color:#F59E0B;background:rgba(245,158,11,.14)}
@@ -113,7 +116,7 @@ body.locked{overflow:hidden}
 .exp-pct{font-size:26px;font-weight:800;color:#FFD88A;line-height:1}
 .exp-bar{height:8px;border-radius:5px;background:#22303C;margin-top:10px;overflow:hidden}
 .exp-bar-fill{height:100%;width:0%;background:linear-gradient(90deg,#F59E0B,#F97316);border-radius:5px;transition:width .2s ease}
-.exp-prev{width:100%;height:auto;max-height:46vh;object-fit:contain;background:#000;border:1px solid #223544;border-radius:13px;margin-top:10px;box-sizing:border-box}
+.exp-prev{width:100%;height:auto;max-height:46vh;max-height:46dvh;object-fit:contain;background:#000;border:1px solid #223544;border-radius:13px;margin-top:10px;box-sizing:border-box}
 .exp-meta{display:flex;justify-content:space-between;gap:10px;margin-top:8px;font-size:12px;color:#9FB4C0}
 .exp-meta .exp-elapsed{font-variant-numeric:tabular-nums;white-space:nowrap}
 .exp-meta .exp-eta{white-space:nowrap;color:#FFD88A;font-variant-numeric:tabular-nums}
@@ -134,16 +137,24 @@ body.locked{overflow:hidden}
    so the panel below kept room; V229: the Script panel left the main
    page (it is a toolbar sheet now), so the caps are raised to ~56vh
    of stage height and the stage takes the freed space; width follows
-   from the ratio. */
+   from the ratio. V231 (user orders): the stage block takes only the
+   TOP HALF of the screen — every cap is in dvh (vh fallback line
+   first; vh on Android Chrome is the LARGE viewport, which is what
+   pushed the toolbar off the bottom in V230) and the stage height is
+   capped twice: ≤ 50dvh − 14px (the .vid-sticky padding, so frame +
+   padding ≤ the top 50%) AND ≤ 100dvh − 340px (the fixed chrome
+   budget: Main row + 61px timeline + toolbar + safe-area), so the
+   column can never overflow the visible height on any phone. Sheets
+   take the bottom 50dvh (see .sheet). */
 .vid-wrap.stg-916,.vid-wrap.stg-169,.vid-wrap.stg-11{overflow:hidden;background:#000;border-radius:12px}
-.vid-wrap.stg-916{aspect-ratio:9/16;width:min(600px,100%,31.5vh)}
-.vid-wrap.stg-169{aspect-ratio:16/9;width:min(600px,100%,100vh)}
-.vid-wrap.stg-11{aspect-ratio:1/1;width:min(600px,100%,56vh)}
+.vid-wrap.stg-916{aspect-ratio:9/16;width:min(600px,100%,calc((50vh - 14px)*0.5625),calc(max(0px,100vh - 340px)*0.5625));width:min(600px,100%,calc((50dvh - 14px)*0.5625),calc(max(0px,100dvh - 340px)*0.5625))}
+.vid-wrap.stg-169{aspect-ratio:16/9;width:min(600px,100%,calc((50vh - 14px)*1.7778),calc(max(0px,100vh - 340px)*1.7778));width:min(600px,100%,calc((50dvh - 14px)*1.7778),calc(max(0px,100dvh - 340px)*1.7778))}
+.vid-wrap.stg-11{aspect-ratio:1/1;width:min(600px,100%,calc(50vh - 14px),calc(max(0px,100vh - 340px)));width:min(600px,100%,calc(50dvh - 14px),calc(max(0px,100dvh - 340px)))}
 .vid-wrap .preview-bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0}
 .vid-wrap.stg-916 .preview,.vid-wrap.stg-169 .preview,.vid-wrap.stg-11 .preview{position:absolute;inset:0;width:100%;height:100%;max-height:none;object-fit:contain;border-radius:0;z-index:1}
 .vid-wrap.stg-square .preview{top:21.875%;bottom:auto;height:56.25%}
 .vid-wrap.stg-916 .ph-box,.vid-wrap.stg-169 .ph-box,.vid-wrap.stg-11 .ph-box{position:absolute;inset:0;aspect-ratio:auto;max-height:none;border-radius:0;z-index:2}
-.ph-box{background:#0E2233;border-radius:12px;aspect-ratio:16/9;max-height:38vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;cursor:pointer}
+.ph-box{background:#0E2233;border-radius:12px;aspect-ratio:16/9;max-height:38vh;max-height:38dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;cursor:pointer}
 .ph-ic{font-size:38px}
 .ph-t{font-size:15px;font-weight:700;color:#E8F0F5}
 .ph-s{font-size:12px;color:#8FA6B5}
@@ -242,18 +253,11 @@ body.locked{overflow:hidden}
 .vp-track{flex:1;height:6px;border-radius:99px;background:#2C2C35;overflow:hidden}
 .vp-bar{height:100%;width:0%;background:#F59E0B;border-radius:99px;transition:width .2s linear}
 .vp-time{font-size:12px;color:#9A9AA5;font-weight:600;white-space:nowrap}
-/* ===== V210 status strip (under the preview frame) ===== */
-.status-strip{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;font-size:11px;font-weight:700;color:#9A9AA5;max-width:600px;margin-left:auto;margin-right:auto}
-.status-strip span{background:#17171C;border:1px solid #26262E;border-radius:999px;padding:2px 8px;white-space:nowrap}
-.status-strip span b{color:#34D399}
-/* V212: the Export segment IS the export button — same pill look as the
-   other segments, an inviting orange pill once export-ready */
-.status-strip .strip-btn{font:inherit;color:inherit;background:#17171C;border:1px solid #26262E;border-radius:999px;padding:2px 8px;white-space:nowrap;cursor:pointer;display:inline-flex;align-items:center;gap:5px}
-.status-strip .strip-btn b{color:#34D399}
-.status-strip .strip-btn.ready{background:linear-gradient(90deg,#F59E0B,#F97316);color:#fff;border-color:transparent;box-shadow:0 3px 10px rgba(245,130,20,.35)}
-.status-strip .strip-btn.ready b{color:#fff}
-.status-strip .strip-btn:disabled{opacity:.55}
-.strip-btn.loading .wave{display:inline-flex}
+/* ===== V231: the V210 status strip is DELETED (user order) — its
+   Script / Voice segments are gone entirely and the Export segment
+   moved into the Main quick row as the qtExport pill (same .qtgl
+   styling as the SRT / Voice pills; runExport's loading wave +
+   disabled state now hang off .qtgl below). ===== */
 .deck-sec{margin-top:14px}
 .deck-sec:first-child{margin-top:2px}
 .deck-ttl{font-size:13.5px;font-weight:800;color:#F2F2F5;margin-bottom:8px}
@@ -317,6 +321,8 @@ input[type=range].vs-range::-moz-range-track{height:9px}
 .quick-row{display:flex;align-items:center;gap:7px;margin-top:7px}
 .qtgl{flex:0 0 auto;padding:5px 12px;border-radius:999px;border:1.5px solid #2C2C35;background:#1B1B21;color:#9A9AA5;font-family:inherit;font-size:11.5px;font-weight:700;cursor:pointer;white-space:nowrap}
 .qtgl.on{border-color:#F59E0B;background:rgba(245,158,11,.14);color:#FBBF24}
+.qtgl:disabled{opacity:.55}
+.qtgl.loading .wave{display:inline-flex}
 .create-mini{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;color:#C9C9D2;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .create-mini .dot{width:8px;height:8px;border-radius:50%;background:#22C55E;flex:0 0 8px;box-shadow:0 0 0 3px rgba(34,197,94,.18)}
 /* V230 custom colour pickers (Subs / Title / Text sheets) */
@@ -410,18 +416,19 @@ function showNotice(msg,type){const n=$('#notice');n.textContent=msg;n.className
 function showDone(title,text){$('#doneTitle').textContent=title;$('#doneText').textContent=text;$('#donePop').classList.add('show')}
 $('#doneOk').addEventListener('click',()=>$('#donePop').classList.remove('show'));
 /* bottom sheet */
-/* Pinned-video geometry: the video frame (.vid-sticky) stays fixed at
-   the top while features are edited, so sheets must open BELOW it —
-   the sheet wrap starts at the pinned frame's bottom edge (the video
-   stays fully visible and undimmed) and every pop-up is capped at
-   min(68vh,100%) (V213, consistent across tools). --sheetTop is
-   measured from the live layout and refreshed on resize, on video load
-   and at every sheet open (the app bar is gone, so the offset is the
-   frame height alone). */
+/* Sheet geometry (V231, user order): the preview/stage takes the TOP
+   50% of the screen and every bottom sheet takes the BOTTOM 50% — the
+   sheet wrap starts at the middle of the VISIBLE viewport and the
+   sheet itself is exactly 50dvh tall (see .sheet). --sheetTop is half
+   of window.innerHeight (the visible height — the same quantity dvh
+   measures, so the two stay in lockstep as the browser chrome shows
+   and hides) and is refreshed on resize and at every sheet open.
+   (Pre-V231 the wrap started at the pinned frame's bottom edge and
+   sheets were capped at min(68vh,100%).) */
 function syncPinGeometry(){
- const fp=document.querySelector('.vid-sticky');const fh=(fp&&fp.offsetHeight)||0;
  const de=document.documentElement;
- if(de&&de.style&&de.style.setProperty){de.style.setProperty('--sheetTop',fh+'px')}
+ const top=Math.max(0,Math.round(((window.innerHeight||0)/2)));
+ if(de&&de.style&&de.style.setProperty){de.style.setProperty('--sheetTop',top+'px')}
 }
 window.syncPinGeometry=syncPinGeometry;
 if(window.addEventListener)window.addEventListener('resize',syncPinGeometry);
@@ -459,8 +466,7 @@ function editorHTML(p){
    can be embedded in it) */
 const transportInner='<div class="transport" id="'+p+'-transport"><div class="tp-row"><button class="tp-play" id="'+p+'-tpPlay" aria-label="Play / Pause">▶</button><button class="tp-skip" id="'+p+'-tpBack" aria-label="5 စက္ကန့် နောက်ပြန်">⏪</button><span class="tp-time" id="'+p+'-tpCur">0:00</span><span class="tp-time tp-right" id="'+p+'-tpDur">0:00</span><button class="tp-skip" id="'+p+'-tpFwd" aria-label="5 စက္ကန့် ရှေ့တိုး">⏩</button></div><input type="range" class="tp-seek" id="'+p+'-tpSeek" min="0" max="1000" value="0"></div>';
 const frameInner='<input type="file" id="'+p+'-file" accept="video/*" style="display:none">'
-+'<div class="vid-wrap"><div class="ph-box" id="'+p+'-ph"><div class="ph-ic">🎬</div><div class="ph-t">Tap to Upload Video</div><div class="ph-s">နှိပ်ပြီး video ဖိုင် ရွေးပါ</div></div><video class="preview-bg" id="'+p+'-videoBg" playsinline muted style="display:none"></video><video class="preview framed" id="'+p+'-video" playsinline style="display:none"></video><div class="mode-pill hide" id="'+p+'-modePill">🎬 Movie Recap Mode</div><div class="title-overlay" id="'+p+'-titleOvl"></div><div class="logo-overlay" id="'+p+'-logoOvl"></div><div class="blur-layer" id="'+p+'-blurLayer"></div><div class="sub-overlay" id="'+p+'-overlay"></div><div class="text-overlay" id="'+p+'-textOvl"></div><div class="frame-border" id="'+p+'-borderOvl"></div>'+transportInner+'</div>'
-+'<div class="status-strip" id="'+p+'-statusStrip"><button type="button" class="strip-btn" id="'+p+'-stScript">📝 Script —</button><span id="'+p+'-stVoice">🎙️ အသံ —</span><button type="button" class="strip-btn" id="'+p+'-stExport"><span class="wave"><i></i><i></i><i></i><i></i><i></i></span><span class="btn-label">🎬 Export —</span></button></div>';
++'<div class="vid-wrap"><div class="ph-box" id="'+p+'-ph"><div class="ph-ic">🎬</div><div class="ph-t">Tap to Upload Video</div><div class="ph-s">နှိပ်ပြီး video ဖိုင် ရွေးပါ</div></div><video class="preview-bg" id="'+p+'-videoBg" playsinline muted style="display:none"></video><video class="preview framed" id="'+p+'-video" playsinline style="display:none"></video><div class="mode-pill hide" id="'+p+'-modePill">🎬 Movie Recap Mode</div><div class="title-overlay" id="'+p+'-titleOvl"></div><div class="logo-overlay" id="'+p+'-logoOvl"></div><div class="blur-layer" id="'+p+'-blurLayer"></div><div class="sub-overlay" id="'+p+'-overlay"></div><div class="text-overlay" id="'+p+'-textOvl"></div><div class="frame-border" id="'+p+'-borderOvl"></div>'+transportInner+'</div>';
 const pickRow='<div class="pick-row"><button class="btn light small" id="'+p+'-pick">📱 Video ရွေးရန်</button><div class="file-info" id="'+p+'-fileinfo">ဖိုင် မရွေးရသေးပါ</div></div>';
 const trimInner='<div class="row2"><div class="field" id="'+p+'-f-start"><label>စချိန် (စက္ကန့်)</label><input type="number" id="'+p+'-start" value="0" min="0" step="0.1"><div class="err-text" id="'+p+'-e-start"></div></div><div class="field" id="'+p+'-f-end"><label>ဆုံးချိန် (စက္ကန့်)</label><input type="number" id="'+p+'-end" value="0" min="0" step="0.1"><div class="err-text" id="'+p+'-e-end"></div></div></div>'
 +'<div class="field"><label>စချိန် slider</label><input type="range" id="'+p+'-rstart" value="0" min="0" max="100" step="0.1"></div><div class="field"><label>ဆုံးချိန် slider</label><input type="range" id="'+p+'-rend" value="0" min="0" max="100" step="0.1"></div><p class="hint" style="font-size:12px;color:#527884">ကြာချိန်: <b id="'+p+'-durinfo">—</b></p><button class="btn light" id="'+p+'-trimReset" style="width:100%">↺ အပြည့် ပြန်ထား (Video တစ်ခုလုံး)</button>';
@@ -592,7 +598,7 @@ const timelineInner='<div class="tl-wrap" id="'+p+'-timeline"><div class="tl-scr
    toolbar below it is pinned to the very bottom of the viewport. */
 const mainRowInner='<div class="main-row" id="'+p+'-mainRow">'
 +modeInner
-+'<div class="quick-row"><button type="button" class="qtgl on" id="'+p+'-qtSrt">🎨 SRT</button><button type="button" class="qtgl" id="'+p+'-qtVoice">🎙️ Voice</button><span class="create-mini"><span class="dot"></span><span id="'+p+'-createStatus">အသင့်ဖြစ်ပါပြီ</span></span></div>'
++'<div class="quick-row"><button type="button" class="qtgl on" id="'+p+'-qtSrt">🎨 SRT</button><button type="button" class="qtgl" id="'+p+'-qtVoice">🎙️ Voice</button><button type="button" class="qtgl" id="'+p+'-qtExport"><span class="wave"><i></i><i></i><i></i><i></i><i></i></span><span class="btn-label">🎬 Export</span></button><span class="create-mini"><span class="dot"></span><span id="'+p+'-createStatus">အသင့်ဖြစ်ပါပြီ</span></span></div>'
 +'</div>';
 const spacerInner='<div class="col-spacer" aria-hidden="true"></div>';
 function tb(id,ic,t){return '<button class="tool-btn" id="'+p+'-tool'+id+'"><span class="tic">'+ic+'</span>'+t+'</button>'}
@@ -640,24 +646,27 @@ const homes='<div id="'+p+'-sheetHomes" style="display:none">'
 +'<div id="'+p+'-homeExport">'+exportInner+'</div>'
 +'</div>';
 /* ---- Layout (V213, CapCut-style; V229 Script sheet; V230 Main row +
-   Export sheet): dark editor that fills the viewport — the page
-   itself never scrolls. NO top bar — first comes the large preview
-   frame (transparent icon transport + slim seek line overlaid on its
-   bottom edge) + the status strip (the Script segment opens the
-   Script sheet; the Export segment IS the Export button), then the
-   MAIN ROW (Original/New mode buttons + style chips + SRT/Voice
-   quick toggles + Create status — the mode section that used to live
-   in the Script sheet), then the TIMELINE (TWO tracks: subtitle cues
-   + voice, + playhead), a flexible SPACER, and the TOOLBAR pinned at
-   the very bottom (the spacer absorbs every leftover pixel — the old
-   in-flow panel is GONE, the Export view is a bottom-sheet pop-up
-   like every other tool now). EVERY toolbar tool (📝 Script FIRST)
-   opens its controls as a BOTTOM-SHEET POP-UP (Burmese Voice app
-   style): the control blocks park in the hidden #sheetHomes and are
-   mounted into the sheet one at a time (single-instance); 🔑 Key at
-   the toolbar's end opens the Gemini-key pop-up sheet. The daily
-   flow stays short: video -> Main mode button -> 🎙️ Voice Create
-   pop-up -> 📣 အသံ ထုတ်မယ် -> Export (status strip). ---- */
+   Export sheet; V231 strip deleted + 50/50 split): dark editor that
+   fills the viewport — the page itself never scrolls. NO top bar —
+   first comes the preview frame (transparent icon transport + slim
+   seek line overlaid on its bottom edge), capped at the TOP 50dvh of
+   the screen, then the MAIN ROW (Original/New mode buttons + style
+   chips + SRT/Voice quick toggles + the 🎬 Export button + Create
+   status — the mode section that used to live in the Script sheet;
+   V231: the old status strip under the frame is DELETED and its
+   Export segment lives here now, beside the Voice pill), then the
+   TIMELINE (TWO tracks: subtitle cues + voice, + playhead), a
+   flexible SPACER, and the TOOLBAR pinned at the very bottom (the
+   spacer absorbs every leftover pixel — the old in-flow panel is
+   GONE, the Export view is a bottom-sheet pop-up like every other
+   tool now, and every sheet is exactly the BOTTOM 50dvh). EVERY
+   toolbar tool (📝 Script FIRST) opens its controls as a
+   BOTTOM-SHEET POP-UP (Burmese Voice app style): the control blocks
+   park in the hidden #sheetHomes and are mounted into the sheet one
+   at a time (single-instance); 🔑 Key at the toolbar's end opens the
+   Gemini-key pop-up sheet. The daily flow stays short: video -> Main
+   mode button -> 🎙️ Voice Create pop-up -> 📣 အသံ ထုတ်မယ် -> 🎬 Export
+   (Main row). ---- */
 return ''
 +'<div class="vid-sticky" id="'+p+'-framePin">'+frameInner+'</div>'
 +mainRowInner
@@ -724,7 +733,7 @@ function makeEditor(p){
     Gemini voice-detail picker) handlers are GONE — both pickers are
     subsumed by the ONE voice-field picker (openVoicePicker, studio block). */
  [['titleTgl'],['subTgl']].forEach(([id])=>{E(id).onclick=()=>E(id).classList.toggle('on')});
- const sxBtn=E('stExport');if(sxBtn)sxBtn.onclick=()=>exportEditor(ed); /* V212: the status-strip Export segment is the only Export button */
+ const sxBtn=E('qtExport');if(sxBtn)sxBtn.onclick=()=>exportEditor(ed); /* V231: the Export button lives in the Main quick row (the status strip is deleted) — same exportEditor entry: validation first, then the Export sheet */ /* V212→V231: the Main-row qtExport pill is the only Export button */
  refreshLabels();applyStage();return ed;
 }
 makeEditor('recap');
@@ -1672,7 +1681,7 @@ async function runExport(ed){
  const assignCues=cs=>{segments.forEach(sg=>{sg.cues=cs.filter(c=>{const mid=(c.start+c.end)/2;return mid>=sg.start-0.01&&mid<sg.end+0.01}).map(c=>({text:c.text,start:Math.max(sg.start,c.start+syncDl),end:Math.min(sg.end,c.end+syncDl)})).filter(c=>c.end-c.start>=0.05)})};
  assignCues(cues);
  /* --- run --- */
- ed.busy=true;const btn=E('stExport');btn.classList.add('loading');btn.disabled=true;btn.querySelector('.btn-label').textContent='လုပ်ဆောင်နေပါတယ်…';
+ ed.busy=true;const btn=E('qtExport');btn.classList.add('loading');btn.disabled=true;btn.querySelector('.btn-label').textContent='လုပ်ဆောင်နေပါတယ်…';
  const logBox=E('log');logBox.style.display='none';logBox.textContent='';
  const logTgl=E('logToggle');if(logTgl)logTgl.textContent='📄 Log ပြရန်';
  if(window.__recapShowExport)window.__recapShowExport(); /* V230: the Export view is a bottom-sheet pop-up now */
@@ -2131,8 +2140,9 @@ function cueSigFor(ed){
  function goStep(i){
   /* V213: 0 -> MAIN (any pop-up closes), 1 -> the 🎨 စာတန်း pop-up,
      2 -> the 🎙️ Voice Create pop-up, 3 -> the Export view.
-     V229: MAIN is the stage + status strip + timeline (the Script
-     page is the 📝 Script sheet). V230: MAIN gains the Main row and
+     V229: MAIN is the stage + timeline (the Script page is the
+     📝 Script sheet). V230: MAIN gains the Main row and V231 deletes
+     the status strip (its Export segment moved into the Main row);
      the Export view is a pop-up SHEET too — nothing mounts in-flow,
      so 0 just closes any sheet and 3 opens the Export sheet. */
   i=Math.max(0,Math.min(3,i));
@@ -3387,8 +3397,8 @@ function cueSigFor(ed){
     controls park in the hidden #recap-sheetHomes and are mounted
     into the sheet one at a time (single-instance, openSheetNodes),
     returning on close via ✓ / backdrop. The main page is: stage +
-    status strip + Main row + timeline + spacer + bottom-pinned
-    toolbar — nothing opens in-flow any more. */
+    Main row + timeline + spacer + bottom-pinned toolbar (V231: the
+    status strip is deleted) — nothing opens in-flow any more. */
  function markToolSel(tid){$$('#'+p+'-toolbar .tool-btn').forEach(b=>b.classList.toggle('sel',!!tid&&b.id===p+'-'+tid))}
  /* 🎬 Export pop-up: render the chooser state, then mount the parked
     Export home into the sheet (the same mount/return machinery as
@@ -3433,7 +3443,7 @@ function cueSigFor(ed){
  const logTglBtn=E('logToggle');if(logTglBtn)logTglBtn.onclick=()=>{const lb=E('log');if(!lb)return;const show=lb.style.display!=='block';lb.style.display=show?'block':'none';logTglBtn.textContent=show?'📄 Log ဖျောက်ရန်':'📄 Log ပြရန်'};
  const expCancelBtn0=E('expCancel');if(expCancelBtn0)expCancelBtn0.onclick=()=>{if(ed._expCancel&&ed._expCancel.fire)ed._expCancel.fire()};
  /* ================= V221: Export chooser =================
-    The strip's Export segment validates (exportEditor) and lands
+    The Main-row 🎬 Export button validates (exportEditor) and lands
     here in a SETUP state; 🎬 Export စတင် snapshots the choices into
     ed._expOpts and calls runExport. Engine rows are built from the
     EXP_ENGINES list. Engine + resolution persist via SETTINGS; the
@@ -3502,29 +3512,21 @@ function cueSigFor(ed){
  };
  const subTglSyncEl=E('subTgl');if(subTglSyncEl)subTglSyncEl.addEventListener('click',()=>syncMainToggles());
  function refreshSummaries(){
-  /* V216 dead-code removal: the per-feature sum* summary lines went away
-     with the V213 feature rows — their target elements no longer exist,
-     so the sumSet writes were guarded no-ops. Only the status strip
-     (real elements) is refreshed now. */
-  const sl=scriptLines().length;
-  /* V208 status strip (inside the pinned frame): glanceable job state from
-     the SAME real state — Script: script lines exist; အသံ: a fresh voice
-     cache matches the current script + engine + voice; Export (coarse):
-     file + script present, plus that voice when the export audio mode is
-     voiceover. Never shows ✓ for anything not actually in state. */
-  const stS=E('stScript');if(stS)stS.innerHTML='📝 Script '+(sl>0?'<b>✓</b>':'—');
-  const stV=E('stVoice');if(stV)stV.innerHTML='🎙️ အသံ '+(voiceFresh()?'<b>✓</b>':'—');
-  const stX=E('stExport');if(stX){const xReady=!!(ed.file&&sl>0&&(ed.audioMode!=='voice'||voiceFresh()));const xlb=stX.querySelector('.btn-label');if(xlb)xlb.innerHTML='🎬 Export '+(xReady?'<b>အသင့်</b>':'—');stX.classList.toggle('ready',xReady)}
+  /* V231: the V208 status strip is DELETED (user order) — its Script /
+     Voice / Export segment state writes went with it, and the Main-row
+     Export button carries no ready-state (it validates on tap, like
+     the segment did). What remains of this refresh is the Main quick
+     toggles mirror. (The V216 sum* writes were already dead code.) */
   syncMainToggles(); /* V230: the Main quick toggles mirror the real state */
  }
  window.__refreshFeatureSummaries=refreshSummaries;
  /* V213 toolbar: EVERY tool opens its feature as a bottom pop-up.
     V229: 📝 Script IS in the toolbar now — FIRST, as step 1 of the
-    workflow — and the status strip's Script segment opens the same
-    sheet (consistent with its Export segment opening the Export
-    view). The deck nodes move into the sheet and back untouched. */
+    workflow. V231: the status strip (whose Script segment also opened
+    this sheet) is deleted by user order — the toolbar button is the
+    Script sheet's only entry point again. The deck nodes move into
+    the sheet and back untouched. */
  [['toolScript','homeScript','📝 Script'],['toolSubs','homeSubs','🎨 စာတန်း'],['toolMixer','homeMixer','🔊 အသံ ချိန်ညှိ'],['toolTrim','homeTrim','✂️ Trim'],['toolAspect','homeAspect','🌫️ Blur / Aspect'],['toolTitle','homeTitle','📝 Title'],['toolText','homeText','➕ Text'],['toolLogo','homeLogo','🛡️ Logo'],['toolBorder','homeBorder','📐 Border']].forEach(([tid,home,title])=>{const b=E(tid);if(b)b.onclick=()=>openFeatureSheet(home,title)});
- const stScriptBtn=E('stScript');if(stScriptBtn)stScriptBtn.onclick=()=>openFeatureSheet('homeScript','📝 Script');
  const tvBtn=E('toolVoice');if(tvBtn)tvBtn.onclick=()=>openVoiceSheet();
  /* 🫥 Blur pop-up: opening it turns the frame's regions editable
     (drag / corner-resize); ANY close path drops .blur-editing again */

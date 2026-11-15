@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="my">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NLO — Recaps Dashboard</title>
+<link rel="icon" type="image/png" sizes="64x64" href="favicon-64.png">
+<meta name="theme-color" content="#0B0B0F">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0B0B0F;color:#E8F1F2;font-family:'Segoe UI',system-ui,sans-serif;padding:20px 16px 40px;max-width:860px;margin:0 auto}
+header{display:flex;align-items:center;gap:14px;margin-bottom:22px}
+header img{width:52px;height:52px;border-radius:14px}
+header h1{font-size:20px;font-weight:800}
+header p{font-size:12px;color:#7d99a3}
+.card{background:#14141c;border:1px solid #26262f;border-radius:16px;padding:16px;margin-bottom:14px}
+.card h2{font-size:13px;color:#9fc3cd;font-weight:700;margin-bottom:10px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+.stat{background:#0e0e13;border:1px solid #23232d;border-radius:12px;padding:12px;text-align:center}
+.stat b{display:block;font-size:24px;color:#FFD740}
+.stat span{font-size:12px;color:#9fc3cd}
+input[type=password]{width:100%;background:#0e0e13;border:1px solid #2c2c38;border-radius:10px;color:#E8F1F2;padding:12px;font-size:15px;margin-bottom:10px}
+button{background:#FFD740;color:#14100a;border:none;border-radius:10px;padding:12px 18px;font-size:15px;font-weight:800;cursor:pointer;width:100%}
+button:active{opacity:.85}
+.err{color:#ff8a80;font-size:14px;margin-top:10px;white-space:pre-wrap}
+.hint{font-size:12px;color:#527884;margin-top:8px}
+.bars{display:flex;align-items:flex-end;gap:3px;height:120px;margin-top:6px}
+.bar{flex:1;background:#2b6cb0;border-radius:3px 3px 0 0;min-height:2px;position:relative}
+.bar:hover{background:#FFD740}
+.bar i{position:absolute;top:-18px;left:50%;transform:translateX(-50%);font-style:normal;font-size:10px;color:#9fc3cd;display:none}
+.bar:hover i{display:block}
+.barlab{display:flex;gap:3px;margin-top:4px}
+.barlab span{flex:1;text-align:center;font-size:9px;color:#527884;overflow:hidden}
+.eng{display:flex;justify-content:space-between;font-size:14px;padding:6px 0;border-bottom:1px solid #1d1d26}
+.eng:last-child{border-bottom:none}
+</style>
+</head>
+<body>
+<header>
+ <img src="icon-192.png" alt="NLO">
+ <div><h1>NLO — Recaps Dashboard</h1><p>Recaps app အသုံးပြုမှု စာရင်း (anonymous counts သာ)</p></div>
+</header>
+
+<div class="card" id="gate">
+ <h2>🔑 Owner Code</h2>
+ <input type="password" id="code" placeholder="Owner code ရိုက်ထည့်ပါ" autocomplete="off">
+ <button id="go">📊 စာရင်း ကြည့်မယ်</button>
+ <div class="err" id="gateErr"></div>
+ <p class="hint">Code ကို ဒီ tab ထဲမှာပဲ (sessionStorage) သိမ်းပါတယ် — tab ပိတ်ရင် ပျောက်ပါတယ်။</p>
+</div>
+
+<div id="out" style="display:none">
+ <div class="card"><h2>📱 ဖွင့်နှုန်း (App Opens)</h2>
+  <div class="grid">
+   <div class="stat"><b id="dDevices">–</b><span>Device စုစုပေါင်း</span></div>
+   <div class="stat"><b id="dToday">–</b><span>ဒီနေ့ ဖွင့်နှုန်း</span></div>
+   <div class="stat"><b id="d7">–</b><span>၇ ရက် အတွင်း</span></div>
+   <div class="stat"><b id="d30">–</b><span>ရက် ၃၀ အတွင်း</span></div>
+   <div class="stat"><b id="dAll">–</b><span>စုစုပေါင်း</span></div>
+  </div>
+ </div>
+ <div class="card"><h2>⚙️ လုပ်ဆောင်ချက် များ</h2>
+  <div class="grid">
+   <div class="stat"><b id="dScript">–</b><span>📝 Script ထုတ်</span></div>
+   <div class="stat"><b id="dVoice">–</b><span>📣 အသံ ထုတ်</span></div>
+   <div class="stat"><b id="dImport">–</b><span>📁 အသံ ထည့်</span></div>
+   <div class="stat"><b id="dExp">–</b><span>🎬 Export စုစုပေါင်း</span></div>
+  </div>
+  <div id="engRows" style="margin-top:10px"></div>
+ </div>
+ <div class="card"><h2>📈 ရက် ၃၀ — နေ့စဉ် ဖွင့်နှုန်း</h2>
+  <div class="bars" id="bars"></div>
+  <div class="barlab" id="barlab"></div>
+ </div>
+ <button id="again" style="background:#1d1d26;color:#E8F1F2">🔄 ပြန် စစ်မယ်</button>
+ <div class="err" id="outErr"></div>
+</div>
+
+<script>
+/* NLO — Recaps Dashboard (V244). Reads aggregate counts ONLY through
+   the recaps_stats(p_code) RPC; the owner code lives in the private
+   recaps_admin table (never readable through the API) and is checked
+   inside the security-definer function. The anon key below is the
+   public client key — it can insert events and call the RPC, nothing
+   more. See hidden_files/recaps_stats.sql. */
+const SUPABASE_URL='https://nfdkvungccscalshjmzo.supabase.co';
+const SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5mZGt2dW5nY2NzY2Fsc2hqbXpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM4NTk3NjgsImV4cCI6MjEwOTQzNTc2OH0.ldWyHiPwsebTsjxgQsCarYtlTcBEEUcD4piJlQfdbIo';
+const $=id=>document.getElementById(id);
+async function loadStats(code){
+ const res=await fetch(SUPABASE_URL+'/rest/v1/rpc/recaps_stats',{method:'POST',headers:{'apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+SUPABASE_ANON_KEY,'Content-Type':'application/json'},body:JSON.stringify({p_code:code})});
+ if(!res.ok)throw new Error('Server က ပြန်ဖြေတာ မအောင်မြင်ပါ (HTTP '+res.status+') — နောက်မှ ပြန် စမ်းပါ');
+ const data=await res.json();
+ if(data&&data.error)throw new Error('❌ Owner code မမှန်ပါ — မှန်တဲ့ code ရိုက်ထည့်ပါ');
+ return data;
+}
+function render(d){
+ $('dDevices').textContent=d.devices??0;
+ $('dToday').textContent=d.opens_today??0;
+ $('d7').textContent=d.opens_7d??0;
+ $('d30').textContent=d.opens_30d??0;
+ $('dAll').textContent=d.opens_total??0;
+ $('dScript').textContent=d.script_gen??0;
+ $('dVoice').textContent=d.voice_gen??0;
+ $('dImport').textContent=d.audio_import??0;
+ $('dExp').textContent=d.exports_total??0;
+ const eng=d.exports_by_engine||{};
+ const names={st:'🎬 Standard',mt:'⚡ Multi-thread',hw:'⚡ Hardware'};
+ $('engRows').innerHTML=Object.keys(eng).length?Object.keys(eng).sort().map(k=>'<div class="eng"><span>'+(names[k]||k||'(မသိ)')+'</span><b>'+eng[k]+'</b></div>').join(''):'<p class="hint">Export engine အလိုက် စာရင်း မရှိသေးပါ</p>';
+ const days=Array.isArray(d.daily_opens)?d.daily_opens:[];
+ const max=Math.max(1,...days.map(x=>x.n||0));
+ $('bars').innerHTML=days.map(x=>'<div class="bar" style="height:'+Math.max(2,Math.round((x.n||0)/max*100))+'%"><i>'+(x.n||0)+'</i></div>').join('');
+ $('barlab').innerHTML=days.map(x=>'<span>'+String(x.d||'').slice(5)+'</span>').join('');
+ $('out').style.display='block';
+}
+async function run(){
+ const code=$('code').value.trim();
+ $('gateErr').textContent='';$('outErr').textContent='';
+ if(!code){$('gateErr').textContent='⚠️ Owner code အရင် ရိုက်ထည့်ပါ';return}
+ try{
+  const d=await loadStats(code);
+  sessionStorage.setItem('recaps_dash_code',code);
+  render(d);
+ }catch(e){$('gateErr').textContent='❌ '+(e&&e.message?e.message:String(e));$('out').style.display='none'}
+}
+$('go').onclick=run;
+$('again').onclick=run;
+$('code').addEventListener('keydown',e=>{if(e.key==='Enter')run()});
+const saved=sessionStorage.getItem('recaps_dash_code');
+if(saved){$('code').value=saved;run()}
+</script>
+</body>
+</html>

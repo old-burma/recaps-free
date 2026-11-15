@@ -24,10 +24,26 @@
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', event => event.waitUntil(self.clients.claim()));
 
-self.addEventListener('fetch', event => {
-  const req = event.request;
-  if (req.method !== 'GET') return; // pass through untouched
-  event.respondWith((async () => {
+/* V244: PWA asset cache — merged into THIS worker on purpose. A scope
+ * can have only ONE active service worker, and this one is load-
+ * bearing (the COI headers below are what enable MT ffmpeg), so the
+ * PWA offline support lives here instead of in a second worker that
+ * would replace it. ONLY the five static brand assets are cached —
+ * icons + manifest, which do not change between deploys (bump
+ * PWA_CACHE if one ever does). Navigations and index.html are NEVER
+ * cached: the app HTML is always fetched fresh, so the ?v= update
+ * flow keeps working exactly as before. Cached copies are stored
+ * AFTER the COI rewrite, so they carry the isolation headers too. */
+const PWA_CACHE = 'recaps-pwa-v1';
+const PWA_PATHS = ['/icon-192.png', '/icon-512.png', '/apple-touch-icon.png', '/favicon-64.png', '/manifest.json'];
+function isPwaAsset(url) {
+  try {
+    const u = new URL(url);
+    return u.origin === self.location.origin && PWA_PATHS.indexOf(u.pathname) >= 0;
+  } catch (e) { return false; }
+}
+
+async function coiFetch(req) {
     let res;
     try {
       res = await fetch(req);
@@ -65,5 +81,24 @@ self.addEventListener('fetch', event => {
     } catch (err) {
       return res;
     }
+}
+
+self.addEventListener('fetch', event => {
+  const req = event.request;
+  if (req.method !== 'GET') return; // pass through untouched
+  event.respondWith((async () => {
+    if (isPwaAsset(req.url)) {
+      try {
+        const cache = await caches.open(PWA_CACHE);
+        const hit = await cache.match(req.url);
+        if (hit) return hit;
+        const res = await coiFetch(req);
+        if (res && res.status === 200) {
+          try { await cache.put(req.url, res.clone()); } catch (e) {}
+        }
+        return res;
+      } catch (e) { /* fall through to the plain COI path */ }
+    }
+    return coiFetch(req);
   })());
 });

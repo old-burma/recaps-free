@@ -4,6 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Recaps — Video Recap လုပ်ရန်</title>
+<!-- V244: PWA — manifest + NLO icons (the icon files live beside this
+     page; the service worker story is in coi-sw.js: the PWA asset
+     cache is merged INTO that worker, because a scope can hold only
+     one worker and the MT export path depends on the COI one) -->
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="64x64" href="favicon-64.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#0B0B0F">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Padauk:wght@400;700&family=Noto+Sans+Myanmar:wght@400;700&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
@@ -593,7 +601,7 @@ const trimInner='<div class="row2"><div class="field" id="'+p+'-f-start"><label>
 +'<div class="field"><label>စချိန် slider</label><input type="range" id="'+p+'-rstart" value="0" min="0" max="100" step="0.1"></div><div class="field"><label>ဆုံးချိန် slider</label><input type="range" id="'+p+'-rend" value="0" min="0" max="100" step="0.1"></div><p class="hint" style="font-size:12px;color:#527884">ကြာချိန်: <b id="'+p+'-durinfo">—</b></p><button class="btn light" id="'+p+'-trimReset" style="width:100%">↺ အပြည့် ပြန်ထား (Video တစ်ခုလုံး)</button>';
 const aspectField='<div class="field"><label>Aspect</label><div class="scroll-row aspect-opts" id="'+p+'-aspectOpts">'+Object.keys(ASPECTS).map(k=>'<button class="opt'+(k===SETTINGS.aspect?' sel':'')+'" data-v="'+k+'"><b>'+ASPECTS[k].label+'</b><span>'+ASPECTS[k].desc+'</span></button>').join('')+'</div></div><div class="field"><label>Blur အား — <span id="'+p+'-blurVal"></span></label><input type="range" id="'+p+'-blur" min="5" max="60" step="1"><p class="hint">Blur pad သုံးသော ပုံစံတွင်သာ သက်ရောက်ပါတယ်</p></div><button class="btn light" id="'+p+'-aspectReset" style="width:100%">↺ Aspect မူလ (9:16) ပြန်ထား</button>';
 const titleField='<div class="switch-row"><div><b style="font-size:14px">ခေါင်းစဉ် (Title)</b><div style="font-size:12px;color:#527884">Video ပေါ်တွင် ပြပြီး လက်ဖြင့် ရွှေ့နိုင်သည်</div></div><div class="tgl on" id="'+p+'-titleTgl"></div></div><div class="field" id="'+p+'-f-title"><label>ခေါင်းစဉ် စာသား</label><input type="text" id="'+p+'-title" placeholder="ဥပမာ — အံ့ဩဖွယ် ဖြစ်ရပ်"><div class="err-text" id="'+p+'-e-title"></div></div><div class="field"><label>စာလုံး အရွယ် — <span id="'+p+'-titleSizeVal">52</span></label><input type="range" id="'+p+'-titleSize" min="30" max="80" step="2" value="52"></div><div class="field"><label>ခေါင်းစဉ် အရောင်</label><input type="color" class="clr-inp" id="'+p+'-titleColor" value="#FFE92E"></div><button class="btn light" id="'+p+'-titleReset" style="width:100%">↺ Title Setting မူလ ပြန်ထား</button>';
-const subsFieldRecap='<div class="field" id="'+p+'-f-subs"><label>မြန်မာ Script (ပြင်နိုင်ပါတယ်)</label><textarea id="'+p+'-subs" placeholder="ပထမ ကြောင်း&#10;ဒုတိယ ကြောင်း&#10;တတိယ ကြောင်း"></textarea><div class="err-text" id="'+p+'-e-subs"></div><div style="margin-top:8px"><button type="button" class="btn light small" id="'+p+'-scriptCopy">📋 Copy</button><span style="font-size:12px;color:#527884;margin-left:8px">Script အပြည့်အစုံကို copy ယူရန်</span></div><p class="hint">တစ်ကြောင်း = စာတန်း cue တစ်ခု — ပြင်ပြီးရင် "↻ Script မှ အချိန် ပြန်ခွဲ" နှိပ်ပြီး cue အချိန် ပြန်ခွဲနိုင်ပါတယ်။ 🗣️ အသံ ထုတ်ရာမှာလည်း ဒီစာသားကိုပဲ သုံးပါမယ်</p></div>';
+const subsFieldRecap='<div class="field" id="'+p+'-f-subs"><label>မြန်မာ Script (ပြင်နိုင်ပါတယ်)</label><textarea id="'+p+'-subs" placeholder="ပထမ ကြောင်း&#10;ဒုတိယ ကြောင်း&#10;တတိယ ကြောင်း"></textarea><div class="err-text" id="'+p+'-e-subs"></div><div style="margin-top:8px"><button type="button" class="btn light small" id="'+p+'-scriptCopy">📋 Copy</button><span style="font-size:12px;color:#527884;margin-left:8px">Script အပြည့်အစုံကို copy ယူရန်</span></div><div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button type="button" class="btn light small" id="'+p+'-srtDl">⬇️ SRT</button><button type="button" class="btn light small" id="'+p+'-projSave">💾 Project သိမ်း</button><button type="button" class="btn light small" id="'+p+'-projLoad">📂 Project ဖွင့်</button><button type="button" class="btn light small" id="'+p+'-cueUndo" style="display:none">↩️ Undo</button><input type="file" id="'+p+'-projFile" accept=".json,application/json" style="display:none"></div><p class="hint" style="margin-top:6px">💾 Project ဖိုင်ထဲမှာ Script, cue အချိန်, setting အကုန် ပါပါတယ် — အသံ (Voice) ဖိုင်တော့ မပါပါ (နောက်မှ ပြန် ထုတ်/ထည့်ရန် လိုပါမယ်)။ 📂 ဖွင့်ရင် မူရင်း video ဖိုင်ကို ပြန် ရွေးပေးရပါမယ်</p><p class="hint">တစ်ကြောင်း = စာတန်း cue တစ်ခု — ပြင်ပြီးရင် "↻ Script မှ အချိန် ပြန်ခွဲ" နှိပ်ပြီး cue အချိန် ပြန်ခွဲနိုင်ပါတယ်။ 🗣️ အသံ ထုတ်ရာမှာလည်း ဒီစာသားကိုပဲ သုံးပါမယ်</p></div>';
 const subToggleRow='<div class="switch-row"><div><b style="font-size:14px">စာတန်း ဖွင့်ရန်</b><div style="font-size:12px;color:#527884">တစ်ကြောင်း = စာတန်း တစ်ခု၊ အချိန် အလိုအလျောက် ခွဲပေးမည်</div></div><div class="tgl on" id="'+p+'-subTgl"></div></div>';
 const srtRow='<button class="btn light small" id="'+p+'-srtBtn">📄 SRT ဒေါင်း</button><span style="font-size:12px;color:#527884;margin-left:8px">စာတန်း အချိန်ဇယား (.srt) ဖိုင် သီးခြား ဒေါင်းရန်</span>';
 const bgmField='<div class="field"><label>မူရင်းအသံ (BGM) — <span id="'+p+'-bgmVolVal">0%</span></label><input type="range" id="'+p+'-bgmVol" min="0" max="100" step="1" value="0"><p class="hint">Voice နှင့် ရောရာတွင် မူရင်း အသံ ဘယ်လောက် ချန်မလဲ — 0% ဆိုရင် မူရင်း အသံ လုံးဝ ပိတ်ပြီး Voice ပဲ ပါမည် (Video ထဲ ထည့်ခြင်း နှင့် Export တွင် သက်ရောက်သည်)</p></div>';
@@ -746,6 +754,7 @@ const exportInner='<div id="'+p+'-expSetup">'
 +'<button class="opt" data-res="640"><b>640</b><span>⚡ အမြန်ဆုံး — ဖိုင် အသေးဆုံး</span></button>'
 +'<button class="opt" data-res="720"><b>720</b><span>HD — အလယ် အလတ်</span></button>'
 +'<button class="opt" data-res="1080"><b>1080</b><span>အကောင်းဆုံး — မူလ အရည်အသွေး</span></button>'
++'<button class="opt" data-res="1440"><b>1440</b><span>2K — အရည်အသွေး အမြင့်ဆုံး (မူရင်း သေးရင် မချဲ့ပါ)</span></button>'
 +'</div></div>'
 +'<div class="switch-row" id="'+p+'-expIncTitleRow"><div><b style="font-size:14px">ခေါင်းစဉ် ထည့်မယ်</b><div style="font-size:12px;color:#527884">ဒီ Export တစ်ခုအတွက်သာ — Title setting မပြောင်းပါ</div></div><div class="tgl on" id="'+p+'-expIncTitle"></div></div>'
 +'<div class="switch-row" id="'+p+'-expIncLogoRow"><div><b style="font-size:14px">Logo ထည့်မယ်</b><div style="font-size:12px;color:#527884">ဒီ Export တစ်ခုအတွက်သာ — Logo setting မပြောင်းပါ</div></div><div class="tgl on" id="'+p+'-expIncLogo"></div></div>'
@@ -763,6 +772,7 @@ const keyHome='<div id="'+p+'-keyBox">'
 +'<p class="hint" style="margin-bottom:14px">recaps-free.work.gd<br>Video တင်ပြီး ဖုန်းထဲမှာပဲ Recap ထုတ်ရန် — Script → စာတန်း → အသံ → Export</p>'
 +'<div class="field"><label>🔑 Gemini Key (API Key)</label><input type="password" id="'+p+'-apiKey" placeholder="AIza…"><p class="hint">⚠️ Key ကို ဒီ browser ၏ localStorage ထဲမှာပဲ သိမ်းပါတယ် — server သို့ မပို့ပါ။ Google AI Studio မှ အခမဲ့ ရယူနိုင်ပါတယ်။ AI Script နှင့် Gemini TTS အတွက် လိုအပ်ပါတယ် (Edge TTS ဆိုရင် key မလိုပါ)</p><button class="btn light small" id="drawerKeyClear">🔑 Key ဖျက်</button></div>'
 +'<div style="font-size:13px;font-weight:800;margin:18px 0 8px">⚙️ Setting</div><button class="btn light" id="drawerReset" style="width:100%">↺ သိမ်းထားသော Setting များ မူလ ပြန်ထား</button><p class="hint" style="margin-top:6px">Aspect / အသံ / Overlay နေရာ စသော သိမ်းထားသည့် setting များကို ရှင်းပြီး app ကို ပြန် reload လုပ်ပါမယ် (Gemini Key မပါပါ)</p>'
++'<div style="text-align:center;font-size:11px;color:#527884;margin-top:18px">Recaps — by <b>NLO</b></div>'
 +'</div>';
 const homes='<div id="'+p+'-sheetHomes" style="display:none">'
 +'<div id="'+p+'-homeScript">'+deckInner+'</div>'
@@ -1085,6 +1095,47 @@ else{x.lineJoin='round';lines.forEach((ln,i)=>{const y=y0+i*lh;const txo=txOf();
    export prep hung forever at that cue with no error. Reject with a
    real message instead (buildLogoPNG already guards its null). */
 return new Promise((res,rej)=>c.toBlob(b=>{if(!b){rej(new Error('ပုံ ထုတ်မရပါ — PNG encode မရပါ'));return}b.arrayBuffer().then(ab=>res(new Uint8Array(ab)),rej)},'image/png'))}
+/* ================= V244: subtitle PNG SPEED (item 1) =================
+   The per-cue PNG prep phase was the slowest measured export phase on
+   the user's phone (140.9s for 53 cues, 2026-11-14). Two changes, both
+   PIXEL-NEUTRAL (a speed change, not a look change):
+   (a) an in-SESSION byte cache: a cue strip's pixels are a pure
+       function of textPNG's inputs — (text, W, blockH, opts.size,
+       opts.color, opts.kw, opts.band, opts.align, opts.cx, opts.pad)
+       — so a re-export, an engine retry or a later segment reuses the
+       bytes instead of paying the canvas draw + PNG encode again.
+       (The pre-V244 per-export dedupe key also carried subY; subY is
+       NOT a render input — it only positions the overlay, and each
+       cue's overlay still uses its own subY — so excluding it cannot
+       change a single pixel.) Callers always copy OUT of the cache
+       (ffCopy / a fresh Blob), so stored bytes are never detached or
+       mutated. Bounded like _subLayoutCache.
+   (b) bounded-concurrency rendering: unique strips are rendered by a
+       small pool instead of strictly one-after-another (textPNG's
+       draw is synchronous per call; its toBlob encode is async, so
+       overlapping calls overlap the encodes). Writes to the ffmpeg
+       FS and overlay/layer assembly stay sequential, in cue order.
+   subPngKey is the ONE key derivation — both export engines and the
+   cache share it, and the harness asserts it covers every input. */
+const _subPngCache=new Map();let _subPngCacheBytes=0;
+function subPngKey(text,W,H,opts){opts=opts||{};return JSON.stringify([String(text),W,H,opts.size||0,opts.color||'',opts.kw||'',opts.band?1:0,opts.align||'',opts.cx==null?'':opts.cx,opts.pad||0])}
+function subPngCacheGet(key){return _subPngCache.get(key)||null}
+function subPngCachePut(key,bytes){if(!bytes||!bytes.length)return;const old=_subPngCache.get(key);if(old)_subPngCacheBytes-=old.length;if(_subPngCache.size>=300||_subPngCacheBytes>64*1024*1024){_subPngCache.clear();_subPngCacheBytes=0}_subPngCache.set(key,bytes);_subPngCacheBytes+=bytes.length}
+/* Render every job ({key,text,H,opts}) at canvas width W with at most
+   `conc` textPNG calls in flight; resolves to a Map key->bytes holding
+   an entry for every job key (session-cache hits included). onOne(job,
+   ms, cached) fires per UNIQUE job. shouldStop() is polled before each
+   new render starts (in-flight renders finish; a stopped run simply
+   leaves keys missing and the caller raises the cancel error). */
+async function renderSubPngJobs(jobs,W,conc,onOne,shouldStop){
+ const out=new Map();const uniq=[];const seen=new Set();
+ for(const j of jobs){if(seen.has(j.key))continue;seen.add(j.key);const hit=subPngCacheGet(j.key);if(hit){out.set(j.key,hit);if(onOne)onOne(j,0,true)}else uniq.push(j)}
+ let idx=0;
+ const worker=async()=>{while(idx<uniq.length){if(shouldStop&&shouldStop())return;const j=uniq[idx++];const t0=expNow();const b=await textPNG(j.text,W,j.H,j.opts);const ms=expNow()-t0;subPngCachePut(j.key,b);out.set(j.key,b);if(onOne)onOne(j,ms,false)}};
+ const n=Math.max(1,Math.min(conc||3,uniq.length||1));
+ await Promise.all(Array.from({length:n},()=>worker()));
+ return out;
+}
 /* V217: the ONE place subtitle PNG params are derived from the editor —
    body colour + contrasting «keyword» colour + band flag (used by
    exportOne and asserted by the harness) */
@@ -1460,6 +1511,28 @@ function coiSetup(){
   }).catch(()=>{});
  }catch(e){}
 }
+/* ================= V244: anonymous usage stats =================
+   Fire-and-forget counters so the owner can see how much the app is
+   used (dashboard.html reads them back through the recaps_stats RPC;
+   see hidden_files/recaps_stats.sql). NO personal data: a random
+   per-device id, the event name and small meta (engine / resolution)
+   only — never file names, script text or keys. The sender is SILENT
+   on any failure, never awaited, never blocks or errors the UI, and
+   no-ops cleanly when the config below is empty.
+   CONFIG — the owner's public Supabase project (the anon key is a
+   public client key; recaps_events is RLS insert-only for anon): */
+const RECAPS_STATS_CFG={url:'https://nfdkvungccscalshjmzo.supabase.co',anonKey:'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5mZGt2dW5nY2NzY2Fsc2hqbXpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM4NTk3NjgsImV4cCI6MjEwOTQzNTc2OH0.ldWyHiPwsebTsjxgQsCarYtlTcBEEUcD4piJlQfdbIo'};
+function recapsDeviceId(){try{let id=localStorage.getItem('recaps_device_id');if(!id){id=(window.crypto&&crypto.randomUUID)?crypto.randomUUID():'d-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,12);localStorage.setItem('recaps_device_id',id)}return id}catch(e){return ''}}
+function recapsStat(event,meta){
+ try{
+  if(!RECAPS_STATS_CFG.url||!RECAPS_STATS_CFG.anonKey)return;
+  if(typeof fetch!=='function')return;
+  const body=JSON.stringify({device_id:recapsDeviceId(),event:String(event||''),meta:meta||{}});
+  const pr=fetch(RECAPS_STATS_CFG.url+'/rest/v1/recaps_events',{method:'POST',headers:{'apikey':RECAPS_STATS_CFG.anonKey,'Authorization':'Bearer '+RECAPS_STATS_CFG.anonKey,'Content-Type':'application/json','Prefer':'return=minimal'},body:body,keepalive:true});
+  if(pr&&typeof pr.catch==='function')pr.catch(()=>{});
+ }catch(e){/* stats must never surface an error */}
+}
+recapsStat('app_open');
 coiSetup();
 hwProbe(); /* V223: probe the Hardware (WebCodecs) engine once, up front, so the chooser verdict is cached before the user opens Export */
 /* V221 ETA — per-RUN throughput, replacing the V218/V220 whole-export
@@ -1688,7 +1761,13 @@ async function exportOne(ff,ed,seg,idx,total,log,progs){
     blockH + the editor's position settings, so identical cues
     still share exactly one strip — and a strip is never reused
     at a different offset. */
- if(useSub){const _tSub=expNow();const subOpts=subPngOpts(ed,S);const pngByKey=new Map();for(let i=0;i<seg.cues.length;i++){const fn='sub'+i+'.png';const cg=subBlockGeom(ed,G,seg.cues[i].text);const key=seg.cues[i].text+'\n'+cg.blockH+'\n'+cg.subY;let pngB=pngByKey.get(key);if(!pngB){pngB=await textPNG(seg.cues[i].text,W,cg.blockH,subOpts);pngByKey.set(key,pngB)}await ff.writeFile(fn,ffCopy(pngB));prepStep('🖼️ စာတန်း ပုံများ ပြင်နေပါတယ်… ('+(i+1)+'/'+seg.cues.length+')');overlays.push({file:fn,y:cg.subY,from:seg.cues[i].start-seg.start,to:seg.cues[i].end-seg.start})}expPhaseLog(log,'စာတန်း ပုံများ',_tSub)}
+ /* V244: renders run through the session cache + a bounded pool
+    (renderSubPngJobs); the ffmpeg-FS writes below stay sequential in
+    cue order, each cue keeping its own geometry/subY — only the
+    render step changed, never the pixels or the placement. The extra
+    Log line (unique count / cache hits / slowest cue) is the phone
+    evidence for where this phase's time goes. */
+ if(useSub){const _tSub=expNow();const subOpts=subPngOpts(ed,S);const geos=seg.cues.map(c=>subBlockGeom(ed,G,c.text));const jobs=seg.cues.map((c,i)=>({key:subPngKey(c.text,W,geos[i].blockH,subOpts),text:c.text,H:geos[i].blockH,opts:subOpts}));let slowMs=0,slowIdx=-1,hitN=0;const pngByKey=await renderSubPngJobs(jobs,W,3,(j,ms,cached)=>{if(cached){hitN++;return}if(ms>slowMs){slowMs=ms;slowIdx=jobs.indexOf(j)}},()=>!!(ed._expCancel&&ed._expCancel.hit));for(let i=0;i<seg.cues.length;i++){const fn='sub'+i+'.png';const cg=geos[i];const pngB=pngByKey.get(jobs[i].key);if(!pngB){if(ed._expCancel&&ed._expCancel.hit)throw expCancelError();throw new Error('စာတန်း ပုံ ထုတ်မရပါ — PNG encode မရပါ')}await ff.writeFile(fn,ffCopy(pngB));prepStep('🖼️ စာတန်း ပုံများ ပြင်နေပါတယ်… ('+(i+1)+'/'+seg.cues.length+')');overlays.push({file:fn,y:cg.subY,from:seg.cues[i].start-seg.start,to:seg.cues[i].end-seg.start})}expPhaseLog(log,'စာတန်း ပုံများ',_tSub);log('🖼️ စာတန်း PNG: မတူသော ပုံ '+pngByKey.size+' ပုံ · cache hit '+hitN+(slowIdx>=0?' · အနှေးဆုံး cue '+(slowIdx+1)+': '+(slowMs/1000).toFixed(1)+'s':''))}
  /* player-block overlays (🛡️ Logo watermark + ➕ free Text): same canvas-PNG pipeline,
     positions mapped from the dragged frame fractions just like the subtitle band */
  if(useLogo){const lp=await buildLogoPNG(ed,W);await ff.writeFile('logo.png',lp.bytes);const lx=Math.max(0,Math.min(W-lp.w,Math.round(((ed.logoX==null?0.10:ed.logoX))*W-lp.w/2)));const ly=Math.max(0,Math.min(H-lp.h,Math.round(((ed.logoY==null?0.08:ed.logoY))*H-lp.h/2)));prepStep('🖼️ Logo ပုံ ပြင်နေပါတယ်…');overlays.push({file:'logo.png',x:lx,y:ly,from:0,to:dur})}
@@ -2419,7 +2498,11 @@ async function exportOneHw(ff,ed,seg,idx,total,log,progs){
     Image (same dedupe key as exportOne: text + tight block height;
     W + opts are fixed for the whole export). V239: the key also
     carries the strip's y offset (cg.subY) — see exportOne. */
- if(useSub){const _tSub=expNow();const subOpts=subPngOpts(ed,S);const imgByKey=new Map();for(let i=0;i<seg.cues.length;i++){const cg=subBlockGeom(ed,G,seg.cues[i].text);const key=seg.cues[i].text+'\n'+cg.blockH+'\n'+cg.subY;let img=imgByKey.get(key);if(!img){img=await hwImgFromBytes(await textPNG(seg.cues[i].text,W,cg.blockH,subOpts));if(!img)throw new Error('စာတန်း ပုံ ဖွင့် မရပါ');imgByKey.set(key,img)}layers.subs.push({img:img,y:cg.subY,from:seg.cues[i].start-seg.start,to:seg.cues[i].end-seg.start});prepStep('🖼️ စာတန်း ပုံများ ပြင်နေပါတယ်… ('+(i+1)+'/'+seg.cues.length+')')}expPhaseLog(log,'စာတန်း ပုံများ',_tSub)}
+ /* V244: same session-cache + pool render as exportOne; the bytes are
+    then decoded to images once per unique strip (hwImgFromBytes gets
+    a fresh copy, never the cached buffer itself), and layer assembly
+    stays sequential in cue order with each cue's own subY. */
+ if(useSub){const _tSub=expNow();const subOpts=subPngOpts(ed,S);const geos=seg.cues.map(c=>subBlockGeom(ed,G,c.text));const jobs=seg.cues.map((c,i)=>({key:subPngKey(c.text,W,geos[i].blockH,subOpts),text:c.text,H:geos[i].blockH,opts:subOpts}));let slowMs=0,slowIdx=-1,hitN=0;const pngByKey=await renderSubPngJobs(jobs,W,3,(j,ms,cached)=>{if(cached){hitN++;return}if(ms>slowMs){slowMs=ms;slowIdx=jobs.indexOf(j)}},()=>!!(ed._expCancel&&ed._expCancel.hit));const imgByKey=new Map();for(const [k,b] of pngByKey){const img=await hwImgFromBytes(ffCopy(b));if(!img)throw new Error('စာတန်း ပုံ ဖွင့် မရပါ');imgByKey.set(k,img)}for(let i=0;i<seg.cues.length;i++){const cg=geos[i];const img=imgByKey.get(jobs[i].key);if(!img){if(ed._expCancel&&ed._expCancel.hit)throw expCancelError();throw new Error('စာတန်း ပုံ ဖွင့် မရပါ')}layers.subs.push({img:img,y:cg.subY,from:seg.cues[i].start-seg.start,to:seg.cues[i].end-seg.start});prepStep('🖼️ စာတန်း ပုံများ ပြင်နေပါတယ်… ('+(i+1)+'/'+seg.cues.length+')')}expPhaseLog(log,'စာတန်း ပုံများ',_tSub);log('🖼️ စာတန်း PNG: မတူသော ပုံ '+pngByKey.size+' ပုံ · cache hit '+hitN+(slowIdx>=0?' · အနှေးဆုံး cue '+(slowIdx+1)+': '+(slowMs/1000).toFixed(1)+'s':''))}
  if(useLogo){const lp=await buildLogoPNG(ed,W);const img=await hwImgFromBytes(lp.bytes);if(!img)throw new Error('Logo ပုံ ဖွင့် မရပါ');const lx=Math.max(0,Math.min(W-lp.w,Math.round(((ed.logoX==null?0.10:ed.logoX))*W-lp.w/2)));const ly=Math.max(0,Math.min(H-lp.h,Math.round(((ed.logoY==null?0.08:ed.logoY))*H-lp.h/2)));layers.logo={img:img,x:lx,y:ly};prepStep('🖼️ Logo ပုံ ပြင်နေပါတယ်…')}
  if(useText){const bh=Math.round(170*S);const ty=Math.max(0,Math.min(H-bh,Math.round((ed.textY||0.16)*H-bh/2)));const img=await hwImgFromBytes(await textPNG(ed.textStr.trim(),W,bh,{size:Math.round((ed.textSize||44)*S),color:(ed.textColor||'#FFFFFF'),cx:(ed.textX==null?0.5:ed.textX)}));if(!img)throw new Error('စာသား ပုံ ဖွင့် မရပါ');layers.text={img:img,x:0,y:ty};prepStep('🖼️ စာသား ပုံ ပြင်နေပါတယ်…')}
  const _tMix=expNow();
@@ -2623,6 +2706,7 @@ async function runExport(ed){
   const res=E('result');res.innerHTML='<b style="font-size:14px">✅ ပြီးပါပြီ — အောက်မှာ တန်းစီ ဒေါင်းနိုင်ပါတယ်</b>';
   made.forEach(m=>{const url=URL.createObjectURL(m.blob);const a=document.createElement('a');a.href=url;a.download=m.name;a.className='btn light small';a.style.margin='8px 8px 0 0';a.textContent='⬇️ '+m.name;res.appendChild(a)});
   expDone();
+  recapsStat('export_done',{engine:(ed._expOpts&&ed._expOpts.engine)||'',resolution:(ed._expOpts&&ed._expOpts.res)||0}); /* V244: anonymous counter */
   if(window.__recapDone)window.__recapDone(3);
   showDone('✅ အသံ ရပါပြီ — Export ပြီးပါပြီ','Video '+made.length+' ပိုင်း ထုတ်ပြီးပါပြီ — အောက်က ဒေါင်း link များမှ ယူပါ။');
  }catch(err){
@@ -3125,6 +3209,7 @@ function cueSigFor(ed){
       the success notice shows only when the save took effect */
    try{
     const c=ed.cues[cuePopIdx];if(!c){closeSheet();return}
+    pushCueUndo(); /* V244: snapshot cues+script BEFORE the mutation */
     /* V240 (D7): Myanmar-digit times normalize inside parseCueTime; a
        time that still cannot be read keeps its old value WITH a
        warning instead of silently */
@@ -3158,12 +3243,12 @@ function cueSigFor(ed){
       not change, so SRT download / export keep reading this manual
       cue list — with the deleted cue gone — instead of re-deriving it */
    try{
-    if(cuePopIdx>=0&&ed.cues[cuePopIdx]){ed.cues.splice(cuePopIdx,1);ed.cuesManual=true;renderCueList();updateCueCount();updateOverlay(true);renderTimeline();checkVoiceStale();refreshVoiceGate();showNotice('🗑️ Cue ဖျက်ပြီးပါပြီ','ok')}
+    if(cuePopIdx>=0&&ed.cues[cuePopIdx]){pushCueUndo();ed.cues.splice(cuePopIdx,1);ed.cuesManual=true;renderCueList();updateCueCount();updateOverlay(true);renderTimeline();checkVoiceStale();refreshVoiceGate();showNotice('🗑️ Cue ဖျက်ပြီးပါပြီ','ok')}
    }catch(e){showNotice('⚠️ Cue ဖျက်မရပါ — '+humanErr(e),'err')}
    finally{closeSheet()}
   };
  }
- E('cueRebuild').onclick=()=>{if(!scriptLines().length){showNotice('⚠️ Cue ခွဲရန် မြန်မာ Script အရင် လိုပါတယ် — 📝 Script ထဲက "🎧 Original / ✨ New" နှိပ်ပြီး Script အရင် ထုတ်ပါ','err');openFeatureSheet('homeScript','📝 Script');return}rebuildCues(); /* V229: the mode buttons live in the Script sheet now */showNotice('✅ Script မှ cue '+ed.cues.length+' ခု ပြန်ခွဲပြီးပါပြီ','ok')};
+ E('cueRebuild').onclick=()=>{if(!scriptLines().length){showNotice('⚠️ Cue ခွဲရန် မြန်မာ Script အရင် လိုပါတယ် — 📝 Script ထဲက "🎧 Original / ✨ New" နှိပ်ပြီး Script အရင် ထုတ်ပါ','err');openFeatureSheet('homeScript','📝 Script');return}pushCueUndo();rebuildCues(); /* V229: the mode buttons live in the Script sheet now */showNotice('✅ Script မှ cue '+ed.cues.length+' ခု ပြန်ခွဲပြီးပါပြီ','ok')};
  E('cueAdd').onclick=()=>{
   const r=trimRange();const last=ed.cues[ed.cues.length-1];
   const s=last?last.end:r.start;const e=r.end?Math.min(r.end,s+2):s+2;
@@ -3695,6 +3780,7 @@ function cueSigFor(ed){
    doneStep(0);
    setCreateStatus('✅ Recaps ရပါပြီ — စာတန်း '+lines.length+' ကြောင်း');
    genProgComplete(); /* V236: 100 only now — the script is applied to the editor */
+   recapsStat('script_gen'); /* V244: anonymous counter — silent, never blocks */
    showNotice('✅ Recaps ရပါပြီ — စာတန်းကို video ပေါ်မှာ စစ်ပြီး စိတ်ကြိုက် ပြင်နိုင်ပါတယ်','ok');
    goStep(1);
   }catch(err){console.error(err);setCreateStatus('❌ '+humanErr(err));showNotice('❌ Recaps လုပ်မရပါ: '+humanErr(err),'err')}
@@ -3757,6 +3843,178 @@ function cueSigFor(ed){
   if(copied)showNotice('📋 Script ကို copy ရပါပြီ','ok');
   else showNotice('❌ Copy မရပါ'+(lastErr?': '+humanErr(lastErr):''),'err');
  };
+/* ================= V244: ⬇️ SRT (Script sheet) =================
+   The SAME cue resolution + buildSRT the 🎨 sheet's 📄 SRT ဒေါင်း
+   uses (one cue-building path): fresh stored cues win, else
+   unifiedCues; the sync delay is applied at download time only.
+   No cues -> instructive error, nothing downloaded. */
+const srtDlBtn=E('srtDl');
+if(srtDlBtn)srtDlBtn.onclick=()=>{
+ const lines=scriptLines();
+ if(!lines.length){fieldErr(p,'subs','SRT ထုတ်ရန် စာတန်း စာသား အရင် လိုပါတယ် — တစ်ကြောင်းစီ ရိုက်ထည့်ပါ၊ သို့မဟုတ် AI Script ထုတ်ပါ');showNotice('⚠️ SRT အတွက် စာသား လိုပါတယ်','err');return}
+ const start=parseFloat(E('start').value),end=parseFloat(E('end').value);
+ if(isNaN(start)||isNaN(end)||end<=start){fieldErr(p,'end','SRT အတွက် ဖြတ်ထားသော အပိုင်း (စချိန်/ဆုံးချိန်) အရင် မှန်အောင် ထားပါ');showNotice('⚠️ Trim အချိန် ပြင်ပါ','err');return}
+ clearErrs(p);
+ const rawCues=(ed.cues&&ed.cues.length&&ed.cuesSig===cueSigFor(ed))?ed.cues:unifiedCues(ed);
+ if(!rawCues.length){showNotice('⚠️ SRT ထုတ်ရန် cue မရှိသေးပါ','err');return}
+ const syncDl=ed.syncDelay||0;
+ const cues=syncDl?rawCues.map(c=>({text:c.text,start:c.start+syncDl,end:c.end+syncDl})):rawCues;
+ const base=((ed.file?ed.file.name:'recap')||'recap').replace(/\.[^.]+$/,'').replace(/[^\w\- ]+/g,'').trim()||'recap';
+ downloadText(base+'.srt',buildSRT(cues,start,end));
+ showNotice('✅ SRT ဖိုင် ဒေါင်းပြီးပါပြီ — '+rawCues.length+' ကြောင်း','ok');
+};
+/* ================= V244: cue-edit UNDO =================
+   A snapshot (cues + script text + manual/sig state) is pushed BEFORE
+   each mutating cue operation: pop-up Save, pop-up Delete and
+   ↻ ပြန်ခွဲ. Clear-all is excluded (it already has its two-tap arm).
+   One stack, up to 10 deep; ↩️ Undo appears in the Script sheet
+   while the stack is non-empty. pushCueUndo is a hoisted function
+   declaration, so the earlier pop-up handlers can call it. */
+const cueUndoStack=[];
+function pushCueUndo(){try{cueUndoStack.push({cues:JSON.parse(JSON.stringify(ed.cues||[])),subs:E('subs')?E('subs').value:'',manual:!!ed.cuesManual,sig:ed.cuesSig||''});if(cueUndoStack.length>10)cueUndoStack.shift()}catch(e){}refreshUndoBtn()}
+function refreshUndoBtn(){const b=E('cueUndo');if(b)b.style.display=cueUndoStack.length?'':'none'}
+const undoBtn=E('cueUndo');
+if(undoBtn)undoBtn.onclick=()=>{
+ const s=cueUndoStack.pop();refreshUndoBtn();if(!s)return;
+ ed.cues=s.cues;ed.cuesManual=s.manual;ed.cuesSig=s.sig;
+ const sb=E('subs');if(sb){sb.value=s.subs;if(sb.dispatchEvent)sb.dispatchEvent(new Event('input'))}
+ renderCueList();updateCueCount();updateOverlay(true);renderTimeline();checkVoiceStale();refreshVoiceGate();refreshSummaries();
+ showNotice('↩️ Undo — cue အရင် အခြေအနေ ပြန်ရောက်ပါပြီ','ok');
+};
+/* ================= V244: 💾 Project save / 📂 load =================
+   A .json snapshot of the whole editing session EXCEPT media bytes:
+   script, cues with timings, trim, aspect, every editor setting
+   (subtitle / logo / title / text / border / blur / mixer / voice
+   picks) via the form state that carries them + the ed data fields.
+   The generated/imported VOICE AUDIO is not embedded — after a load
+   the voice state is none (regenerate or re-import). Loading asks
+   the user to re-pick the video file and verifies its signature
+   (name + size + lastModified) against the saved one; a mismatch
+   applies NOTHING. Form capture excludes file inputs, password
+   fields (the Gemini key), the cue pop-up inputs and export-session
+   controls; blurOn/blurFull are region-owned views (region objects
+   carry their own state) and the expInc* toggles are export-session
+   state, so those are not restored as toggles either. */
+const PROJ_ED_FIELDS=['aspect','blur','audioMode','voice','ttsEngine','edgeVoice','bgmVol','voiceVol','bgmMute','voiceMute','syncDelay','subPosY','subPosCustom','subBand','subColor','subColMain','subColHi','subSize','titleX','titleY','titleSize','titleColor','textOn','textStr','textX','textY','textSize','textColor','logoOn','logoX','logoY','logoSize','logoOpacity','logoSrc','logoText','logoImgData','borderOn','borderW','borderColor','blurRegions','adjSpeed','aiMode','recapStyle','modeChosen','cuesManual'];
+const PROJ_SEL_GROUPS=[['aspectOpts','v'],['styleChips','v'],['subColors','v'],['logoSrcs','v'],['borderColors','c']];
+const PROJ_SKIP_TGL={blurOn:1,blurFull:1,expIncTitle:1,expIncLogo:1};
+function projFormCapture(){
+ const form={},tgl={},sel={};
+ document.querySelectorAll('[id^="'+p+'-"]').forEach(el=>{
+  const suf=el.id.slice(p.length+1);
+  if(el.classList&&el.classList.contains('tgl')){if(!PROJ_SKIP_TGL[suf])tgl[suf]=el.classList.contains('on');return}
+  const tag=el.tagName;
+  if(tag!=='INPUT'&&tag!=='TEXTAREA'&&tag!=='SELECT')return;
+  if(el.type==='file'||el.type==='password')return;
+  if(suf==='apiKey'||suf.indexOf('cp')===0)return;
+  if(el.type==='checkbox'||el.type==='radio'){form[suf]={c:!!el.checked};return}
+  form[suf]={v:el.value};
+ });
+ PROJ_SEL_GROUPS.forEach(pr=>{const g=E(pr[0]);if(!g)return;const s=g.querySelector('.sel');if(s)sel[pr[0]]=s.dataset[pr[1]]});
+ return{form:form,tgl:tgl,sel:sel};
+}
+function projCollect(){
+ const edj={};PROJ_ED_FIELDS.forEach(k=>{try{const v=ed[k];if(v===undefined)return;edj[k]=JSON.parse(JSON.stringify(v))}catch(e){}});
+ const fc=projFormCapture();
+ return{app:'recaps-project',v:1,savedAt:new Date().toISOString(),file:ed.file?{name:ed.file.name,size:ed.file.size,lastModified:ed.file.lastModified||0}:null,script:E('subs')?E('subs').value:'',cues:JSON.parse(JSON.stringify(ed.cues||[])),ed:edj,form:fc.form,tgl:fc.tgl,sel:fc.sel};
+}
+function projSigMatch(f,pf){return !!f&&!!pf&&f.name===pf.name&&f.size===pf.size&&(f.lastModified||0)===(pf.lastModified||0)}
+function applyProject(proj){
+ const form=proj.form||{},tgl=proj.tgl||{},sel=proj.sel||{};
+ /* 1) form controls: set values, then fire the app's own input/change
+       handlers so every synced ed field and label follows */
+ Object.keys(form).forEach(suf=>{
+  const el=document.getElementById(p+'-'+suf);if(!el)return;const rec=form[suf];
+  if(rec&&typeof rec==='object'&&'c' in rec){el.checked=!!rec.c}
+  else if(rec&&typeof rec==='object'){el.value=rec.v}
+ });
+ Object.keys(form).forEach(suf=>{
+  const el=document.getElementById(p+'-'+suf);if(!el)return;
+  try{el.dispatchEvent(new Event('input',{bubbles:true}))}catch(e){}
+  try{el.dispatchEvent(new Event('change',{bubbles:true}))}catch(e){}
+ });
+ /* 2) selection groups + toggles: click ONLY where the state differs,
+       so the app's own handlers do the sync work */
+ PROJ_SEL_GROUPS.forEach(pr=>{
+  const want=sel[pr[0]];if(want==null)return;const g=E(pr[0]);if(!g)return;
+  const kids=g.querySelectorAll('[data-'+pr[1]+']');
+  for(let i=0;i<kids.length;i++){if(kids[i].dataset[pr[1]]===String(want)&&!kids[i].classList.contains('sel')){kids[i].click();break}}
+ });
+ Object.keys(tgl).forEach(suf=>{
+  if(PROJ_SKIP_TGL[suf])return;
+  const el=document.getElementById(p+'-'+suf);if(!el||!el.classList)return;
+  if(el.classList.contains('on')!==!!tgl[suf]){if(el.onclick)el.click();else el.classList.toggle('on',!!tgl[suf])}
+ });
+ /* 3) editor data fields — authoritative for non-DOM state */
+ const edj=proj.ed||{};
+ PROJ_ED_FIELDS.forEach(k=>{if(k in edj){try{ed[k]=JSON.parse(JSON.stringify(edj[k]))}catch(e){ed[k]=edj[k]}}});
+ /* the voice AUDIO is never in a project file: the cache starts empty */
+ if(ed.voiceUrl){try{URL.revokeObjectURL(ed.voiceUrl)}catch(e){}ed.voiceUrl=null}
+ if(ed.renderUrl){try{URL.revokeObjectURL(ed.renderUrl)}catch(e){}ed.renderUrl=null}
+ ed.voiceCache=null;ed._effVoice=null;ed._cachedVoice=null;ed._cachedVoiceExt=null;
+ const vp=E('voicePlayer');if(vp)vp.style.display='none';
+ const vfi=E('voiceFileInfo');if(vfi){vfi.style.display='none';vfi.textContent=''}
+ if(ed.logoImgData){try{localStorage.setItem('recaps_logo_img',ed.logoImgData)}catch(e){}}
+ ed.blurSel=(ed.blurRegions&&ed.blurRegions.length)?ed.blurRegions[0].id:null;
+ /* 4) script + cues last (the form pass may have re-derived state) */
+ if(typeof proj.script==='string'){const sb=E('subs');if(sb)sb.value=proj.script}
+ ed.cues=JSON.parse(JSON.stringify(proj.cues||[]));
+ ed.cuesSig=cueSigFor(ed);
+ /* 5) overlays + blur + every summary re-sync */
+ if(window.__recapProjectSync)window.__recapProjectSync();
+ if(ed.refresh)ed.refresh();
+ if(ed.applyStage)ed.applyStage();
+ renderCueList();updateCueCount();updateOverlay(true);renderTimeline();checkVoiceStale();refreshVoiceGate();refreshSummaries();
+}
+const projSaveBtn=E('projSave');
+if(projSaveBtn)projSaveBtn.onclick=()=>{
+ if(!ed.file){showNotice('⚠️ Project သိမ်းရန် video အရင် တင်ပါ','err');return}
+ const base=(ed.file.name||'recap').replace(/\.[^.]+$/,'').replace(/[^\w\- ]+/g,'').trim()||'recap';
+ downloadText(base+'.recap.json',JSON.stringify(projCollect()));
+ showNotice('✅ Project ဖိုင် ဒေါင်းပြီးပါပြီ — အသံ မပါဝင်ပါ','ok');
+};
+let pendingProj=null,projPickArmed=false,projApplyTimer=null;
+const projLoadBtn=E('projLoad'),projFileInp=E('projFile');
+if(projLoadBtn&&projFileInp)projLoadBtn.onclick=()=>projFileInp.click();
+if(projFileInp)projFileInp.addEventListener('change',async()=>{
+ const f=projFileInp.files&&projFileInp.files[0];projFileInp.value='';
+ if(!f)return;
+ try{
+  const proj=JSON.parse(await f.text());
+  if(!proj||proj.app!=='recaps-project'||!proj.file||!proj.ed)throw new Error('Project ဖိုင် ပုံစံ မမှန်ပါ');
+  pendingProj=proj;projPickArmed=true;
+  showNotice('📂 Project ဖတ်ပြီးပါပြီ — အခု မူရင်း video ဖိုင် "'+proj.file.name+'" ကို ပြန် ရွေးပါ','info');
+  ed._changeWipe=!!ed.file;try{E('file').value=''}catch(e){}
+  E('file').click();
+ }catch(err){pendingProj=null;showNotice('❌ Project ဖိုင် ဖတ်မရပါ: '+humanErr(err),'err')}
+});
+/* registered AFTER makeEditor's own change listener on the same input,
+   so ed.file is already the re-picked file when this runs */
+const vidFileInp=E('file');
+if(vidFileInp)vidFileInp.addEventListener('change',()=>{
+ const f=vidFileInp.files&&vidFileInp.files[0];
+ if(!pendingProj)return;
+ if(!projPickArmed){pendingProj=null;return}
+ projPickArmed=false;
+ if(!f){pendingProj=null;return}
+ const pf=pendingProj.file;
+ if(!projSigMatch(f,pf)){
+  pendingProj=null;
+  showNotice('⚠️ ရွေးလိုက်တဲ့ video က Project ထဲက ဖိုင်နဲ့ မတူပါ — Project ကို မတင်ပါ (မှန်တဲ့ ဖိုင်: '+pf.name+')','err');
+  return;
+ }
+ /* signature matches — wait until the main change handler's metadata
+    load has run (it resets trim/cues first), then apply on top */
+ let tries=0;
+ if(projApplyTimer)clearInterval(projApplyTimer);
+ projApplyTimer=setInterval(()=>{
+  tries++;
+  if(!pendingProj){clearInterval(projApplyTimer);projApplyTimer=null;return}
+  if(ed.file===f&&ed.duration>0){clearInterval(projApplyTimer);projApplyTimer=null;const proj=pendingProj;pendingProj=null;try{applyProject(proj);showNotice('✅ Project ပြန်တင်ပြီးပါပြီ — အသံ မပါဝင်ပါ (Voice ပြန် ထုတ်/ထည့်ပါ)','ok')}catch(err){showNotice('❌ Project တင်မရပါ: '+humanErr(err),'err')}}
+  else if(tries>60){clearInterval(projApplyTimer);projApplyTimer=null;pendingProj=null;showNotice('⚠️ Video metadata မရသေးလို့ Project မတင်ပါ — video ပြန် ရွေးပြီး Project ဖွင့် ပြန်လုပ်ပါ','err')}
+ },200);
+});
+window.__recapProject={collect:projCollect,apply:applyProject,sigMatch:projSigMatch,pushUndo:pushCueUndo,undoStack:()=>cueUndoStack,pending:()=>pendingProj};
  /* (the recreate handler above: V230 — the mode buttons live on the
     Main page now, so the notice points there; the sheet scrolls to
     its top so the script box is in view when the sheet closes) */
@@ -3953,6 +4211,7 @@ function cueSigFor(ed){
    updateVoiceWarn();renderTimeline();checkVoiceStale();if(ed.refresh)ed.refresh();refreshSummaries();
    setVoiceStatus('✅ အသံ file ထည့်ပြီးပါပြီ — '+(f.name||'audio')+' ('+dur.toFixed(1)+' စက္ကန့်)'+(fitMsg?' · '+fitMsg:''));
    showDone('✅ အသံ ရပါပြီ','📁 '+(f.name||'audio')+' ကို Voice အဖြစ် ထည့်ပြီးပါပြီ — စင်ပေါ်မှာ စမ်း နားထောင်နိုင်ပါပြီ။');
+   recapsStat('audio_import'); /* V244: anonymous counter */
   }catch(err){console.error(err);setVoiceStatus('❌ အသံ file ထည့်၍ မရပါ');showNotice('❌ အသံ file ထည့်၍ မရပါ: '+humanErr(err),'err')}
   finally{ed.voiceBusy=false}
  });
@@ -4035,7 +4294,7 @@ function cueSigFor(ed){
    setVoiceStatus('✅ အသံ ရပါပြီ — နားထောင်ကြည့်ပါ။'+(vi?' အသံ ~'+vi.effDur.toFixed(1)+' စက္ကန့် / video အပိုင်း '+vi.seg.toFixed(1)+' စက္ကန့် (အမြန် '+fmtSpeed(vi.eff)+')။':'')+' Export မှာ ဒီ အသံကို ပြန်သုံးပါမယ်'+(fitMsg?' '+fitMsg:''));
    /* V213 (Burmese Voice app pattern): generation success fires the
       '✅ အသံ ရပါပြီ' DONE POP-UP, not just a toast */
-   showDone('✅ အသံ ရပါပြီ','အသံ ထုတ်ပြီးပါပြီ — ဒီ pop-up ထဲက player မှာ နားထောင်ကြည့်ပါ။ Export မှာ ဒီ အသံကို ပြန်သုံးပါမယ်။');const adl2=E('audioDl');if(adl2){adl2.classList.remove('off');if(adl2.removeAttribute)adl2.removeAttribute('aria-disabled')}
+   showDone('✅ အသံ ရပါပြီ','အသံ ထုတ်ပြီးပါပြီ — ဒီ pop-up ထဲက player မှာ နားထောင်ကြည့်ပါ။ Export မှာ ဒီ အသံကို ပြန်သုံးပါမယ်။');recapsStat('voice_gen');const adl2=E('audioDl');if(adl2){adl2.classList.remove('off');if(adl2.removeAttribute)adl2.removeAttribute('aria-disabled')}
   }catch(err){console.error(err);let m=err.message||String(err);if(ed.ttsEngine==='edge')m+=' — Edge TTS မရရင် Engine ကို Gemini သို့ ပြောင်းသုံးကြည့်ပါ';setVoiceStatus('❌ '+m);showNotice('❌ အသံ ထုတ်မရပါ: '+m,'err')}
   finally{wlRelease();ed.voiceBusy=false;busyBtn(btn,false,'📣 အသံ ထုတ်မယ်');refreshVoiceGate();checkVoiceStale()}
  }
@@ -4298,6 +4557,11 @@ function cueSigFor(ed){
  ed.blurSel=ed.blurRegions.length?ed.blurRegions[0].id:null;
  function persistOvl(){SETTINGS.textOn=ed.textOn;SETTINGS.textStr=ed.textStr;SETTINGS.textSize=ed.textSize;SETTINGS.textX=ed.textX;SETTINGS.textY=ed.textY;SETTINGS.logoOn=ed.logoOn;SETTINGS.logoText=ed.logoText;SETTINGS.borderOn=ed.borderOn;SETTINGS.titleSize=ed.titleSize;SETTINGS.titleX=ed.titleX;SETTINGS.titleY=ed.titleY;SETTINGS.logoSrc=ed.logoSrc;SETTINGS.logoSize=ed.logoSize;SETTINGS.logoOpacity=ed.logoOpacity;SETTINGS.logoX=ed.logoX;SETTINGS.logoY=ed.logoY;SETTINGS.borderW=ed.borderW;SETTINGS.borderColor=ed.borderColor;SETTINGS.subColor=ed.subColor;SETTINGS.subBand=ed.subBand;SETTINGS.subSize=ed.subSize;SETTINGS.subColMain=ed.subColMain;SETTINGS.subColHi=ed.subColHi;SETTINGS.titleColor=ed.titleColor;SETTINGS.textColor=ed.textColor;saveSettings()}
  function persistBlur(){try{SETTINGS.blurRegions=JSON.parse(JSON.stringify(ed.blurRegions||[]))}catch(e){SETTINGS.blurRegions=ed.blurRegions||[]}saveSettings()}
+ /* V244: project-load bridge — after a project file restores ed state
+    from the studio closure, re-run THIS closure's sync paths so the
+    overlays, the blur layer/list/controls and both SETTINGS
+    persistences all match the restored state */
+ window.__recapProjectSync=()=>{try{persistOvl()}catch(e){}try{persistBlur()}catch(e){}try{syncTitleOvl()}catch(e){}try{syncTextOvl()}catch(e){}try{syncLogoOvl()}catch(e){}try{syncBorderOvl()}catch(e){}try{syncBlurLayer()}catch(e){}try{blurListRender()}catch(e){}try{blurCtlSync()}catch(e){}};
  let pillTimer=null;
  function showModePill(){const mp=E('modePill');if(!mp)return;mp.classList.remove('hide');if(pillTimer)clearTimeout(pillTimer);pillTimer=setTimeout(()=>{mp.classList.add('hide')},3000)}
  vidEl.addEventListener('play',showModePill);
@@ -4555,7 +4819,7 @@ function cueSigFor(ed){
  function expEngineStatus(id){if(id==='hw')return expHwStatus();if(id==='mt')return expMtStatus();return{ok:true,reason:''}}
  function expBestEngine(){return expHwStatus().ok?'hw':(expMtStatus().ok?'mt':'st')}
  function expChosenEngine(){const w=SETTINGS.expEngine;if(w==='hw'||w==='mt'||w==='st')return expEngineStatus(w).ok?w:expBestEngine();return expBestEngine()}
- function expChosenRes(){return (SETTINGS.expRes===640||SETTINGS.expRes===720)?SETTINGS.expRes:1080}
+ function expChosenRes(){return (SETTINGS.expRes===640||SETTINGS.expRes===720||SETTINGS.expRes===1440)?SETTINGS.expRes:1080} /* V244: 1440 (2K) joins the whitelist — same semantics as the others: scaledGeom caps at min(1, res/short side), so a smaller source is never upscaled */
  function expChosenPace(){return SETTINGS.hwPace==='rt'?'rt':'fast'} /* V232: Hardware pacing — persisted like expEngine/expRes; anything but 'rt' is Fast */
  function renderExpSetup(){
   const box=E('expEngines');if(!box)return;

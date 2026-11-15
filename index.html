@@ -347,6 +347,37 @@ input[type=range].vs-range::-moz-range-track{height:9px}
 .create-mini .dot{width:8px;height:8px;border-radius:50%;background:#22C55E;flex:0 0 8px;box-shadow:0 0 0 3px rgba(34,197,94,.18)}
 /* V230 custom colour pickers (Subs / Title / Text sheets) */
 .clr-inp{width:100%;height:38px;padding:3px;border-radius:11px;border:1.5px solid #2C2C35;background:#1B1B21;cursor:pointer}
+/* ===== V242: PC/laptop layout (user order 2026-11-15) — an ADDITIVE
+   desktop layer. Below 900px NOTHING in this block applies and the
+   phone layout stays exactly as V241 left it. On wide screens the
+   editor becomes two columns (stage left at full editor height, the
+   Main row / timeline / spacer stacked in a right rail, toolbar
+   spanning the bottom) and every bottom sheet becomes a CENTRED
+   DIALOG instead of a half-height sheet stretched across the screen.
+   All drag handlers already use pointer events, so the mouse works
+   everywhere with no JS change; the only JS addition is an Esc-to-
+   close handler gated on this same breakpoint (see keydown below). */
+@media (min-width:900px){
+.layout{max-width:1560px}
+#page-recap{display:grid;grid-template-columns:minmax(0,1fr) minmax(330px,430px);grid-template-rows:auto auto 1fr auto;grid-template-areas:"stage main" "stage timeline" "stage spacer" "toolbar toolbar"}
+.vid-sticky{grid-area:stage;height:auto;min-height:0}
+.main-row{grid-area:main}
+.tl-wrap{grid-area:timeline}
+.col-spacer{grid-area:spacer}
+.toolbar{grid-area:toolbar;justify-content:center;padding-top:8px}
+.tool-btn{min-width:62px}
+.tool-btn:hover{background:rgba(255,255,255,.06)}
+.opt:hover{border-color:#3A3A45}
+.vid-wrap{max-width:none}
+.vid-wrap.stg-916{width:min(100%,calc((100vh - 150px)*0.5625));width:min(100%,calc((100dvh - 150px)*0.5625))}
+.vid-wrap.stg-169{width:min(100%,calc((100vh - 150px)*1.7778));width:min(100%,calc((100dvh - 150px)*1.7778))}
+.vid-wrap.stg-11{width:min(100%,calc(100vh - 150px));width:min(100%,calc(100dvh - 150px))}
+.vid-wrap.stg-orig{width:min(100%,calc((100vh - 150px)*var(--stg-ar,1.7778)));width:min(100%,calc((100dvh - 150px)*var(--stg-ar,1.7778)))}
+.sheet-wrap{top:0}
+.sheet-wrap.open{display:flex;align-items:center;justify-content:center}
+.sheet{position:relative;left:auto;right:auto;bottom:auto;width:min(680px,94vw);height:auto;max-height:88vh;max-height:88dvh;border-radius:24px}
+.sheet-wrap.voicePop .sheet{height:auto;max-height:88vh;max-height:88dvh}
+}
 </style>
 </head>
 <body>
@@ -516,6 +547,19 @@ $('#sheetBg').addEventListener('click',closeSheet);
    through the same closeSheet path as the backdrop */
 $('#sheetClose').addEventListener('click',closeSheet);
 $('#sheetDone').addEventListener('click',closeSheet);
+/* V242: desktop only — Esc closes the open sheet (same closeSheet
+   path as the backdrop click / ✕ / ✓). Gated at event time on the
+   same min-width:900px breakpoint as the desktop layout, and ignored
+   while the focus is in a text field, so it can never hijack typing;
+   on phones there is no Esc key and the media check keeps this a
+   no-op there regardless. */
+document.addEventListener('keydown',e=>{
+ if(e.key!=='Escape')return;
+ if(!window.matchMedia||!window.matchMedia('(min-width:900px)').matches)return;
+ const t=e.target;
+ if(t&&(t.tagName==='INPUT'||t.tagName==='TEXTAREA'||t.tagName==='SELECT'||t.isContentEditable))return;
+ const sw=$('#sheetWrap');if(sw&&sw.classList.contains('open'))closeSheet();
+});
 /* IndexedDB library — resilient: the connection can enter a "closing" state
    (seen live after heavy ffmpeg.wasm exports), so reopen + retry instead of
    caching one connection forever. */
@@ -549,7 +593,7 @@ const trimInner='<div class="row2"><div class="field" id="'+p+'-f-start"><label>
 +'<div class="field"><label>စချိန် slider</label><input type="range" id="'+p+'-rstart" value="0" min="0" max="100" step="0.1"></div><div class="field"><label>ဆုံးချိန် slider</label><input type="range" id="'+p+'-rend" value="0" min="0" max="100" step="0.1"></div><p class="hint" style="font-size:12px;color:#527884">ကြာချိန်: <b id="'+p+'-durinfo">—</b></p><button class="btn light" id="'+p+'-trimReset" style="width:100%">↺ အပြည့် ပြန်ထား (Video တစ်ခုလုံး)</button>';
 const aspectField='<div class="field"><label>Aspect</label><div class="scroll-row aspect-opts" id="'+p+'-aspectOpts">'+Object.keys(ASPECTS).map(k=>'<button class="opt'+(k===SETTINGS.aspect?' sel':'')+'" data-v="'+k+'"><b>'+ASPECTS[k].label+'</b><span>'+ASPECTS[k].desc+'</span></button>').join('')+'</div></div><div class="field"><label>Blur အား — <span id="'+p+'-blurVal"></span></label><input type="range" id="'+p+'-blur" min="5" max="60" step="1"><p class="hint">Blur pad သုံးသော ပုံစံတွင်သာ သက်ရောက်ပါတယ်</p></div><button class="btn light" id="'+p+'-aspectReset" style="width:100%">↺ Aspect မူလ (9:16) ပြန်ထား</button>';
 const titleField='<div class="switch-row"><div><b style="font-size:14px">ခေါင်းစဉ် (Title)</b><div style="font-size:12px;color:#527884">Video ပေါ်တွင် ပြပြီး လက်ဖြင့် ရွှေ့နိုင်သည်</div></div><div class="tgl on" id="'+p+'-titleTgl"></div></div><div class="field" id="'+p+'-f-title"><label>ခေါင်းစဉ် စာသား</label><input type="text" id="'+p+'-title" placeholder="ဥပမာ — အံ့ဩဖွယ် ဖြစ်ရပ်"><div class="err-text" id="'+p+'-e-title"></div></div><div class="field"><label>စာလုံး အရွယ် — <span id="'+p+'-titleSizeVal">52</span></label><input type="range" id="'+p+'-titleSize" min="30" max="80" step="2" value="52"></div><div class="field"><label>ခေါင်းစဉ် အရောင်</label><input type="color" class="clr-inp" id="'+p+'-titleColor" value="#FFE92E"></div><button class="btn light" id="'+p+'-titleReset" style="width:100%">↺ Title Setting မူလ ပြန်ထား</button>';
-const subsFieldRecap='<div class="field" id="'+p+'-f-subs"><label>မြန်မာ Script (ပြင်နိုင်ပါတယ်)</label><textarea id="'+p+'-subs" placeholder="ပထမ ကြောင်း&#10;ဒုတိယ ကြောင်း&#10;တတိယ ကြောင်း"></textarea><div class="err-text" id="'+p+'-e-subs"></div><p class="hint">တစ်ကြောင်း = စာတန်း cue တစ်ခု — ပြင်ပြီးရင် "↻ Script မှ အချိန် ပြန်ခွဲ" နှိပ်ပြီး cue အချိန် ပြန်ခွဲနိုင်ပါတယ်။ 🗣️ အသံ ထုတ်ရာမှာလည်း ဒီစာသားကိုပဲ သုံးပါမယ်</p></div>';
+const subsFieldRecap='<div class="field" id="'+p+'-f-subs"><label>မြန်မာ Script (ပြင်နိုင်ပါတယ်)</label><textarea id="'+p+'-subs" placeholder="ပထမ ကြောင်း&#10;ဒုတိယ ကြောင်း&#10;တတိယ ကြောင်း"></textarea><div class="err-text" id="'+p+'-e-subs"></div><div style="margin-top:8px"><button type="button" class="btn light small" id="'+p+'-scriptCopy">📋 Copy</button><span style="font-size:12px;color:#527884;margin-left:8px">Script အပြည့်အစုံကို copy ယူရန်</span></div><p class="hint">တစ်ကြောင်း = စာတန်း cue တစ်ခု — ပြင်ပြီးရင် "↻ Script မှ အချိန် ပြန်ခွဲ" နှိပ်ပြီး cue အချိန် ပြန်ခွဲနိုင်ပါတယ်။ 🗣️ အသံ ထုတ်ရာမှာလည်း ဒီစာသားကိုပဲ သုံးပါမယ်</p></div>';
 const subToggleRow='<div class="switch-row"><div><b style="font-size:14px">စာတန်း ဖွင့်ရန်</b><div style="font-size:12px;color:#527884">တစ်ကြောင်း = စာတန်း တစ်ခု၊ အချိန် အလိုအလျောက် ခွဲပေးမည်</div></div><div class="tgl on" id="'+p+'-subTgl"></div></div>';
 const srtRow='<button class="btn light small" id="'+p+'-srtBtn">📄 SRT ဒေါင်း</button><span style="font-size:12px;color:#527884;margin-left:8px">စာတန်း အချိန်ဇယား (.srt) ဖိုင် သီးခြား ဒေါင်းရန်</span>';
 const bgmField='<div class="field"><label>မူရင်းအသံ (BGM) — <span id="'+p+'-bgmVolVal">0%</span></label><input type="range" id="'+p+'-bgmVol" min="0" max="100" step="1" value="0"><p class="hint">Voice နှင့် ရောရာတွင် မူရင်း အသံ ဘယ်လောက် ချန်မလဲ — 0% ဆိုရင် မူရင်း အသံ လုံးဝ ပိတ်ပြီး Voice ပဲ ပါမည် (Video ထဲ ထည့်ခြင်း နှင့် Export တွင် သက်ရောက်သည်)</p></div>';
@@ -594,7 +638,13 @@ const subsHome=subToggleRow
    (🔊 စမ်းသပ် left / ↺ Reset right) · BIG pale generate button ·
    quick re-render (inside adjSpeedField) · player · stale warning ·
    🎵 Audio · ▶ preview / 🎬 insert (in voiceBoxInner below). */
+/* V243: import an own audio file AS the voice — an alternative
+   source next to generating one. The picked file becomes
+   ed.voiceCache (src:'file') and flows through the exact same
+   stage / mixer / insert / export path as a generated voice. */
+const voiceImportBlock='<button class="btn light" id="'+p+'-voiceImport" style="width:100%">📁 အသံ file ထည့်</button><input type="file" id="'+p+'-voiceFile" accept="audio/*,.mp3,.wav,.m4a,.ogg" style="display:none"><div class="file-info" id="'+p+'-voiceFileInfo" style="display:none"></div><p class="hint" style="margin:6px 0 0">ကိုယ်ပိုင် အသံ file (mp3 / wav / m4a / ogg) ကို Voice အဖြစ် သုံးရန် — အသံ ထုတ်စရာ မလိုဘဲ ဒီ file ကိုပဲ သုံးပါမယ်</p>';
 const voiceHome=voiceFieldBlock+audioInner
++voiceImportBlock
 +genSpeedField+adjSpeedField+autoFitRow
 +'<div class="file-info" id="'+p+'-effInfo"></div>'
 +'<div class="voice-actions"><button class="btn light" id="'+p+'-voiceTest">🔊 စမ်းသပ်</button><button class="btn light" id="'+p+'-voiceReset">↺ Reset</button></div>'
@@ -786,6 +836,11 @@ function makeEditor(p){
  const chBtn=E('qtChange');if(chBtn)chBtn.onclick=()=>{ed._changeWipe=true;try{E('file').value=''}catch(e){}E('file').click()};
  E('file').addEventListener('change',()=>{const f=E('file').files[0];if(!f)return;const wasChange=!!ed._changeWipe;ed._changeWipe=false;if(wasChange&&ed.file&&window.__recapWipeForChange)window.__recapWipeForChange();ed.file=f;if(ed.url)URL.revokeObjectURL(ed.url);ed.url=URL.createObjectURL(f);const v=E('video');v.src=ed.url;v.style.display='block';const ph0=E('ph');if(ph0)ph0.style.display='none';E('fileinfo').textContent=f.name+' · '+fmtSize(f.size);if(f.size>200*1048576)showNotice('⚠️ ဖိုင် 200 MB ထက် ကြီးနေပါတယ် ('+fmtSize(f.size)+') — browser ထဲတွင် Export ကြာနိုင် / မအောင်မြင်နိုင်ပါတယ်။ ဖိုင် သေးတာ သုံးရန် အကြံပြုပါတယ်။','info');v.onloadedmetadata=()=>{if(ed.url&&v.src!==ed.url)return; /* an inserted-voice preview is loaded, not a new source file */ ed.duration=v.duration;ed.videoW=v.videoWidth||0;ed.videoH=v.videoHeight||0;E('start').value=0;E('end').value=Math.floor(v.duration*10)/10;E('rstart').max=v.duration;E('rend').max=v.duration;E('rstart').value=0;E('rend').value=v.duration;refreshLabels();if(window.__recapNavRefresh)window.__recapNavRefresh();showNotice(wasChange?'🎬 Video လဲပြီးပါပြီ — အရင် project အကုန် ရှင်းပြီးပါပြီ':'✅ Video တင်ပြီးပါပြီ — ကြာချိန် '+fmtDur(v.duration),'ok');if(ed.pendingCreate&&ed.modeChosen){ed.pendingCreate=false;if(window.__recapPendingCreate)window.__recapPendingCreate()}}});
  [['start','rstart'],['end','rend']].forEach(([a,b])=>{E(a).addEventListener('input',()=>{E(b).value=E(a).value;refreshLabels()});E(b).addEventListener('input',()=>{E(a).value=E(b).value;refreshLabels()})});
+ /* V243: an imported file voice is not re-fitted on trim edits
+    (fitting happens when a voice is made — same rule as a
+    generated voice), but its duration-mismatch warning
+    re-evaluates against the new segment at once */
+ ['start','end','rstart','rend'].forEach(id=>{const el=E(id);if(el)el.addEventListener('input',()=>{if(ed.voiceCache&&ed.voiceCache.src==='file')updateVoiceWarn()})});
  /* V216 WYSIWYG aspect stage: morph .vid-wrap to the chosen OUTPUT
     canvas (classes stg-916 / stg-169 / stg-11 / stg-orig, plus
     stg-square for the 9:16 + landscape special case) the moment the
@@ -1073,7 +1128,7 @@ function edgeVoiceLabel(id){const v=EDGE_VOICES.find(x=>x.id===id);return v?v.la
 /* V215: THE effective-selection label for the voice field — one place,
    used by refreshLabels (deck) and the voice sheet alike: original
    audio wins; otherwise the Edge voice (သီဟ/နီလာ); otherwise Gemini. */
-function voiceFieldLabelOf(st){if(st.audioMode==='original')return '🔊 မူရင်းအသံ';if(st.ttsEngine==='edge')return st.edgeVoice==='my-MM-NilarNeural'?'👩 နီလာ (အမျိုးသမီး)':'👨 သီဟ (အမျိုးသား)';return '🎙️ Gemini · '+(st.voice||'Kore')}
+function voiceFieldLabelOf(st){if(st.audioMode==='original')return '🔊 မူရင်းအသံ';if(st.voiceCache&&st.voiceCache.src==='file')return '📁 '+(st.voiceCache.fileName||'အသံ file');if(st.ttsEngine==='edge')return st.edgeVoice==='my-MM-NilarNeural'?'👩 နီလာ (အမျိုးသမီး)':'👨 သီဟ (အမျိုးသား)';return '🎙️ Gemini · '+(st.voice||'Kore')}
 const EDGE_API='https://burmese-voice-tts.onrender.com/api/synthesize';
 async function edgeServerTTS(text,voiceName,statusFn){
  const ctl=(typeof AbortController!=='undefined')?new AbortController():null;
@@ -2528,7 +2583,7 @@ async function runExport(ed){
       block with both durations + the speed needed (instructive error). */
    const vid=(ed.ttsEngine==='edge'?ed.edgeVoice:ed.voice);
    const canon=canonicalLines(ed);
-   let vc=(ed.voiceCache&&ed.voiceCache.asm===VOICE_ASM&&ed.voiceCache.engine===ed.ttsEngine&&ed.voiceCache.voice===vid&&(ed.voiceCache.linesSig!=null?ed.voiceCache.linesSig===canon.join('\n'):ed.voiceCache.text===lines.join(' ')))?ed.voiceCache:null;
+   let vc=(ed.voiceCache&&ed.voiceCache.asm===VOICE_ASM&&(ed.voiceCache.src==='file'||(ed.voiceCache.engine===ed.ttsEngine&&ed.voiceCache.voice===vid&&(ed.voiceCache.linesSig!=null?ed.voiceCache.linesSig===canon.join('\n'):ed.voiceCache.text===lines.join(' ')))))?ed.voiceCache:null;/* V243: src:'file' = imported voice — reused as-is, never regenerated */
    let vcRegen=false;
    let pristine,pext;
    if(vc){pristine=vc.bytes;pext=vc.ext;log('✅ အသံ အပိုင်းမှာ ထုတ်ထားသော အသံကို ပြန်သုံးပါတယ်')}
@@ -3683,6 +3738,25 @@ function cueSigFor(ed){
  /* deck style chips: select-only — the chosen style feeds ✨ New runs */
  $$('#'+p+'-styleChips .style-chip').forEach(c=>{c.onclick=()=>{ed.recapStyle=c.dataset.v;$$('#'+p+'-styleChips .style-chip').forEach(x=>x.classList.toggle('sel',x===c))}});
  const recreateBtn=E('recreate');if(recreateBtn)recreateBtn.onclick=()=>{const sb=$('#sheetBody');if(sb)sb.scrollTop=0;showNotice('🎬 Main စာမျက်နှာက 🎧 Original / ✨ New ပြန်ရွေးပြီး Script အသစ် ထုတ်ပါ — လက်ရှိ Script နှင့် cue များကို အစားထိုးပါမယ်','info')};
+ /* V243: 📋 Copy — the app blocks text selection, so this button is
+    the way to take the script out. Copies the textarea content
+    EXACTLY (nothing added); async clipboard API first, temporary
+    textarea + execCommand fallback second; empty script is an
+    instructive error, total failure surfaces the true error. */
+ const cpBtn=E('scriptCopy');
+ if(cpBtn)cpBtn.onclick=async()=>{
+  const txt=E('subs')?E('subs').value:'';
+  if(!txt||!txt.trim()){showNotice('⚠️ Copy ရန် Script မရှိသေးပါ — အရင် Script ထုတ်ပါ / ရိုက်ထည့်ပါ','err');return}
+  let copied=false,lastErr=null;
+  if(navigator.clipboard&&navigator.clipboard.writeText){try{await navigator.clipboard.writeText(txt);copied=true}catch(e){lastErr=e}}
+  if(!copied){
+   const ta=document.createElement('textarea');ta.value=txt;ta.setAttribute('readonly','');ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);
+   try{ta.focus();ta.select();copied=!!document.execCommand('copy')}catch(e){lastErr=e}
+   ta.remove();
+  }
+  if(copied)showNotice('📋 Script ကို copy ရပါပြီ','ok');
+  else showNotice('❌ Copy မရပါ'+(lastErr?': '+humanErr(lastErr):''),'err');
+ };
  /* (the recreate handler above: V230 — the mode buttons live on the
     Main page now, so the notice points there; the sheet scrolls to
     its top so the script box is in view when the sheet closes) */
@@ -3713,6 +3787,7 @@ function cueSigFor(ed){
   if(ed.renderUrl){try{URL.revokeObjectURL(ed.renderUrl)}catch(e){}ed.renderUrl=null}
   ed.voiceCache=null;ed._effVoice=null;try{ttsLineCache.clear()}catch(e){} /* V219: per-line TTS chunks go with the voice */
   const vp=E('voicePlayer');if(vp)vp.style.display='none';
+  const vfi=E('voiceFileInfo');if(vfi){vfi.style.display='none';vfi.textContent=''} /* V243: an imported file voice dies with the voice here too */
   const va=E('vpAudio');if(va){try{va.pause()}catch(e){}va.src=''}
   setVoiceStatus('');
   const adl9=E('audioDl');if(adl9)adl9.classList.add('off');
@@ -3761,7 +3836,7 @@ function cueSigFor(ed){
  window.__recapWipeForChange=wipeForChange;
  /* ================= voiceover (gated on script, engine choice, cache + mini player) ================= */
  function effVoice(){return ed.ttsEngine==='edge'?ed.edgeVoice:ed.voice}
- function voiceFresh(){const c=ed.voiceCache;if(!c||c.asm!==VOICE_ASM||c.engine!==ed.ttsEngine||c.voice!==effVoice())return false;/* V219: freshness is judged on the canonical line list the voice actually spoke */if(c.linesSig!=null)return c.linesSig===canonicalLines(ed).join('\n');return c.text===scriptText()}
+ function voiceFresh(){const c=ed.voiceCache;if(!c||c.asm!==VOICE_ASM)return false;if(c.src==='file')return true;/* V243: an imported file voice is not text-derived — script/cue edits never stale it */if(c.engine!==ed.ttsEngine||c.voice!==effVoice())return false;/* V219: freshness is judged on the canonical line list the voice actually spoke */if(c.linesSig!=null)return c.linesSig===canonicalLines(ed).join('\n');return c.text===scriptText()}
  function checkVoiceStale(){
   const has=!!ed.voiceCache,fresh=voiceFresh();
   const st=E('voiceStale');if(st)st.style.display=(has&&!fresh)?'block':'none';
@@ -3787,6 +3862,10 @@ function cueSigFor(ed){
     the old chip handler's: refresh (field label) · stale · gate ·
     summaries · BGM auto-duck · confirmation notice. */
  function selectVoicePick(kind,name){
+  /* V243: choosing any picker source REPLACES an imported file
+     voice — the file is cleared first, never silently kept under a
+     new label */
+  if(ed.voiceCache&&ed.voiceCache.src==='file'){clearImportedVoice();updateVoiceWarn();renderTimeline()}
   if(kind==='original'){ed.audioMode='original'}
   else if(kind==='thiha'){ed.audioMode='voice';ed.ttsEngine='edge';ed.edgeVoice='my-MM-ThihaNeural'}
   else if(kind==='nilar'){ed.audioMode='voice';ed.ttsEngine='edge';ed.edgeVoice='my-MM-NilarNeural'}
@@ -3821,8 +3900,62 @@ function cueSigFor(ed){
   const gs=E('genSpeed');if(gs){gs.value=0;gs.dispatchEvent(new Event('input'))}
   const as=E('adjSpeed');if(as){as.value=0;as.dispatchEvent(new Event('input'))}
   SETTINGS.autoFitVoice=true;saveSettings();syncAutoFitTgl(); /* V238: Reset restores Auto-fit ON */
-  showNotice('↺ အသံ အမြန်နှုန်း နှစ်ခုလုံး 0% ပြန်ထားပြီးပါပြီ','info');
+  /* V243: Reset also REMOVES an imported file voice — back to the
+     no-voice state (generated voices are untouched by this branch) */
+  let clearedFile='';
+  if(ed.voiceCache&&ed.voiceCache.src==='file'){clearedFile=ed.voiceCache.fileName||'';clearImportedVoice();ed.audioMode='original';updateVoiceWarn();renderTimeline();checkVoiceStale();if(ed.refresh)ed.refresh();refreshSummaries()}
+  showNotice('↺ အသံ အမြန်နှုန်း နှစ်ခုလုံး 0% ပြန်ထားပြီးပါပြီ'+(clearedFile?' — 📁 အသံ file ('+clearedFile+') ကိုလည်း ဖယ်လိုက်ပါပြီ':''),'info');
  };
+ /* ================= V243: import an audio file as the voice ====
+    The picked file becomes ed.voiceCache with src:'file' — the
+    SAME single-blob voice path a generated voice uses, so stage
+    sync, the mixer, Insert and every export engine treat it
+    identically. Duration is MEASURED (probeAudioDur), never
+    assumed; V239 auto-fit applies at import when its toggle is ON;
+    a mismatch is warned / export-blocked, never silently trimmed
+    or stretched. Semantics: notes in audit_v243_notes.md. */
+ function clearImportedVoice(){
+  ed.voiceCache=null;ed._effVoice=null;
+  if(ed.voiceUrl){try{URL.revokeObjectURL(ed.voiceUrl)}catch(e){}ed.voiceUrl=null}
+  if(ed.renderUrl){try{URL.revokeObjectURL(ed.renderUrl)}catch(e){}ed.renderUrl=null}
+  const au=E('vpAudio');if(au){try{au.pause()}catch(e){}try{au.removeAttribute('src')}catch(e){}}
+  const pl=E('voicePlayer');if(pl)pl.style.display='none';
+  const fi=E('voiceFileInfo');if(fi){fi.style.display='none';fi.textContent=''}
+  const adl=E('audioDl');if(adl)adl.classList.add('off');
+  setVoiceStatus('');
+ }
+ const impBtn=E('voiceImport'),impInp=E('voiceFile');
+ if(impBtn&&impInp)impBtn.onclick=()=>{if(ed.voiceBusy)return;impInp.click()};
+ if(impInp)impInp.addEventListener('change',async()=>{
+  const f=impInp.files&&impInp.files[0];impInp.value='';
+  if(!f||ed.voiceBusy)return;
+  ed.voiceBusy=true;
+  try{
+   const buf=new Uint8Array(await f.arrayBuffer());
+   if(!buf.length)throw new Error('file က ဗလာ ဖြစ်နေပါတယ်');
+   let ext=((f.name||'').split('.').pop()||'').toLowerCase().replace(/[^a-z0-9]/g,'');
+   if(!['mp3','wav','m4a','ogg','opus','flac','aac','webm'].includes(ext))ext='mp3';
+   const dur=await probeAudioDur(buf,ext);
+   if(!(dur>0))throw new Error('အသံ file ကို ဖတ်၍ မရပါ — mp3 / wav / m4a / ogg file တစ်ခု သုံးပါ');
+   ed.audioMode='voice';
+   ed.voiceCache={asm:VOICE_ASM,src:'file',fileName:f.name||'audio',text:'',lines:[],linesSig:null,engine:'file',voice:'file',bytes:buf,ext:ext,genSpeed:1,chunkDurs:null,pause:0,dur:dur};
+   ed._effVoice=null;ed.renderUrl=null;
+   ed.adjSpeed=1;const asI=E('adjSpeed');if(asI){asI.value=0;asI.dispatchEvent(new Event('input'))}
+   if(ed.voiceUrl){try{URL.revokeObjectURL(ed.voiceUrl)}catch(e){}}
+   const mimeMap={mp3:'audio/mpeg',wav:'audio/wav',m4a:'audio/mp4',ogg:'audio/ogg',opus:'audio/ogg',flac:'audio/flac',aac:'audio/aac',webm:'audio/webm'};
+   ed.voiceUrl=URL.createObjectURL(new Blob([buf],{type:mimeMap[ext]||'audio/mpeg'}));
+   const au=E('vpAudio');if(au){au.src=ed.voiceUrl;au.playbackRate=1}
+   const pl=E('voicePlayer');if(pl)pl.style.display='block';
+   const adl=E('audioDl');if(adl){adl.classList.remove('off');adl.removeAttribute('aria-disabled')}
+   const fitMsg=await autoFitVoice(ed);
+   if(fitMsg&&au)au.playbackRate=effSpeedOf(ed);
+   const fi=E('voiceFileInfo');if(fi){fi.style.display='block';fi.textContent='📁 '+(f.name||'audio')+' · '+dur.toFixed(1)+' စက္ကန့် — ဒီ file ကို Voice အဖြစ် သုံးနေပါတယ်'}
+   updateVoiceWarn();renderTimeline();checkVoiceStale();if(ed.refresh)ed.refresh();refreshSummaries();
+   setVoiceStatus('✅ အသံ file ထည့်ပြီးပါပြီ — '+(f.name||'audio')+' ('+dur.toFixed(1)+' စက္ကန့်)'+(fitMsg?' · '+fitMsg:''));
+   showDone('✅ အသံ ရပါပြီ','📁 '+(f.name||'audio')+' ကို Voice အဖြစ် ထည့်ပြီးပါပြီ — စင်ပေါ်မှာ စမ်း နားထောင်နိုင်ပါပြီ။');
+  }catch(err){console.error(err);setVoiceStatus('❌ အသံ file ထည့်၍ မရပါ');showNotice('❌ အသံ file ထည့်၍ မရပါ: '+humanErr(err),'err')}
+  finally{ed.voiceBusy=false}
+ });
  const duckEl=E('autoDuck');if(duckEl)duckEl.addEventListener('change',()=>{if(duckEl.checked)applyAutoDuck()});
  /* V238: 🎯 Auto-fit toggle — persisted with the other voice settings
     (SETTINGS.autoFitVoice, default ON); the Voice Reset restores it

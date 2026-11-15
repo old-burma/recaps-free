@@ -1521,7 +1521,7 @@ function coiSetup(){
    no-ops cleanly when the config below is empty.
    CONFIG — the owner's public Supabase project (the anon key is a
    public client key; recaps_events is RLS insert-only for anon): */
-const RECAPS_STATS_CFG={url:'https://nfdkvungccscalshjmzo.supabase.co',anonKey:'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5mZGt2dW5nY2NzY2Fsc2hqbXpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM4NTk3NjgsImV4cCI6MjEwOTQzNTc2OH0.ldWyHiPwsebTsjxgQsCarYtlTcBEEUcD4piJlQfdbIo'};
+const RECAPS_STATS_CFG={url:'https://rnqnhcpzhntolqftjpzk.supabase.co',anonKey:'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJucW5oY3B6aG50b2xxZnRqcHprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ3MTg0MTMsImV4cCI6MjExMDI5NDQxM30.gFW98E43RUOvVruOgPGoYWteWdgREVF9Tg5I2VZtE0w'};
 function recapsDeviceId(){try{let id=localStorage.getItem('recaps_device_id');if(!id){id=(window.crypto&&crypto.randomUUID)?crypto.randomUUID():'d-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,12);localStorage.setItem('recaps_device_id',id)}return id}catch(e){return ''}}
 function recapsStat(event,meta){
  try{

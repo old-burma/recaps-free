@@ -83,8 +83,8 @@ button:active{opacity:.85}
    inside the security-definer function. The anon key below is the
    public client key — it can insert events and call the RPC, nothing
    more. See hidden_files/recaps_stats.sql. */
-const SUPABASE_URL='https://nfdkvungccscalshjmzo.supabase.co';
-const SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5mZGt2dW5nY2NzY2Fsc2hqbXpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM4NTk3NjgsImV4cCI6MjEwOTQzNTc2OH0.ldWyHiPwsebTsjxgQsCarYtlTcBEEUcD4piJlQfdbIo';
+const SUPABASE_URL='https://rnqnhcpzhntolqftjpzk.supabase.co';
+const SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJucW5oY3B6aG50b2xxZnRqcHprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ3MTg0MTMsImV4cCI6MjExMDI5NDQxM30.gFW98E43RUOvVruOgPGoYWteWdgREVF9Tg5I2VZtE0w';
 const $=id=>document.getElementById(id);
 async function loadStats(code){
  const res=await fetch(SUPABASE_URL+'/rest/v1/rpc/recaps_stats',{method:'POST',headers:{'apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+SUPABASE_ANON_KEY,'Content-Type':'application/json'},body:JSON.stringify({p_code:code})});

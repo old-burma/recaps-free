@@ -53,7 +53,7 @@ body{font-family:'Inter','Padauk','Noto Sans Myanmar',system-ui,sans-serif;color
 .btn:disabled{opacity:.55}
 .btn.off{opacity:.45}
 .field{margin-bottom:14px}.field label{display:block;font-size:13px;font-weight:700;margin-bottom:6px;color:#E8E8ED}
-.field input[type=text],.field input[type=number],.field input[type=password],.field textarea{width:100%;padding:11px 13px;border-radius:13px;border:1.5px solid #2C2C35;font-family:inherit;font-size:14px;background:#101014;color:#F2F2F5}
+.field input[type=text],.field input[type=url],.field input[type=number],.field input[type=password],.field textarea{width:100%;padding:11px 13px;border-radius:13px;border:1.5px solid #2C2C35;font-family:inherit;font-size:14px;background:#101014;color:#F2F2F5}
 .field textarea{min-height:110px;line-height:1.7;resize:vertical}
 .field .hint{font-size:11.5px;color:#8A8A95;margin-top:4px}
 .hint{font-size:11.5px;color:#8A8A95;line-height:1.55}
@@ -481,6 +481,19 @@ body.ks-on-recap #recapMainBtn{display:flex}
 <div class="ks-head"><button class="icon-btn" id="ksBack" type="button" aria-label="နောက်သို့">‹</button><div class="ks-title">✂️ အခန်း ဖြတ်ဆက်</div><button class="btn light small" id="ksReset" type="button">↺ Reset</button></div>
 <div class="ks-scroll">
 <div class="ks-stage"><video id="ks-video" playsinline controls></video><div class="file-info" id="ks-fileinfo">Video မရွေးရသေးပါ</div></div>
+<!-- V248: video source card — the KS page normally uses the video
+     loaded in the Recaps editor; a URL (YouTube / TikTok page link
+     or a direct .mp4 link) gives THIS page its own video instead,
+     without touching the editor's loaded video or state. -->
+<div class="card ks-card"><h3>🎞️ Video အရင်းအမြစ်</h3>
+<div class="file-info" id="ksSrcInfo"></div>
+<p style="margin-top:6px">ပုံမှန်အားဖြင့် 🎬 Recaps page မှာ ရွေးထားတဲ့ video ကို သုံးပါတယ်။ ဒီ page အတွက် သီးသန့် video လိုချင်ရင် URL ထည့်ပြီး ယူနိုင်ပါတယ် (YouTube / TikTok link သို့မဟုတ် .mp4 link တိုက်ရိုက်) — URL video က Recaps page က video ကို မပြောင်းပါ။</p>
+<div class="field"><label>Video URL</label><input type="url" id="ksUrlInput" placeholder="https://…" autocomplete="off"></div>
+<button class="btn primary" id="ksUrlBtn" type="button"><span class="wave"><i></i><i></i><i></i><i></i><i></i></span><span class="btn-label">🔗 ယူမယ်</span></button>
+<button class="btn light" id="ksUrlCancel" type="button" style="display:none;width:100%;margin-top:8px">ရပ်</button>
+<div class="ks-prog" id="ksUrlProg" style="display:none"><div class="ks-prog-pct" id="ksUrlProgPct">0%</div><div class="ks-prog-bar"><div class="ks-prog-fill" id="ksUrlProgFill"></div></div><div class="ks-prog-meta"><span id="ksUrlProgLabel"></span><span></span></div></div>
+<div class="file-info" id="ksUrlStatus"></div>
+<button class="btn light" id="ksUrlReset" type="button" style="display:none;width:100%;margin-top:8px">↺ မူရင်း video ပြန်သုံး</button></div>
 <div class="card ks-card"><h3>🎯 အဓိက အခန်း ရွေးရန်</h3>
 <div class="field"><label>စုစုပေါင်း ကြာချိန် (ခန့်မှန်း)</label><div class="style-row" id="ks-targetRow"><button class="style-chip" data-v="60" type="button">60 စက္ကန့်</button><button class="style-chip" data-v="90" type="button">90 စက္ကန့်</button><button class="style-chip sel" data-v="120" type="button">120 စက္ကန့်</button><button class="style-chip" data-v="180" type="button">180 စက္ကန့်</button><button class="style-chip" data-v="0" type="button">အလိုအလျောက်</button></div></div>
 <button class="btn primary" id="ksAnalyse" type="button"><span class="wave"><i></i><i></i><i></i><i></i><i></i></span><span class="btn-label">✂️ အဓိက အခန်း ရွေးမယ်</span></button>
@@ -5195,6 +5208,16 @@ window.__recapProject={collect:projCollect,apply:applyProject,sigMatch:projSigMa
    Main. The KS page and its flow are otherwise unchanged.
    All state lives in `ks`, fully separate from the recap
    script/cue/voice state; the recap pipelines are never touched.
+   V248: the page can also take its OWN video from a URL — a
+   "🔗 URL မှ ယူမယ်" source card on this page only (direct .mp4
+   links are fetched in the browser first; page links go through
+   the server's POST /api/video/fetch yt-dlp job). The fetched
+   Blob becomes the page's own source (ks.ownFile/ks.ownUrl) and
+   ksSource() routes the video binding, the ffmpeg input, the
+   duration and the export dimensions to whichever source is
+   active; the recap editor's video/state are never touched, and
+   "↺ မူရင်း video ပြန်သုံး" hands the page back to the editor's
+   video. Nothing changes on the Main or Recap pages.
    Reused app helpers (by name): geminiGen (the GEM_MODELS chain),
    transcribeChunksPiped + chunkCacheGet/chunkCachePut (chunked
    transcription + its cache), getFFmpeg / ffExecP / ffReadU8
@@ -5202,10 +5225,28 @@ window.__recapProject={collect:projCollect,apply:applyProject,sigMatch:projSigMa
    Lock), showNotice / showDone, getApiKey, fmtDur, humanErr,
    recapsStat. The page has its OWN <video> (#ks-video) bound to the
    same object URL as the recap stage. */
-const ks={scenes:[],frames:[],target:120,res:1080,keepAudio:true,busy:false,expBusy:false,cancel:false,edited:false,duration:0,videoSig:'',boundUrl:'',previewEnd:null,dlUrl:null,progMax:0};
+const ks={scenes:[],frames:[],target:120,res:1080,keepAudio:true,busy:false,expBusy:false,cancel:false,edited:false,duration:0,videoSig:'',boundUrl:'',previewEnd:null,dlUrl:null,progMax:0,ownUrl:null,ownFile:null,ownName:'',fetchBusy:false,fetchCancel:false};
 const ks$=id=>document.getElementById(id);
 function ksEd(){try{return (typeof editors!=='undefined'&&editors&&editors.recap)||null}catch(e){return null}}
 function ksEsc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+/* V248: the KS page's ACTIVE video source. The page's own
+   URL-fetched video (ks.ownFile/ks.ownUrl) wins when present;
+   otherwise the recap editor's loaded file — exactly the pre-V248
+   behaviour. Everything KS reads (the <video> binding, the ffmpeg
+   input file, duration, export dimensions) goes through this one
+   resolver, so the two sources can never get mixed up. */
+function ksSource(){
+ if(ks.ownFile)return{file:ks.ownFile,url:ks.ownUrl,name:ks.ownName,own:true};
+ const ed=ksEd();
+ if(ed&&ed.file)return{file:ed.file,url:ed.url||'',name:ed.file.name,own:false};
+ return null;
+}
+function ksRenderSrcInfo(){
+ const el=ks$('ksSrcInfo');if(!el)return;
+ if(ks.ownFile){el.textContent='📡 လက်ရှိ သုံးနေတာ: URL မှ ယူထားသော video — '+ks.ownName;return}
+ const ed=ksEd();
+ el.textContent=(ed&&ed.file)?('📼 လက်ရှိ သုံးနေတာ: Recaps page က video — '+ed.file.name):'📼 လက်ရှိ သုံးနေတာ: Recaps page က video (မရွေးရသေးပါ)';
+}
 /* Pure scene-list sanitizer: clamp to [0,duration], drop scenes
    shorter than 2s, sort by start, merge overlaps, cap at 30.
    No DOM, no state — unit-tested by v246_harness.js. */
@@ -5266,19 +5307,23 @@ function ksSwitchPage(name){
  ksSyncDrawer();ksCloseDrawer();
  try{window.scrollTo(0,0)}catch(e){}
 }
-/* Entering the page: bind this page's own <video> to the loaded
-   file's object URL; a different file resets the scene list. */
+/* Entering the page: bind this page's own <video> to the ACTIVE
+   source's object URL (V248: ksSource() — the page's own
+   URL-fetched video when one is set, else the recap editor's
+   loaded file); a different source resets the scene list. */
 function ksEnter(){
- const ed=ksEd(),v=ks$('ks-video'),fi=ks$('ks-fileinfo');
- if(!ed||!ed.file){if(fi)fi.textContent='⚠️ Video မရွေးရသေးပါ — 🎬 Recaps page မှာ အရင် video ရွေးပါ';return}
- const sig=ed.file.name+'|'+ed.file.size;
+ const v=ks$('ks-video'),fi=ks$('ks-fileinfo');
+ const src=ksSource();
+ if(!src){if(fi)fi.textContent='⚠️ Video မရွေးရသေးပါ — 🎬 Recaps page မှာ video ရွေးပါ၊ သို့မဟုတ် အောက်မှာ URL ထည့်ပြီး ယူပါ';ksRenderSrcInfo();return}
+ const sig=src.name+'|'+(src.file?src.file.size:0)+(src.own?'|url':'');
  if(sig!==ks.videoSig){
-  ks.videoSig=sig;ks.scenes=[];ks.frames=[];ks.edited=false;ks.previewEnd=null;ks.duration=ed.duration||0;
-  if(v&&ed.url){v.src=ed.url;ks.boundUrl=ed.url}
+  ks.videoSig=sig;ks.scenes=[];ks.frames=[];ks.edited=false;ks.previewEnd=null;ks.duration=src.own?0:((ksEd()||{}).duration||0);
+  if(v&&src.url){v.src=src.url;ks.boundUrl=src.url}
   ksRenderList();
- }else if(v&&ed.url&&ks.boundUrl!==ed.url){v.src=ed.url;ks.boundUrl=ed.url}
- if(ed.duration)ks.duration=ed.duration;
- if(fi)fi.textContent=ed.file.name+' · '+fmtDur(ks.duration||ed.duration||0);
+ }else if(v&&src.url&&ks.boundUrl!==src.url){v.src=src.url;ks.boundUrl=src.url}
+ if(!src.own){const ed=ksEd();if(ed&&ed.duration)ks.duration=ed.duration}
+ if(fi)fi.textContent=src.name+' · '+fmtDur(ks.duration||0);
+ ksRenderSrcInfo();
 }
 /* ---------- small UI helpers ---------- */
 function ksSetStatus(t){const s=ks$('ksStatus');if(s)s.textContent=t}
@@ -5331,10 +5376,11 @@ function ksPreview(s){
    transcription over the whole video under a ks signature.
    Returns a timestamped transcript string, or null (no audio). */
 async function ksGetTranscript(key,progFn){
- const ed=ksEd();const dur=ks.duration||ed.duration||0;
+ const ed=ksEd();const src=ksSource();const srcFile=src?src.file:null;
+ const dur=ks.duration||(src&&src.own?0:(ed?ed.duration:0))||0;
  const sEl=ks$('recap-start'),eEl=ks$('recap-end');
  const tS=sEl?parseFloat(sEl.value):NaN,tE=eEl?parseFloat(eEl.value):NaN;
- if(ed.txSig&&isFinite(tS)&&isFinite(tE)&&tS<=0.05&&tE>=dur-1.0){
+ if(!src.own&&ed&&ed.txSig&&isFinite(tS)&&isFinite(tE)&&tS<=0.05&&tE>=dur-1.0){
   const sig=(ed.file.name+'|'+ed.file.size)+'|'+tS+'|'+tE;
   if(sig===ed.txSig){
    let N=0;for(let q=0;q<dur-0.05;q+=60)N++;
@@ -5345,14 +5391,14 @@ async function ksGetTranscript(key,progFn){
    if(txBox&&(txBox.value||'').trim()){if(progFn)progFn(1,1);return txBox.value.trim()}
   }
  }
- const sig='ks|'+ed.file.name+'|'+ed.file.size+'|'+dur.toFixed(2);
+ const sig='ks|'+src.name+'|'+(srcFile?srcFile.size:0)+'|'+dur.toFixed(2);
  let N=0;for(let q=0;q<dur-0.05;q+=60)N++;
  if(!N)return null;
  const seeded=new Array(N).fill(null);
  for(let i=0;i<N;i++){const c=chunkCacheGet(sig,'tx',i);if(c!=null)seeded[i]=c}
  const ff=await getFFmpeg(()=>{});
  const fetchFile=window.FFmpegUtil&&window.FFmpegUtil.fetchFile;
- await ff.writeFile('ks_in.mp4',fetchFile?await fetchFile(ed.file):new Uint8Array(await ed.file.arrayBuffer()));
+ await ff.writeFile('ks_in.mp4',fetchFile?await fetchFile(srcFile):new Uint8Array(await srcFile.arrayBuffer()));
  try{
   await transcribeChunksPiped(key,N,async i=>{
    const s=i*60,e=Math.min(dur,s+60),fn='ks_a'+i+'.mp3';
@@ -5395,13 +5441,13 @@ async function ksSampleFrames(){
 }
 /* ---------- analysis ---------- */
 async function ksAnalyse(){
- const ed=ksEd();
- if(!ed||!ed.file){showNotice('⚠️ Video ဖိုင် လိုပါတယ် — 🎬 Recaps page မှာ အရင် video ရွေးပါ','err');return}
+ const ed=ksEd();const src=ksSource();
+ if(!src){showNotice('⚠️ Video ဖိုင် လိုပါတယ် — 🎬 Recaps page မှာ video ရွေးပါ၊ သို့မဟုတ် ဒီ page မှာ URL ထည့်ပြီး ယူပါ','err');return}
  const key=getApiKey();
  if(!key){showNotice('⚠️ ဒီ အလုပ်အတွက် Gemini API Key လိုပါတယ် — 🎬 Recaps page အောက်ခြေ toolbar က 🔑 Key မှာ သင့် key ထည့်ပါ','err');return}
  if(ks.busy)return;
  ksEnter();
- const dur=ks.duration||ed.duration||0;
+ const dur=ks.duration||(src.own?0:(ed?ed.duration:0))||0;
  if(!dur){showNotice('⚠️ Video ကြာချိန် မသိရပါ — video ကို ခဏ play လုပ်ပြီး ပြန် ကြိုးစားပါ','err');return}
  ks.busy=true;ks.progMax=0;
  const btn=ks$('ksAnalyse');ksBusyBtn(btn,true,'✂️ ရွေးနေပါတယ်…');
@@ -5447,8 +5493,8 @@ function ksSetExpProg(pct,label){pct=Math.max(0,Math.min(100,Math.round(pct||0))
 function ksSetExpStatus(t){const s=ks$('ksExpStatus');if(s)s.textContent=t}
 function ksCancelErr(){const e=new Error('Export ကို ရပ်လိုက်ပါပြီ');e.cancelled=true;return e}
 async function ksExport(){
- const ed=ksEd();
- if(!ed||!ed.file){showNotice('⚠️ Video ဖိုင် လိုပါတယ် — 🎬 Recaps page မှာ အရင် video ရွေးပါ','err');return}
+ const ed=ksEd();const src=ksSource();
+ if(!src){showNotice('⚠️ Video ဖိုင် လိုပါတယ် — 🎬 Recaps page မှာ video ရွေးပါ၊ သို့မဟုတ် ဒီ page မှာ URL ထည့်ပြီး ယူပါ','err');return}
  const inc=ksIncluded().slice().sort((a,b)=>a.start-b.start);
  if(!inc.length){showNotice('⚠️ ထုတ်ရန် အခန်း မရှိပါ — အခန်း ရွေးပြီး "✓ ပါမယ်" ဖွင့်ထားပါ','err');return}
  if(ks.expBusy)return;
@@ -5461,8 +5507,8 @@ async function ksExport(){
  const written=[];
  try{
   const fetchFile=window.FFmpegUtil&&window.FFmpegUtil.fetchFile;
-  await ff.writeFile('ks_in.mp4',fetchFile?await fetchFile(ed.file):new Uint8Array(await ed.file.arrayBuffer()));written.push('ks_in.mp4');
-  const vw=ed.videoW||0,vh=ed.videoH||0,shortS=Math.min(vw||Infinity,vh||Infinity);
+  await ff.writeFile('ks_in.mp4',fetchFile?await fetchFile(src.file):new Uint8Array(await src.file.arrayBuffer()));written.push('ks_in.mp4');
+  const kvv=ks$('ks-video');const vw=src.own?(kvv?kvv.videoWidth||0:0):(ed?ed.videoW||0:0),vh=src.own?(kvv?kvv.videoHeight||0:0):(ed?ed.videoH||0:0),shortS=Math.min(vw||Infinity,vh||Infinity);
   const scale=(vw&&vh&&shortS>ks.res)?('scale=w=\'if(gt(iw,ih),-2,'+ks.res+')\':h=\'if(gt(iw,ih),'+ks.res+',-2)\''):null;
   const total=inc.length+1;let doneU=0;const segNames=[];
   for(let i=0;i<inc.length;i++){
@@ -5503,6 +5549,162 @@ async function ksExport(){
   wlRelease();ks.expBusy=false;ksBusyBtn(btn,false,'🎬 ဖြတ်ဆက် ထုတ်မယ်');if(cn)cn.style.display='none';
  }
 }
+/* ---------- V248: take this page's OWN video from a URL ----------
+   Two routes: (1) a DIRECT media link (.mp4/.webm/.mov) is fetched
+   straight from the browser — when the host allows CORS the file
+   lands as a Blob with no server involved; if that fetch fails the
+   flow falls back to (2) the server route: POST the page URL to
+   https://burmese-voice-tts.onrender.com/api/video/fetch (yt-dlp
+   on the server, one job at a time), poll its status, then
+   download the finished file as a Blob. Either way the result
+   becomes the KS page's OWN source via ksBindOwn — the recap
+   editor's loaded video and state are never touched, and
+   "↺ မူရင်း video ပြန်သုံး" (ksResetOwn) hands the page back to
+   the editor's video. */
+const KS_FETCH_API='https://burmese-voice-tts.onrender.com/api/video/fetch';
+const KS_FILE_API='https://burmese-voice-tts.onrender.com/api/video/file/';
+const ksSleep=ms=>new Promise(r=>setTimeout(r,ms));
+function ksFetchCancelErr(){const e=new Error('URL ယူတာ ရပ်လိုက်ပါပြီ');e.cancelled=true;return e}
+function ksSetUrlStatus(t){const s=ks$('ksUrlStatus');if(s)s.textContent=t}
+function ksSetUrlProg(pct,label){pct=Math.max(0,Math.min(100,Math.round(pct||0)));const b=ks$('ksUrlProg');if(b)b.style.display='block';const p=ks$('ksUrlProgPct');if(p)p.textContent=pct+'%';const f=ks$('ksUrlProgFill');if(f)f.style.width=pct+'%';if(label!=null){const l=ks$('ksUrlProgLabel');if(l)l.textContent=label}}
+function ksHideUrlProg(){const b=ks$('ksUrlProg');if(b)b.style.display='none'}
+function ksIsDirectMediaUrl(u){try{return /\.(mp4|webm|mov|m4v)$/i.test(new URL(u).pathname)}catch(e){return false}}
+function ksBindOwn(blob,name){
+ if(ks.ownUrl){try{URL.revokeObjectURL(ks.ownUrl)}catch(e){}}
+ ks.ownFile=blob;ks.ownName=String(name||'URL video').slice(0,120);
+ ks.ownUrl=URL.createObjectURL(blob);
+ const rb=ks$('ksUrlReset');if(rb)rb.style.display='block';
+ ksEnter();
+}
+function ksResetOwn(){
+ if(ks.ownUrl){try{URL.revokeObjectURL(ks.ownUrl)}catch(e){}}
+ ks.ownFile=null;ks.ownUrl=null;ks.ownName='';
+ const rb=ks$('ksUrlReset');if(rb)rb.style.display='none';
+ const inp=ks$('ksUrlInput');if(inp)inp.value='';
+ ksSetUrlStatus('↺ Recaps page က video ကို ပြန်သုံးနေပါတယ်');
+ ksEnter();
+}
+/* GET a URL as a Blob, reporting byte progress; honours ks.fetchCancel. */
+async function ksFetchBlob(url,onProg){
+ const resp=await fetch(url);
+ if(!resp.ok)throw new Error('HTTP '+resp.status+' — ဖိုင် ဆွဲမရပါ');
+ const total=+resp.headers.get('Content-Length')||0;
+ const type=resp.headers.get('Content-Type')||'';
+ if(!resp.body||!resp.body.getReader){const b=await resp.blob();return{blob:b,type:type||b.type}}
+ const reader=resp.body.getReader();const chunks=[];let got=0;
+ while(true){
+  if(ks.fetchCancel){try{await reader.cancel()}catch(e){}throw ksFetchCancelErr()}
+  const r=await reader.read();
+  if(r.done)break;
+  chunks.push(r.value);got+=r.value.length;
+  if(onProg)onProg(got,total);
+ }
+ return{blob:new Blob(chunks,{type:type||'video/mp4'}),type};
+}
+function ksLooksVideo(type,size){
+ if(!size)return false;
+ if(!type)return true;
+ if(type.indexOf('video/')===0)return true;
+ if(type.indexOf('octet-stream')>=0)return true;
+ return false;
+}
+/* Route (1): direct media link, browser-side. Returns true when the
+   file was bound; false asks the caller to fall back to the server. */
+async function ksTryDirect(url){
+ let name='URL video';
+ try{name=decodeURIComponent(new URL(url).pathname.split('/').pop()||'URL video')}catch(e){}
+ try{
+  ksSetUrlProg(0,'⬇️ Direct ဒေါင်းနေပါတယ်');
+  const r=await ksFetchBlob(url,(g,t)=>{if(t)ksSetUrlProg(g*100/t,'⬇️ Direct ဒေါင်းနေပါတယ်');else ksSetUrlProg(0,'⬇️ Direct ဒေါင်းနေပါတယ် — '+(g/1048576).toFixed(1)+' MB')});
+  if(!ksLooksVideo(r.type||r.blob.type,r.blob.size))return false;
+  ksBindOwn(r.blob,name);
+  ksSetUrlProg(100,'✅ ပြီးပါပြီ');setTimeout(ksHideUrlProg,700);
+  ksSetUrlStatus('✅ Direct link မှ ရပါပြီ — '+name);
+  showNotice('✅ Video ရပါပြီ','ok');
+  if(typeof recapsStat==='function')recapsStat('keyscenes_urlfetch');
+  return true;
+ }catch(e){
+  if(e&&e.cancelled)throw e;
+  return false;
+ }
+}
+/* Route (2): the yt-dlp server. The first POST can take ~1 minute
+   while a sleeping Render free instance wakes — network failures
+   are retried for up to ~3 minutes with a "server နိုးနေတယ်…"
+   status; a real HTTP error from the server is fatal at once and
+   its true text is surfaced. */
+async function ksFetchViaServer(url){
+ let jobId=null;const t0=Date.now();
+ ksSetUrlStatus('📡 Server နဲ့ ချိတ်နေပါတယ်…');
+ while(!jobId){
+  if(ks.fetchCancel)throw ksFetchCancelErr();
+  try{
+   const r=await fetch(KS_FETCH_API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url})});
+   if(!r.ok){let d='';try{d=(await r.json()).detail||''}catch(e){}const er=new Error('Server error '+r.status+(d?': '+d:''));er.fatal=true;throw er}
+   const j=await r.json();
+   if(j.status==='error'){const er=new Error(j.error||'Server error');er.fatal=true;throw er}
+   jobId=j.job_id;
+  }catch(e){
+   if(e&&e.cancelled)throw e;
+   if(e&&e.fatal)throw e;
+   if(Date.now()-t0>180000)throw new Error('Server နဲ့ ချိတ်မရပါ — ကွန်နက်ရှင် စစ်ပြီး ပြန် ကြိုးစားပါ');
+   ksSetUrlStatus('⏳ server နိုးနေတယ်… — free server အိပ်ပျော်နေရင် ပထမ အကြိမ် ၁ မိနစ် လောက် ကြာတတ်ပါတယ်');
+   await ksSleep(4000);
+  }
+ }
+ let title='';
+ while(true){
+  if(ks.fetchCancel)throw ksFetchCancelErr();
+  await ksSleep(3000);
+  if(ks.fetchCancel)throw ksFetchCancelErr();
+  let s=null;
+  try{const r=await fetch(KS_FETCH_API+'/'+jobId);if(r.ok)s=await r.json()}catch(e){}
+  if(!s)continue;
+  if(s.title)title=s.title;
+  if(s.status==='error')throw new Error(s.error||'Server download error');
+  if(s.status==='ready'){
+   ksSetUrlStatus('⬇️ "'+(title||'video')+'" — ဖိုင် ဆွဲနေပါတယ်…');
+   const r=await ksFetchBlob(KS_FILE_API+jobId,(g,t)=>{if(t)ksSetUrlProg(g*100/t,'⬇️ ဖိုင် ဆွဲနေပါတယ်')});
+   ksBindOwn(r.blob,title||'URL video');
+   ksSetUrlProg(100,'✅ ပြီးပါပြီ');setTimeout(ksHideUrlProg,700);
+   ksSetUrlStatus('✅ ရပါပြီ — '+(title||'URL video'));
+   showNotice('✅ Video ရပါပြီ','ok');
+   if(typeof recapsStat==='function')recapsStat('keyscenes_urlfetch');
+   return;
+  }
+  if(s.status==='downloading'&&s.progress_pct!=null){ksSetUrlProg(s.progress_pct,'⬇️ Server ဒေါင်းနေပါတယ်');ksSetUrlStatus('⬇️ Server က video ဒေါင်းနေပါတယ်… '+s.progress_pct+'%'+(title?' — '+title:''))}
+  else ksSetUrlStatus('⏳ Server ပြင်ဆင်နေပါတယ်…'+(title?' — '+title:''));
+ }
+}
+async function ksFetchFromUrl(){
+ if(ks.fetchBusy)return;
+ const inp=ks$('ksUrlInput');
+ const raw=inp?(inp.value||'').trim():'';
+ if(!raw){showNotice('⚠️ URL အရင် ထည့်ပါ — YouTube / TikTok link သို့မဟုတ် .mp4 link','err');return}
+ let u=null;try{u=new URL(raw)}catch(e){}
+ if(!u||(u.protocol!=='http:'&&u.protocol!=='https:')){showNotice('⚠️ URL ပုံစံ မမှန်ပါ — http:// သို့မဟုတ် https:// နဲ့ စတဲ့ link အပြည့် ထည့်ပါ','err');return}
+ const url=u.href;
+ ks.fetchBusy=true;ks.fetchCancel=false;
+ const btn=ks$('ksUrlBtn'),cn=ks$('ksUrlCancel');
+ ksBusyBtn(btn,true,'🔗 ယူနေပါတယ်…');if(cn)cn.style.display='block';
+ wlAcquire();
+ try{
+  if(ksIsDirectMediaUrl(url)){
+   ksSetUrlStatus('🔗 Direct media link — browser မှ တိုက်ရိုက် ယူကြည့်နေပါတယ်…');
+   const okDirect=await ksTryDirect(url);
+   if(okDirect)return;
+   if(ks.fetchCancel)throw ksFetchCancelErr();
+   ksSetUrlStatus('↪️ Direct မရလို့ (CORS စသည်ဖြင့်) server မှ တဆင့် ယူနေပါတယ်…');
+  }
+  await ksFetchViaServer(url);
+ }catch(e){
+  if(e&&e.cancelled){ksSetUrlStatus('⏹️ ရပ်လိုက်ပါပြီ');showNotice('⏹️ URL ယူတာ ရပ်လိုက်ပါပြီ','info')}
+  else{ksSetUrlStatus('❌ '+humanErr(e));showNotice('❌ '+humanErr(e),'err')}
+  ksHideUrlProg();
+ }finally{
+  wlRelease();ks.fetchBusy=false;ksBusyBtn(btn,false,'🔗 ယူမယ်');if(cn)cn.style.display='none';
+ }
+}
 /* ---------- wiring ---------- */
 (function ksWire(){
  const mb=ks$('ksMenuBtn');if(mb)mb.addEventListener('click',ksOpenDrawer);
@@ -5519,12 +5721,17 @@ async function ksExport(){
  const anBtn=ks$('ksAnalyse');if(anBtn)anBtn.addEventListener('click',()=>ksAnalyse());
  const exBtn=ks$('ksExport');if(exBtn)exBtn.addEventListener('click',()=>ksExport());
  const cnBtn=ks$('ksCancel');if(cnBtn)cnBtn.addEventListener('click',()=>{ks.cancel=true;ksSetExpStatus('⏹️ ရပ်နေပါတယ်…')});
+ /* V248: URL source wiring */
+ const urlBtn=ks$('ksUrlBtn');if(urlBtn)urlBtn.addEventListener('click',()=>ksFetchFromUrl());
+ const urlCn=ks$('ksUrlCancel');if(urlCn)urlCn.addEventListener('click',()=>{ks.fetchCancel=true;ksSetUrlStatus('⏹️ ရပ်နေပါတယ်…')});
+ const urlRs=ks$('ksUrlReset');if(urlRs)urlRs.addEventListener('click',()=>ksResetOwn());
+ const urlInp=ks$('ksUrlInput');if(urlInp)urlInp.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();ksFetchFromUrl()}});
  const rsBtn=ks$('ksReset');if(rsBtn)rsBtn.addEventListener('click',()=>ksArm(rsBtn,()=>{ks.scenes=[];ks.edited=false;ks.previewEnd=null;ksRenderList();ksSetStatus('');const r=ks$('ksResult');if(r)r.style.display='none';showNotice('↺ အခန်း စာရင်း ရှင်းပြီးပါပြီ','info')}));
  const rrBtn=ks$('ksRerun');if(rrBtn)rrBtn.addEventListener('click',()=>{if(ks.edited)ksArm(rrBtn,()=>ksAnalyse());else ksAnalyse()});
  const addBtn=ks$('ksAdd');if(addBtn)addBtn.addEventListener('click',()=>{
-  const ed=ksEd();
-  if(!ed||!ed.file){showNotice('⚠️ Video အရင် ရွေးပါ — 🎬 Recaps page မှာ video တင်ပါ','err');return}
-  const v=ks$('ks-video');const d=ks.duration||ed.duration||0;
+  const src=ksSource();
+  if(!src){showNotice('⚠️ Video အရင် ရွေးပါ — 🎬 Recaps page မှာ video တင်ပါ၊ သို့မဟုတ် URL ထည့်ပြီး ယူပါ','err');return}
+  const ed=ksEd();const v=ks$('ks-video');const d=ks.duration||(src.own?0:(ed?ed.duration:0))||0;
   let st=v?+(v.currentTime||0):0;
   st=Math.max(0,d>0?Math.min(st,Math.max(0,d-1)):st);
   const en=d>0?Math.min(d,st+10):st+10;
@@ -5538,7 +5745,7 @@ async function ksExport(){
  const kv=ks$('ks-video');
  if(kv){
   kv.addEventListener('timeupdate',()=>{if(ks.previewEnd!=null&&kv.currentTime>=ks.previewEnd){try{kv.pause()}catch(e){}ks.previewEnd=null}});
-  kv.addEventListener('loadedmetadata',()=>{if(kv.duration&&isFinite(kv.duration)){ks.duration=kv.duration;const ed=ksEd(),fi=ks$('ks-fileinfo');if(fi&&ed&&ed.file)fi.textContent=ed.file.name+' · '+fmtDur(ks.duration)}});
+  kv.addEventListener('loadedmetadata',()=>{if(kv.duration&&isFinite(kv.duration)){ks.duration=kv.duration;const src=ksSource(),fi=ks$('ks-fileinfo');if(fi&&src)fi.textContent=src.name+' · '+fmtDur(ks.duration)}});
  }
  const list=ks$('ksList');
  if(list){
@@ -5563,6 +5770,7 @@ async function ksExport(){
   });
  }
  ksSyncDrawer();
+ ksRenderSrcInfo();
 })();
 </script>
 </body>

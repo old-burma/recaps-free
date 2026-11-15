@@ -1316,20 +1316,86 @@ async function assembleLineChunks(raws){
   return{bytes:out,ext:raws[0].ext,chunkDurs:durs.every(d=>d>0)?durs:null,pause:0};
  }
 }
+/* V245: Edge-server pre-warm. Any request wakes a sleeping Render
+   free-tier service, so a fire-and-forget no-cors GET to the server
+   root starts the ~1-minute wake early (called at app boot and when
+   the Voice Create flow opens/starts) instead of letting the first
+   synthesis line pay it. Throttled to one ping per 3 minutes;
+   never throws, never awaited, result ignored. */
+let lastEdgeWake=0;
+function wakeEdgeServer(){
+ const now=Date.now();if(now-lastEdgeWake<180000)return;lastEdgeWake=now;
+ try{fetch('https://burmese-voice-tts.onrender.com/',{mode:'no-cors',cache:'no-store'}).catch(()=>{})}catch(e){}
+}
+/* V245: parallel per-line synthesis. The old serial loop made Voice
+   Create pay every line's network round-trip in turn; a small worker
+   pool (Edge 4 / Gemini 3 — mirroring synthLine's engine dispatch)
+   now synthesises lines concurrently while raws[i] keeps the
+   assembly order identical to the canonical line order. The cache
+   contract is unchanged (same ttsLineKey, same 300-entry eviction);
+   identical lines inside one batch share ONE in-flight synthesis.
+   Progress reports COMPLETED lines, so the count still always
+   reaches n. Transient failures (429 / 500 / 503 in the message, or
+   a network TypeError / "Failed to fetch") retry up to 2 more times
+   (~2s, then ~5s); any other error fails the whole generation with
+   its true error text, exactly as the serial loop did. A cancel
+   stops workers from starting new lines; in-flight lines settle
+   before expCancelError is thrown. */
 async function generateVoiceLines(ed,lines,statusFn,progFn){
  if(!lines||!lines.length)throw new Error('အသံ ထုတ်ရန် စာသား မရှိပါ');
- const raws=[];
- for(let i=0;i<lines.length;i++){
-  if(ed._expCancel&&ed._expCancel.hit)throw expCancelError();
-  const key=ttsLineKey(ed,lines[i]);
-  let hit=ttsLineCache.get(key);
-  if(!hit){hit=await synthLine(ed,lines[i],statusFn);ttsLineCache.set(key,hit);if(ttsLineCache.size>300)ttsLineCache.delete(ttsLineCache.keys().next().value)}
-  raws.push(hit);
-  if(statusFn&&lines.length>1)statusFn('🎙️ အသံ ထုတ်နေပါတယ်… အပိုင်း '+(i+1)+'/'+lines.length);
+ const n=lines.length,raws=new Array(n);
+ const conc=ed.ttsEngine==='edge'?4:3;
+ const wait=ms=>new Promise(r=>setTimeout(r,ms));
+ const cancelled=()=>!!(ed._expCancel&&ed._expCancel.hit);
+ let next=0,done=0,fatal=null;
+ const inflight=new Map();
+ function report(){
+  done++;
+  if(statusFn&&n>1)statusFn('🎙️ အသံ ထုတ်နေပါတယ်… အပိုင်း '+done+'/'+n);
   /* V220: per-line progress for callers that show a bar (export) —
      fires for cached lines too, so the count always reaches n */
-  if(progFn)try{progFn(i+1,lines.length)}catch(e){}
+  if(progFn)try{progFn(done,n)}catch(e){}
  }
+ async function synthRetry(text){
+  const waits=[2000,5000];
+  for(let a=0;;a++){
+   try{return await synthLine(ed,text,statusFn)}
+   catch(e){
+    const m=(e&&e.message)||String(e||'');
+    const transient=/429|500|503/.test(m)||(e instanceof TypeError)||/failed to fetch/i.test(m);
+    if(!transient||a>=waits.length)throw e;
+    await wait(waits[a]);
+   }
+  }
+ }
+ function linePromise(i){
+  const key=ttsLineKey(ed,lines[i]);
+  const hit=ttsLineCache.get(key);
+  if(hit)return Promise.resolve(hit);
+  let pr=inflight.get(key);
+  if(!pr){
+   pr=synthRetry(lines[i]).then(v=>{
+    ttsLineCache.set(key,v);
+    if(ttsLineCache.size>300)ttsLineCache.delete(ttsLineCache.keys().next().value);
+    inflight.delete(key);return v;
+   },e=>{inflight.delete(key);throw e});
+   inflight.set(key,pr);
+  }
+  return pr;
+ }
+ async function worker(){
+  while(!fatal&&!cancelled()){
+   const i=next++;if(i>=n)return;
+   try{raws[i]=await linePromise(i)}
+   catch(e){if(!fatal)fatal=e;return}
+   report();
+  }
+ }
+ const pool=[];
+ for(let w=0;w<Math.min(conc,n);w++)pool.push(worker());
+ await Promise.all(pool);
+ if(cancelled())throw expCancelError();
+ if(fatal)throw fatal;
  return assembleLineChunks(raws);
 }
 async function generateVoice(ed,text,statusFn){
@@ -3038,6 +3104,7 @@ function cueSigFor(ed){
 (function(){
  const ed=editors.recap;if(!ed)return;const p='recap';const E=id=>$('#'+p+'-'+id);
  ed.aiMode='faithful';ed.aiBusy=false;ed.voiceBusy=false;ed.recapStyle='standard';ed.pendingCreate=false;
+ wakeEdgeServer(); /* V245: start waking the Edge TTS server at boot, so it is awake by Voice Create time */
  /* ================= one-screen studio navigation =================
     No step wizard: every section is stacked on ONE screen under the pinned
     video, nothing is locked behind steps — blocks validate with instructive
@@ -4261,6 +4328,7 @@ window.__recapProject={collect:projCollect,apply:applyProject,sigMatch:projSigMa
  if(duckEl&&duckEl.checked)applyAutoDuck();
  async function runVoiceGen(){
   if(ed.voiceBusy)return;
+  wakeEdgeServer(); /* V245: last pre-warm chance before the lines start */
   const txt=scriptText();
   if(!txt){showNotice('⚠️ အသံ ထုတ်ရန် မြန်မာ Script အရင် လိုပါတယ် — 📝 Script ထဲက "🎧 Original / ✨ New" နှိပ်ပြီး Script အရင် ထုတ်ပါ','err');openFeatureSheet('homeScript','📝 Script');return} /* V229: the mode buttons live in the Script sheet now */
   if(ed.ttsEngine==='gemini'&&!getApiKey()){showNotice('⚠️ Gemini TTS အတွက် Gemini API Key လိုပါတယ် — အောက်ခြေ toolbar က 🔑 Key မှာ သင့် key ထည့်ပါ (Edge TTS ဆိုရင် key မလိုပါ)','err');const ki=$('#recap-apiKey');ki.focus();ki.scrollIntoView({behavior:'smooth',block:'center'});return}
@@ -4790,6 +4858,7 @@ window.__recapProject={collect:projCollect,apply:applyProject,sigMatch:projSigMa
  /* 🎙️ Voice Create pop-up (Burmese Voice app style): the full voice
     box (#voiceBox, parked in #homeVoice) in the taller voicePop sheet */
  function openVoiceSheet(){
+  wakeEdgeServer(); /* V245: pre-warm while the user reviews the voice settings */
   checkVoiceStale();refreshVoiceGate();updateVoiceWarn();
   const box=E('voiceBox');if(!box)return;
   openSheetNodes('🎙️ Voice Create',box);

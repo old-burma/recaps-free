@@ -394,7 +394,7 @@ input[type=range].vs-range::-moz-range-track{height:9px}
 #page-recap:not(.active){display:none}
 #page-keyscenes{display:none}
 #page-keyscenes.active{display:flex;flex-direction:column;height:100%}
-#ksMenuBtn{position:fixed;top:10px;left:10px;z-index:90;width:42px;height:42px;border-radius:12px;border:1.5px solid #2C2C35;background:rgba(20,20,26,.85);color:#F2F2F5;font-size:19px;line-height:1;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center}
+#ksMenuBtn{position:fixed;top:10px;left:10px;z-index:90;width:42px;height:42px;border-radius:12px;border:1.5px solid #2C2C35;background:rgba(20,20,26,.85);color:#F2F2F5;font-size:19px;line-height:1;cursor:pointer;font-family:inherit;display:none;align-items:center;justify-content:center}
 #drawerBg{position:fixed;inset:0;background:rgba(5,5,8,.55);z-index:140;opacity:0;pointer-events:none;transition:opacity .22s}
 #drawerBg.show{opacity:1;pointer-events:auto}
 #appDrawer{position:fixed;top:0;left:0;bottom:0;width:min(280px,82vw);background:#141419;border-right:1px solid #26262E;z-index:150;transform:translateX(-106%);transition:transform .24s ease;padding:16px 14px;display:flex;flex-direction:column;gap:8px;overflow-y:auto}
@@ -405,7 +405,7 @@ input[type=range].vs-range::-moz-range-track{height:9px}
 .dr-item{text-align:left;padding:13px 14px;border-radius:13px;border:1.5px solid #2C2C35;background:#1B1B21;color:#F2F2F5;font-family:inherit;font-size:14.5px;font-weight:700;cursor:pointer;width:100%}
 .dr-item.sel{border-color:#F59E0B;background:rgba(245,158,11,.14);color:#FBBF24}
 .btn.armed{background:#e5484d;border-color:#e5484d;color:#fff}
-.ks-head{display:flex;align-items:center;gap:10px;padding:12px 14px 10px 62px;flex:none}
+.ks-head{display:flex;align-items:center;gap:10px;padding:12px 14px 10px;flex:none}
 .ks-title{font-size:17px;font-weight:800;flex:1;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ks-scroll{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:2px 14px 22px;max-width:760px;width:100%;margin:0 auto}
 .ks-stage{margin-bottom:12px}
@@ -428,12 +428,52 @@ input[type=range].vs-range::-moz-range-track{height:9px}
 .ks-sbtn.armed{background:#e5484d;border-color:#e5484d;color:#fff}
 .ks-nudge{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;color:#9A9AA5}
 .ks-nudge button{padding:6px 8px;border-radius:8px;border:1.5px solid #2C2C35;background:#1E1E24;color:#F2F2F5;font-family:inherit;font-size:11.5px;font-weight:700;cursor:pointer}
+/* ===== V247: MAIN landing page + navigation restructure (user order
+   2026-11-15) — the app boots onto #page-main and the user chooses
+   🎬 Recaps or ✂️ ဖြတ်ဆက် from there; the cutter is NOT mixed into
+   the Recaps editor page. The ☰ button + drawer live with the Main
+   page: the button renders only while the body carries .ks-on-main
+   (maintained by ksSwitchPage), and ksOpenDrawer() itself refuses
+   to open on any other page. The recap editor page instead gets ONE
+   small ‹ Main pill, shown only while the body carries .ks-on-recap.
+   The Key Scenes page keeps its own in-flow ‹ back (now → Main). == */
+#page-main{display:none}
+#page-main.active{display:flex;flex-direction:column;height:100%}
+.mn-scroll{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:66px 18px 28px;max-width:560px;width:100%;margin:0 auto}
+.mn-brand{text-align:center;margin-bottom:26px}
+.mn-logo{font-size:52px;line-height:1}
+.mn-app{font-size:30px;font-weight:800;margin-top:8px}
+.mn-by{color:#9A9AA5;font-size:13px;margin-top:3px}
+.mn-by b{color:#F5A623}
+.mn-tag{color:#9A9AA5;font-size:13.5px;line-height:1.65;margin-top:10px}
+.mn-card{display:flex;align-items:center;gap:14px;width:100%;text-align:left;background:#141419;border:1.5px solid #2C2C35;border-radius:18px;padding:18px 16px;margin-bottom:14px;color:#F2F2F5;font-family:inherit;cursor:pointer}
+.mn-card:active{border-color:#F59E0B;background:rgba(245,158,11,.08)}
+.mn-ic{font-size:30px;flex:none}
+.mn-tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.mn-tx b{font-size:18px;font-weight:800}
+.mn-tx span{font-size:13px;color:#9A9AA5;line-height:1.55}
+.mn-ar{font-size:24px;color:#9A9AA5;flex:none}
+body.ks-on-main #ksMenuBtn{display:flex}
+#recapMainBtn{position:fixed;top:10px;left:10px;z-index:90;display:none;align-items:center;gap:2px;padding:9px 14px 9px 10px;border-radius:999px;border:1.5px solid #2C2C35;background:rgba(20,20,26,.85);color:#F2F2F5;font-size:13.5px;font-weight:700;line-height:1;cursor:pointer;font-family:inherit}
+body.ks-on-recap #recapMainBtn{display:flex}
 </style>
 </head>
-<body>
+<body class="ks-on-main">
 <div class="layout"><main class="main">
-<!-- Recap editor — the app's single feature; content injected by JS -->
-<section class="tabpage active" id="page-recap"></section>
+<!-- V247: MAIN page — the app's landing page and boot default. Two
+     big entry cards choose the tool: 🎬 Recaps (the editor page) or
+     ✂️ ဖြတ်ဆက် (the Key Scenes page). The slide menu (☰ + drawer,
+     below the sections) lives with THIS page. -->
+<section class="tabpage active" id="page-main">
+<div class="mn-scroll">
+<div class="mn-brand"><div class="mn-logo">🎬</div><div class="mn-app">Recaps</div><div class="mn-by">by <b>NLO</b></div><p class="mn-tag">ဘာလုပ်မလဲ ရွေးပါ — recap လုပ်မလား၊ အဓိက အခန်းတွေ ဖြတ်ဆက် မလား</p></div>
+<button class="mn-card" id="mainGoRecap" type="button"><span class="mn-ic">🎬</span><span class="mn-tx"><b>Recaps</b><span>recap လုပ်ရန် — Script / အသံ / စာတန်း</span></span><span class="mn-ar">›</span></button>
+<button class="mn-card" id="mainGoScenes" type="button"><span class="mn-ic">✂️</span><span class="mn-tx"><b>ဖြတ်ဆက်</b><span>အဓိက အခန်း auto ရွေး၊ စစ်၊ ဖြတ်ဆက်</span></span><span class="mn-ar">›</span></button>
+<p class="hint" style="text-align:center">ဘယ်ဘက် အပေါ်က ☰ Menu မှလည်း page ပြောင်းနိုင်ပါတယ်</p>
+</div>
+</section>
+<!-- Recap editor — content injected by JS -->
+<section class="tabpage" id="page-recap"></section>
 <!-- V246: ✂️ အခန်း ဖြတ်ဆက် — a dedicated full-screen PAGE of its own
      (not a sheet, not part of the editor page). Static markup; all
      behaviour lives in the V246 script block before </body>. -->
@@ -462,11 +502,15 @@ input[type=range].vs-range::-moz-range-track{height:9px}
 </div>
 </section>
 </main></div>
-<!-- V246: slide-menu drawer — the app-level navigation between the
-     Recaps page and the Key Scenes page -->
+<!-- V246: slide-menu drawer — the app-level navigation between pages.
+     V247: the drawer + its ☰ live with the MAIN page (the button is
+     visible only there — see the V247 CSS); items now include Main. -->
 <button id="ksMenuBtn" type="button" aria-label="Menu">☰</button>
 <div id="drawerBg"></div>
-<aside id="appDrawer"><div class="dr-head"><div class="dr-brand">Recaps <span>· NLO</span></div><button class="sheet-x" id="drawerClose" type="button" aria-label="ပိတ်">✕</button></div><button class="dr-item sel" data-page="recap" id="drItemRecap" type="button">🎬 Recaps</button><button class="dr-item" data-page="keyscenes" id="drItemScenes" type="button">✂️ အခန်း ဖြတ်ဆက်</button></aside>
+<aside id="appDrawer"><div class="dr-head"><div class="dr-brand">Recaps <span>· NLO</span></div><button class="sheet-x" id="drawerClose" type="button" aria-label="ပိတ်">✕</button></div><button class="dr-item sel" data-page="main" id="drItemMain" type="button">🏠 Main</button><button class="dr-item" data-page="recap" id="drItemRecap" type="button">🎬 Recaps</button><button class="dr-item" data-page="keyscenes" id="drItemScenes" type="button">✂️ အခန်း ဖြတ်ဆက်</button></aside>
+<!-- V247: the recap editor page's only navigation chrome — one small
+     ‹ Main pill where the ☰ used to float (visible only on that page) -->
+<button id="recapMainBtn" type="button">‹ Main</button>
 <div class="sheet-wrap" id="sheetWrap"><div class="sheet-bg" id="sheetBg"></div><div class="sheet"><div class="sheet-head"><h3 id="sheetTitle"></h3><button class="sheet-x" id="sheetClose" type="button" aria-label="ပိတ်">✕</button></div><div id="sheetBody"></div><div class="sheet-foot"><button class="btn primary" id="sheetDone" type="button">✓ ပြီး</button></div></div></div>
 <div id="notice"></div>
 <div id="donePop"><div class="box"><div style="font-size:34px">✅</div><h3 style="margin:8px 0" id="doneTitle">ရပါပြီ</h3><p id="doneText" style="font-size:13.5px;color:#527884"></p><button class="btn primary" id="doneOk" style="margin-top:14px">ဟုတ်ကဲ့</button></div></div>
@@ -815,7 +859,7 @@ const mainRowInner='<div class="main-row" id="'+p+'-mainRow">'
 const spacerInner='<div class="col-spacer" id="'+p+'-spacer"><div class="gen-prog" id="'+p+'-genProg" style="display:none"><div class="gen-prog-pct" id="'+p+'-genProgPct">0%</div><div class="gen-prog-bar"><div class="gen-prog-fill" id="'+p+'-genProgFill"></div></div><div class="gen-prog-meta"><span id="'+p+'-genProgLabel"></span><span class="gen-prog-unit" id="'+p+'-genProgUnit"></span></div></div></div>';
 function tb(id,ic,t){return '<button class="tool-btn" id="'+p+'-tool'+id+'"><span class="tic">'+ic+'</span>'+t+'</button>'}
 const toolbarInner='<nav class="toolbar" id="'+p+'-toolbar">'
-+tb('Script','📝','Script')+tb('Subs','🎨','စာတန်း')+tb('Voice','🎙️','Voice Create')+tb('Mixer','🔊','Mixer')+tb('Trim','✂️','Trim')+tb('Aspect','🌫️','Aspect')+tb('Title','📝','Title')+tb('Text','➕','Text')+tb('Logo','🛡️','Logo')+tb('Border','📐','Border')+tb('Blur','🫥','Blur')+tb('Scenes','✂️','ဖြတ်ဆက်')
++tb('Script','📝','Script')+tb('Subs','🎨','စာတန်း')+tb('Voice','🎙️','Voice Create')+tb('Mixer','🔊','Mixer')+tb('Trim','✂️','Trim')+tb('Aspect','🌫️','Aspect')+tb('Title','📝','Title')+tb('Text','➕','Text')+tb('Logo','🛡️','Logo')+tb('Border','📐','Border')+tb('Blur','🫥','Blur')
 +'<button class="tool-btn" id="'+p+'-toolKey"><span class="tic">🔑</span>Key</button>'
 +'</nav>';
 const exportInner='<div id="'+p+'-expSetup">'
@@ -5144,6 +5188,11 @@ window.__recapProject={collect:projCollect,apply:applyProject,sigMatch:projSigMa
    sheet and NOT embedded in the recap editor page. Reached BOTH
    ways: (1) the toolbar tool button (recap-toolScenes, "✂️ ဖြတ်ဆက်")
    on the main editor page, and (2) the slide-menu drawer item.
+   V247 (see the navigation note at the drawer section below)
+   restructured entry again per the user's phone check: the app
+   boots onto a MAIN page, the toolbar button is GONE, the drawer
+   lives with the Main page, and the KS back control returns to
+   Main. The KS page and its flow are otherwise unchanged.
    All state lives in `ks`, fully separate from the recap
    script/cue/voice state; the recap pipelines are never touched.
    Reused app helpers (by name): geminiGen (the GEM_MODELS chain),
@@ -5179,19 +5228,41 @@ function ksSanitizeScenes(list,duration){
  }
  return merged.slice(0,30);
 }
-/* ---------- drawer + page switching ---------- */
-let ksPage='recap';
-function ksSyncDrawer(){const r=ks$('drItemRecap'),s=ks$('drItemScenes');if(r)r.classList.toggle('sel',ksPage==='recap');if(s)s.classList.toggle('sel',ksPage==='keyscenes')}
-function ksOpenDrawer(){const d=ks$('appDrawer'),b=ks$('drawerBg');if(d)d.classList.add('open');if(b)b.classList.add('show');document.body.classList.add('locked');ksSyncDrawer()}
+/* ---------- drawer + page switching ----------
+   V247 navigation restructure (user order 2026-11-15, after his
+   phone check of V246): the app boots onto a MAIN page
+   (#page-main) holding two entry cards — 🎬 Recaps and
+   ✂️ ဖြတ်ဆက် — and the slide drawer lives with that Main page
+   (the ☰ renders only under body.ks-on-main, and ksOpenDrawer
+   refuses to open elsewhere). The recap editor page is back to
+   clean: no toolbar Scenes button, no floating ☰ — just the
+   small ‹ Main pill (#recapMainBtn, shown under body.ks-on-recap).
+   The KS page's ‹ back returns to Main. Exactly one .tabpage is
+   .active at a time; every switch scrolls to top.
+   Boot/layout note: the recap editor never assumed boot-time
+   visibility — its DOM is injected and makeEditor() wires it
+   unconditionally at boot (pure DOM, no geometry reads), the
+   sheet geometry (syncPinGeometry) derives only from
+   window.innerHeight, and the timeline/stage geometry is CSS-
+   and event-driven with clientWidth fallbacks. As a belt-and-
+   braces guard, entering the recap page re-runs syncPinGeometry
+   (idempotent) so sheet offsets are fresh after the switch. */
+let ksPage='main';
+function ksSyncDrawer(){const m=ks$('drItemMain'),r=ks$('drItemRecap'),s=ks$('drItemScenes');if(m)m.classList.toggle('sel',ksPage==='main');if(r)r.classList.toggle('sel',ksPage==='recap');if(s)s.classList.toggle('sel',ksPage==='keyscenes')}
+function ksOpenDrawer(){if(ksPage!=='main')return;const d=ks$('appDrawer'),b=ks$('drawerBg');if(d)d.classList.add('open');if(b)b.classList.add('show');document.body.classList.add('locked');ksSyncDrawer()}
 function ksCloseDrawer(){const d=ks$('appDrawer'),b=ks$('drawerBg');if(d)d.classList.remove('open');if(b)b.classList.remove('show');const sw=ks$('sheetWrap');if(!(sw&&sw.classList.contains('open')))document.body.classList.remove('locked')}
 function ksSwitchPage(name){
  ksPage=name;
- const rp=ks$('page-recap'),kp=ks$('page-keyscenes');
+ const mp=ks$('page-main'),rp=ks$('page-recap'),kp=ks$('page-keyscenes');
+ if(mp)mp.classList.toggle('active',name==='main');
  if(rp)rp.classList.toggle('active',name==='recap');
  if(kp)kp.classList.toggle('active',name==='keyscenes');
+ document.body.classList.toggle('ks-on-main',name==='main');
+ document.body.classList.toggle('ks-on-recap',name==='recap');
  const rv=ks$('recap-video'),kv=ks$('ks-video');
  if(name==='keyscenes'){if(rv&&!rv.paused)try{rv.pause()}catch(e){}ksEnter()}
  else{if(kv&&!kv.paused)try{kv.pause()}catch(e){}ks.previewEnd=null}
+ if(name==='recap'&&typeof syncPinGeometry==='function'){try{syncPinGeometry()}catch(e){}}
  ksSyncDrawer();ksCloseDrawer();
  try{window.scrollTo(0,0)}catch(e){}
 }
@@ -5437,10 +5508,14 @@ async function ksExport(){
  const mb=ks$('ksMenuBtn');if(mb)mb.addEventListener('click',ksOpenDrawer);
  const db=ks$('drawerBg');if(db)db.addEventListener('click',ksCloseDrawer);
  const dc=ks$('drawerClose');if(dc)dc.addEventListener('click',ksCloseDrawer);
+ const diM=ks$('drItemMain');if(diM)diM.addEventListener('click',()=>ksSwitchPage('main'));
  const diR=ks$('drItemRecap');if(diR)diR.addEventListener('click',()=>ksSwitchPage('recap'));
  const diS=ks$('drItemScenes');if(diS)diS.addEventListener('click',()=>ksSwitchPage('keyscenes'));
- const bk=ks$('ksBack');if(bk)bk.addEventListener('click',()=>ksSwitchPage('recap'));
- const tbBtn=ks$('recap-toolScenes');if(tbBtn)tbBtn.addEventListener('click',()=>ksSwitchPage('keyscenes'));
+ const bk=ks$('ksBack');if(bk)bk.addEventListener('click',()=>ksSwitchPage('main'));
+ /* V247: Main page entry cards + the recap page's ‹ Main pill */
+ const mgR=ks$('mainGoRecap');if(mgR)mgR.addEventListener('click',()=>ksSwitchPage('recap'));
+ const mgS=ks$('mainGoScenes');if(mgS)mgS.addEventListener('click',()=>ksSwitchPage('keyscenes'));
+ const rmB=ks$('recapMainBtn');if(rmB)rmB.addEventListener('click',()=>ksSwitchPage('main'));
  const anBtn=ks$('ksAnalyse');if(anBtn)anBtn.addEventListener('click',()=>ksAnalyse());
  const exBtn=ks$('ksExport');if(exBtn)exBtn.addEventListener('click',()=>ksExport());
  const cnBtn=ks$('ksCancel');if(cnBtn)cnBtn.addEventListener('click',()=>{ks.cancel=true;ksSetExpStatus('⏹️ ရပ်နေပါတယ်…')});

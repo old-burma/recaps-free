@@ -386,13 +386,87 @@ input[type=range].vs-range::-moz-range-track{height:9px}
 .sheet{position:relative;left:auto;right:auto;bottom:auto;width:min(680px,94vw);height:auto;max-height:88vh;max-height:88dvh;border-radius:24px}
 .sheet-wrap.voicePop .sheet{height:auto;max-height:88vh;max-height:88dvh}
 }
+/* ===== V246: ✂️ အခန်း ဖြတ်ဆက် — its own PAGE inside the app (NOT a
+   sheet) + the slide-menu drawer that navigates between pages. The
+   recap page's ID rule (#page-recap{display:flex/grid}) outranks
+   .tabpage{display:none}, so an explicit :not(.active) hide is
+   required for the switch to work at every width. ===== */
+#page-recap:not(.active){display:none}
+#page-keyscenes{display:none}
+#page-keyscenes.active{display:flex;flex-direction:column;height:100%}
+#ksMenuBtn{position:fixed;top:10px;left:10px;z-index:90;width:42px;height:42px;border-radius:12px;border:1.5px solid #2C2C35;background:rgba(20,20,26,.85);color:#F2F2F5;font-size:19px;line-height:1;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center}
+#drawerBg{position:fixed;inset:0;background:rgba(5,5,8,.55);z-index:140;opacity:0;pointer-events:none;transition:opacity .22s}
+#drawerBg.show{opacity:1;pointer-events:auto}
+#appDrawer{position:fixed;top:0;left:0;bottom:0;width:min(280px,82vw);background:#141419;border-right:1px solid #26262E;z-index:150;transform:translateX(-106%);transition:transform .24s ease;padding:16px 14px;display:flex;flex-direction:column;gap:8px;overflow-y:auto}
+#appDrawer.open{transform:translateX(0)}
+.dr-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+.dr-brand{font-weight:800;font-size:15px}
+.dr-brand span{color:#F5A623}
+.dr-item{text-align:left;padding:13px 14px;border-radius:13px;border:1.5px solid #2C2C35;background:#1B1B21;color:#F2F2F5;font-family:inherit;font-size:14.5px;font-weight:700;cursor:pointer;width:100%}
+.dr-item.sel{border-color:#F59E0B;background:rgba(245,158,11,.14);color:#FBBF24}
+.btn.armed{background:#e5484d;border-color:#e5484d;color:#fff}
+.ks-head{display:flex;align-items:center;gap:10px;padding:12px 14px 10px 62px;flex:none}
+.ks-title{font-size:17px;font-weight:800;flex:1;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ks-scroll{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:2px 14px 22px;max-width:760px;width:100%;margin:0 auto}
+.ks-stage{margin-bottom:12px}
+#ks-video{width:100%;border-radius:12px;background:#000;max-height:44vh;max-height:44dvh}
+.ks-prog{margin-top:12px}
+.ks-prog-pct{font-size:26px;font-weight:800}
+.ks-prog-bar{height:8px;border-radius:99px;background:#2C2C35;overflow:hidden;margin:6px 0}
+.ks-prog-fill{height:100%;width:0;background:linear-gradient(90deg,#F59E0B,#F97316);border-radius:99px;transition:width .25s}
+.ks-prog-meta{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;color:#9A9AA5}
+.ks-scene{display:flex;gap:11px;background:#101014;border:1px solid #26262E;border-radius:15px;padding:11px;margin-bottom:10px}
+.ks-scene.off{opacity:.45}
+.ks-thumb{width:86px;height:64px;object-fit:cover;border-radius:9px;background:#000;flex:0 0 86px}
+.ks-sc-main{flex:1;min-width:0}
+.ks-sc-title{width:100%;padding:8px 10px;border-radius:10px;border:1.5px solid #2C2C35;background:#17171C;color:#F2F2F5;font-family:inherit;font-size:13.5px;font-weight:700}
+.ks-sc-times{font-size:12.5px;color:#FBBF24;font-weight:700;margin-top:6px}
+.ks-sc-why{font-size:12px;color:#9A9AA5;line-height:1.5;margin-top:3px}
+.ks-sc-btns{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;align-items:center}
+.ks-sbtn{padding:7px 10px;border-radius:999px;border:1.5px solid #2C2C35;background:#1E1E24;color:#F2F2F5;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer}
+.ks-sbtn.on{border-color:#22A06B;color:#4ADE80}
+.ks-sbtn.armed{background:#e5484d;border-color:#e5484d;color:#fff}
+.ks-nudge{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;color:#9A9AA5}
+.ks-nudge button{padding:6px 8px;border-radius:8px;border:1.5px solid #2C2C35;background:#1E1E24;color:#F2F2F5;font-family:inherit;font-size:11.5px;font-weight:700;cursor:pointer}
 </style>
 </head>
 <body>
 <div class="layout"><main class="main">
 <!-- Recap editor — the app's single feature; content injected by JS -->
 <section class="tabpage active" id="page-recap"></section>
+<!-- V246: ✂️ အခန်း ဖြတ်ဆက် — a dedicated full-screen PAGE of its own
+     (not a sheet, not part of the editor page). Static markup; all
+     behaviour lives in the V246 script block before </body>. -->
+<section class="tabpage" id="page-keyscenes">
+<div class="ks-head"><button class="icon-btn" id="ksBack" type="button" aria-label="နောက်သို့">‹</button><div class="ks-title">✂️ အခန်း ဖြတ်ဆက်</div><button class="btn light small" id="ksReset" type="button">↺ Reset</button></div>
+<div class="ks-scroll">
+<div class="ks-stage"><video id="ks-video" playsinline controls></video><div class="file-info" id="ks-fileinfo">Video မရွေးရသေးပါ</div></div>
+<div class="card ks-card"><h3>🎯 အဓိက အခန်း ရွေးရန်</h3>
+<div class="field"><label>စုစုပေါင်း ကြာချိန် (ခန့်မှန်း)</label><div class="style-row" id="ks-targetRow"><button class="style-chip" data-v="60" type="button">60 စက္ကန့်</button><button class="style-chip" data-v="90" type="button">90 စက္ကန့်</button><button class="style-chip sel" data-v="120" type="button">120 စက္ကန့်</button><button class="style-chip" data-v="180" type="button">180 စက္ကန့်</button><button class="style-chip" data-v="0" type="button">အလိုအလျောက်</button></div></div>
+<button class="btn primary" id="ksAnalyse" type="button"><span class="wave"><i></i><i></i><i></i><i></i><i></i></span><span class="btn-label">✂️ အဓိက အခန်း ရွေးမယ်</span></button>
+<div class="ks-prog" id="ksProg" style="display:none"><div class="ks-prog-pct" id="ksProgPct">0%</div><div class="ks-prog-bar"><div class="ks-prog-fill" id="ksProgFill"></div></div><div class="ks-prog-meta"><span id="ksProgLabel"></span><span id="ksProgUnit"></span></div></div>
+<div class="file-info" id="ksStatus"></div></div>
+<div class="card ks-card" id="ksReviewCard" style="display:none"><h3>📋 အခန်း စာရင်း</h3><p>အခန်း တစ်ခုချင်းကို စစ်ပြီး ပြင် / ဖြုတ် / ထည့် လုပ်နိုင်ပါတယ် — "✓ ပါမယ်" ဖွင့်ထားသော အခန်းများသာ ထုတ်ပေးပါမယ်။</p>
+<div class="file-info" id="ksSummary" style="color:#FBBF24;font-weight:700"></div>
+<div id="ksList" style="margin-top:10px"></div>
+<div class="picker-row"><button class="btn light small" id="ksAdd" type="button">+ အခန်း ထပ်ထည့်</button><button class="btn light small" id="ksRerun" type="button">🔁 ပြန် ရွေးမယ်</button></div></div>
+<div class="card ks-card" id="ksExportCard" style="display:none"><h3>🎬 ဖြတ်ဆက် ထုတ်ရန်</h3>
+<div class="field"><label>Resolution (အရင်းအမြစ် ထက် မကြီးပါ)</label><div class="style-row" id="ksResRow"><button class="style-chip" data-v="720" type="button">720</button><button class="style-chip sel" data-v="1080" type="button">1080</button></div></div>
+<div class="switch-row"><div><b style="font-size:14px">မူရင်း အသံ</b><div style="font-size:12px;color:#9A9AA5">ပိတ်ရင် အသံ မပါဘဲ ထုတ်မည်</div></div><div class="tgl on" id="ksAudioTgl"></div></div>
+<button class="btn primary" id="ksExport" type="button"><span class="wave"><i></i><i></i><i></i><i></i><i></i></span><span class="btn-label">🎬 ဖြတ်ဆက် ထုတ်မယ်</span></button>
+<button class="btn light" id="ksCancel" type="button" style="display:none;width:100%;margin-top:8px">ရပ်</button>
+<div class="ks-prog" id="ksExpProg" style="display:none"><div class="ks-prog-pct" id="ksExpProgPct">0%</div><div class="ks-prog-bar"><div class="ks-prog-fill" id="ksExpProgFill"></div></div><div class="ks-prog-meta"><span id="ksExpProgLabel"></span><span></span></div></div>
+<div class="file-info" id="ksExpStatus"></div>
+<div id="ksResult" style="display:none;margin-top:10px"><a class="btn green" id="ksDownload" style="width:100%" href="#" download="keyscenes.mp4">⬇️ Video ဒေါင်း</a></div></div>
+<p class="hint" style="text-align:center">✂️ အခန်း ဖြတ်ဆက် · by <b style="color:#F5A623">NLO</b></p>
+</div>
+</section>
 </main></div>
+<!-- V246: slide-menu drawer — the app-level navigation between the
+     Recaps page and the Key Scenes page -->
+<button id="ksMenuBtn" type="button" aria-label="Menu">☰</button>
+<div id="drawerBg"></div>
+<aside id="appDrawer"><div class="dr-head"><div class="dr-brand">Recaps <span>· NLO</span></div><button class="sheet-x" id="drawerClose" type="button" aria-label="ပိတ်">✕</button></div><button class="dr-item sel" data-page="recap" id="drItemRecap" type="button">🎬 Recaps</button><button class="dr-item" data-page="keyscenes" id="drItemScenes" type="button">✂️ အခန်း ဖြတ်ဆက်</button></aside>
 <div class="sheet-wrap" id="sheetWrap"><div class="sheet-bg" id="sheetBg"></div><div class="sheet"><div class="sheet-head"><h3 id="sheetTitle"></h3><button class="sheet-x" id="sheetClose" type="button" aria-label="ပိတ်">✕</button></div><div id="sheetBody"></div><div class="sheet-foot"><button class="btn primary" id="sheetDone" type="button">✓ ပြီး</button></div></div></div>
 <div id="notice"></div>
 <div id="donePop"><div class="box"><div style="font-size:34px">✅</div><h3 style="margin:8px 0" id="doneTitle">ရပါပြီ</h3><p id="doneText" style="font-size:13.5px;color:#527884"></p><button class="btn primary" id="doneOk" style="margin-top:14px">ဟုတ်ကဲ့</button></div></div>
@@ -741,7 +815,7 @@ const mainRowInner='<div class="main-row" id="'+p+'-mainRow">'
 const spacerInner='<div class="col-spacer" id="'+p+'-spacer"><div class="gen-prog" id="'+p+'-genProg" style="display:none"><div class="gen-prog-pct" id="'+p+'-genProgPct">0%</div><div class="gen-prog-bar"><div class="gen-prog-fill" id="'+p+'-genProgFill"></div></div><div class="gen-prog-meta"><span id="'+p+'-genProgLabel"></span><span class="gen-prog-unit" id="'+p+'-genProgUnit"></span></div></div></div>';
 function tb(id,ic,t){return '<button class="tool-btn" id="'+p+'-tool'+id+'"><span class="tic">'+ic+'</span>'+t+'</button>'}
 const toolbarInner='<nav class="toolbar" id="'+p+'-toolbar">'
-+tb('Script','📝','Script')+tb('Subs','🎨','စာတန်း')+tb('Voice','🎙️','Voice Create')+tb('Mixer','🔊','Mixer')+tb('Trim','✂️','Trim')+tb('Aspect','🌫️','Aspect')+tb('Title','📝','Title')+tb('Text','➕','Text')+tb('Logo','🛡️','Logo')+tb('Border','📐','Border')+tb('Blur','🫥','Blur')
++tb('Script','📝','Script')+tb('Subs','🎨','စာတန်း')+tb('Voice','🎙️','Voice Create')+tb('Mixer','🔊','Mixer')+tb('Trim','✂️','Trim')+tb('Aspect','🌫️','Aspect')+tb('Title','📝','Title')+tb('Text','➕','Text')+tb('Logo','🛡️','Logo')+tb('Border','📐','Border')+tb('Blur','🫥','Blur')+tb('Scenes','✂️','ဖြတ်ဆက်')
 +'<button class="tool-btn" id="'+p+'-toolKey"><span class="tic">🔑</span>Key</button>'
 +'</nav>';
 const exportInner='<div id="'+p+'-expSetup">'
@@ -5061,6 +5135,359 @@ window.__recapProject={collect:projCollect,apply:applyProject,sigMatch:projSigMa
  /* V230: boot state — no sheet or panel open; every control block sits in its parking home */
  refreshSummaries();
  updateCueCount();refreshVoiceGate();updateVoiceWarn();applySubPos();updateSubPosLabel();setSyncDelay(0);updateModeUI();syncTitleOvl();syncTextOvl();syncLogoOvl();syncBorderOvl();tpSync();renderTimeline();syncBlurLayer();blurListRender();blurCtlSync();
+})();
+</script>
+<script>
+/* ================= V246: ✂️ အခန်း ဖြတ်ဆက် (Key Scenes) =================
+   Its OWN page (#page-keyscenes) inside the app — a dedicated
+   full-screen view with its own header/back/Reset, NOT a bottom
+   sheet and NOT embedded in the recap editor page. Reached BOTH
+   ways: (1) the toolbar tool button (recap-toolScenes, "✂️ ဖြတ်ဆက်")
+   on the main editor page, and (2) the slide-menu drawer item.
+   All state lives in `ks`, fully separate from the recap
+   script/cue/voice state; the recap pipelines are never touched.
+   Reused app helpers (by name): geminiGen (the GEM_MODELS chain),
+   transcribeChunksPiped + chunkCacheGet/chunkCachePut (chunked
+   transcription + its cache), getFFmpeg / ffExecP / ffReadU8
+   (ffmpeg.wasm, toBlobURL loading), wlAcquire / wlRelease (Wake
+   Lock), showNotice / showDone, getApiKey, fmtDur, humanErr,
+   recapsStat. The page has its OWN <video> (#ks-video) bound to the
+   same object URL as the recap stage. */
+const ks={scenes:[],frames:[],target:120,res:1080,keepAudio:true,busy:false,expBusy:false,cancel:false,edited:false,duration:0,videoSig:'',boundUrl:'',previewEnd:null,dlUrl:null,progMax:0};
+const ks$=id=>document.getElementById(id);
+function ksEd(){try{return (typeof editors!=='undefined'&&editors&&editors.recap)||null}catch(e){return null}}
+function ksEsc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+/* Pure scene-list sanitizer: clamp to [0,duration], drop scenes
+   shorter than 2s, sort by start, merge overlaps, cap at 30.
+   No DOM, no state — unit-tested by v246_harness.js. */
+function ksSanitizeScenes(list,duration){
+ const dur=Math.max(0,+duration||0);const out=[];
+ if(Array.isArray(list))for(const it of list){
+  if(!it||typeof it!=='object')continue;
+  const s0=+it.start,e0=+it.end;
+  if(!isFinite(s0)||!isFinite(e0))continue;
+  const s=Math.max(0,Math.min(s0,dur)),e=Math.max(0,Math.min(e0,dur));
+  if(e-s<2)continue;
+  out.push({start:Math.round(s*100)/100,end:Math.round(e*100)/100,title:String(it.title||'').slice(0,80),why:String(it.why||'').slice(0,200),include:true});
+ }
+ out.sort((a,b)=>a.start-b.start);
+ const merged=[];
+ for(const sc of out){
+  const last=merged[merged.length-1];
+  if(last&&sc.start<last.end){if(sc.end>last.end)last.end=sc.end;if(!last.title)last.title=sc.title;if(sc.why&&!last.why)last.why=sc.why}
+  else merged.push(sc);
+ }
+ return merged.slice(0,30);
+}
+/* ---------- drawer + page switching ---------- */
+let ksPage='recap';
+function ksSyncDrawer(){const r=ks$('drItemRecap'),s=ks$('drItemScenes');if(r)r.classList.toggle('sel',ksPage==='recap');if(s)s.classList.toggle('sel',ksPage==='keyscenes')}
+function ksOpenDrawer(){const d=ks$('appDrawer'),b=ks$('drawerBg');if(d)d.classList.add('open');if(b)b.classList.add('show');document.body.classList.add('locked');ksSyncDrawer()}
+function ksCloseDrawer(){const d=ks$('appDrawer'),b=ks$('drawerBg');if(d)d.classList.remove('open');if(b)b.classList.remove('show');const sw=ks$('sheetWrap');if(!(sw&&sw.classList.contains('open')))document.body.classList.remove('locked')}
+function ksSwitchPage(name){
+ ksPage=name;
+ const rp=ks$('page-recap'),kp=ks$('page-keyscenes');
+ if(rp)rp.classList.toggle('active',name==='recap');
+ if(kp)kp.classList.toggle('active',name==='keyscenes');
+ const rv=ks$('recap-video'),kv=ks$('ks-video');
+ if(name==='keyscenes'){if(rv&&!rv.paused)try{rv.pause()}catch(e){}ksEnter()}
+ else{if(kv&&!kv.paused)try{kv.pause()}catch(e){}ks.previewEnd=null}
+ ksSyncDrawer();ksCloseDrawer();
+ try{window.scrollTo(0,0)}catch(e){}
+}
+/* Entering the page: bind this page's own <video> to the loaded
+   file's object URL; a different file resets the scene list. */
+function ksEnter(){
+ const ed=ksEd(),v=ks$('ks-video'),fi=ks$('ks-fileinfo');
+ if(!ed||!ed.file){if(fi)fi.textContent='⚠️ Video မရွေးရသေးပါ — 🎬 Recaps page မှာ အရင် video ရွေးပါ';return}
+ const sig=ed.file.name+'|'+ed.file.size;
+ if(sig!==ks.videoSig){
+  ks.videoSig=sig;ks.scenes=[];ks.frames=[];ks.edited=false;ks.previewEnd=null;ks.duration=ed.duration||0;
+  if(v&&ed.url){v.src=ed.url;ks.boundUrl=ed.url}
+  ksRenderList();
+ }else if(v&&ed.url&&ks.boundUrl!==ed.url){v.src=ed.url;ks.boundUrl=ed.url}
+ if(ed.duration)ks.duration=ed.duration;
+ if(fi)fi.textContent=ed.file.name+' · '+fmtDur(ks.duration||ed.duration||0);
+}
+/* ---------- small UI helpers ---------- */
+function ksSetStatus(t){const s=ks$('ksStatus');if(s)s.textContent=t}
+function ksSetProg(pct,label,unit){pct=Math.max(0,Math.min(100,Math.round(pct||0)));if(pct<ks.progMax)pct=ks.progMax;ks.progMax=pct;const b=ks$('ksProg');if(b)b.style.display='block';const p=ks$('ksProgPct');if(p)p.textContent=pct+'%';const f=ks$('ksProgFill');if(f)f.style.width=pct+'%';if(label!=null){const l=ks$('ksProgLabel');if(l)l.textContent=label}const u=ks$('ksProgUnit');if(u)u.textContent=unit||''}
+function ksHideProg(){const b=ks$('ksProg');if(b)b.style.display='none'}
+function ksBusyBtn(btn,on,label){if(!btn)return;btn.classList.toggle('loading',on);btn.disabled=on;const l=btn.querySelector('.btn-label');if(l&&label)l.textContent=label}
+/* Two-tap confirm — the same arm pattern as the editor's clearAll:
+   first tap arms for 4s, second tap runs fn. */
+function ksArm(btn,fn){
+ if(btn.dataset&&btn.dataset.armed==='1'){btn.dataset.armed='';btn.classList.remove('armed');if(btn.dataset.label)btn.textContent=btn.dataset.label;fn();return}
+ if(btn.dataset){btn.dataset.label=btn.textContent;btn.dataset.armed='1'}
+ btn.textContent='တကယ်? ထပ်နှိပ်';btn.classList.add('armed');
+ setTimeout(()=>{if(btn.dataset&&btn.dataset.armed==='1'){btn.dataset.armed='';btn.classList.remove('armed');if(btn.dataset.label)btn.textContent=btn.dataset.label}},4000);
+}
+function ksChipRow(rowId,fn){const r=ks$(rowId);if(!r)return;r.addEventListener('click',e=>{const t=e.target;const b=t&&t.closest?t.closest('.style-chip'):null;if(!b)return;r.querySelectorAll('.style-chip').forEach(c=>c.classList.toggle('sel',c===b));fn(b.dataset.v)})}
+/* ---------- review list ---------- */
+function ksThumbFor(t){let best=null,bd=Infinity;for(const f of ks.frames){const d=Math.abs(f.t-t);if(d<bd){bd=d;best=f}}return best?best.url:''}
+function ksIncluded(){return ks.scenes.filter(s=>s.include)}
+function ksRenderSummary(){const el=ks$('ksSummary');if(!el)return;if(!ks.scenes.length){el.textContent='';return}const inc=ksIncluded();let tot=0;for(const s of inc)tot+=s.end-s.start;el.textContent='ရွေးထားသော အခန်း: '+inc.length+' ခု · စုစုပေါင်း '+fmtDur(tot)+' (စာရင်း စုစုပေါင်း '+ks.scenes.length+' ခု)'}
+function ksRenderList(){
+ const list=ks$('ksList');if(!list)return;
+ list.innerHTML=ks.scenes.map((s,i)=>{
+  const th=ksThumbFor(s.start);
+  return '<div class="ks-scene'+(s.include?'':' off')+'" data-i="'+i+'">'
+  +(th?'<img class="ks-thumb" src="'+th+'" alt="">':'<div class="ks-thumb"></div>')
+  +'<div class="ks-sc-main"><input type="text" class="ks-sc-title" data-i="'+i+'" value="'+ksEsc(s.title)+'" placeholder="အခန်း အမည်">'
+  +'<div class="ks-sc-times">'+fmtDur(s.start)+' – '+fmtDur(s.end)+' · ကြာချိန် '+fmtDur(s.end-s.start)+'</div>'
+  +(s.why?'<div class="ks-sc-why">'+ksEsc(s.why)+'</div>':'')
+  +'<div class="ks-sc-btns"><button class="ks-sbtn" type="button" data-act="preview" data-i="'+i+'">▶ ကြည့်</button>'
+  +'<button class="ks-sbtn'+(s.include?' on':'')+'" type="button" data-act="toggle" data-i="'+i+'">'+(s.include?'✓ ပါမယ်':'မပါဘူး')+'</button>'
+  +'<span class="ks-nudge">စ <button type="button" data-act="s-" data-i="'+i+'">−1s</button><button type="button" data-act="s+" data-i="'+i+'">+1s</button></span>'
+  +'<span class="ks-nudge">ဆုံး <button type="button" data-act="e-" data-i="'+i+'">−1s</button><button type="button" data-act="e+" data-i="'+i+'">+1s</button></span>'
+  +'<button class="ks-sbtn" type="button" data-act="del" data-i="'+i+'">🗑</button></div></div></div>';
+ }).join('');
+ ksRenderSummary();
+ const rc=ks$('ksReviewCard'),ec=ks$('ksExportCard');
+ if(rc)rc.style.display=ks.scenes.length?'block':'none';
+ if(ec)ec.style.display=ks.scenes.length?'block':'none';
+}
+function ksPreview(s){
+ const v=ks$('ks-video');
+ if(!v||!ks.boundUrl){showNotice('⚠️ Video မရွေးရသေးပါ — 🎬 Recaps page မှာ အရင် video ရွေးပါ','err');return}
+ ks.previewEnd=s.end;
+ try{v.currentTime=s.start}catch(e){}
+ const p=v.play();if(p&&p.catch)p.catch(()=>{});
+}
+/* ---------- transcript: reuse the recap editor's when it covers
+   this exact file over the FULL range (its chunk cache keeps the
+   60s-chunk timestamps); otherwise run the app's chunked
+   transcription over the whole video under a ks signature.
+   Returns a timestamped transcript string, or null (no audio). */
+async function ksGetTranscript(key,progFn){
+ const ed=ksEd();const dur=ks.duration||ed.duration||0;
+ const sEl=ks$('recap-start'),eEl=ks$('recap-end');
+ const tS=sEl?parseFloat(sEl.value):NaN,tE=eEl?parseFloat(eEl.value):NaN;
+ if(ed.txSig&&isFinite(tS)&&isFinite(tE)&&tS<=0.05&&tE>=dur-1.0){
+  const sig=(ed.file.name+'|'+ed.file.size)+'|'+tS+'|'+tE;
+  if(sig===ed.txSig){
+   let N=0;for(let q=0;q<dur-0.05;q+=60)N++;
+   const parts=[];let all=true;
+   for(let i=0;i<N;i++){const c=chunkCacheGet(sig,'tx',i);if(c==null){all=false;break}parts.push('['+fmtDur(i*60)+'–'+fmtDur(Math.min(dur,(i+1)*60))+'] '+String(c).replace(/\n+/g,' '))}
+   if(all&&N>0){if(progFn)progFn(1,1);return parts.join('\n')}
+   const txBox=ks$('recap-transcript');
+   if(txBox&&(txBox.value||'').trim()){if(progFn)progFn(1,1);return txBox.value.trim()}
+  }
+ }
+ const sig='ks|'+ed.file.name+'|'+ed.file.size+'|'+dur.toFixed(2);
+ let N=0;for(let q=0;q<dur-0.05;q+=60)N++;
+ if(!N)return null;
+ const seeded=new Array(N).fill(null);
+ for(let i=0;i<N;i++){const c=chunkCacheGet(sig,'tx',i);if(c!=null)seeded[i]=c}
+ const ff=await getFFmpeg(()=>{});
+ const fetchFile=window.FFmpegUtil&&window.FFmpegUtil.fetchFile;
+ await ff.writeFile('ks_in.mp4',fetchFile?await fetchFile(ed.file):new Uint8Array(await ed.file.arrayBuffer()));
+ try{
+  await transcribeChunksPiped(key,N,async i=>{
+   const s=i*60,e=Math.min(dur,s+60),fn='ks_a'+i+'.mp3';
+   const code=await ff.exec(['-ss',s.toFixed(2),'-i','ks_in.mp4','-t',(e-s).toFixed(2),'-vn','-ac','1','-ar','16000','-b:a','32k',fn],600000);
+   if(code!==0){if(i===0)throw new Error(AI_NO_AUDIO);throw new Error('အသံ ထုတ်ရာတွင် ffmpeg exit code '+code)}
+   const data=await ff.readFile(fn);try{await ff.deleteFile(fn)}catch(e2){}
+   return data;
+  },t=>ksSetStatus(t),sig,seeded,progFn);
+ }catch(e){
+  try{await ff.deleteFile('ks_in.mp4')}catch(e3){}
+  if(e&&e.message===AI_NO_AUDIO)return null;
+  throw e;
+ }
+ try{await ff.deleteFile('ks_in.mp4')}catch(e3){}
+ const parts=[];
+ for(let i=0;i<N;i++){if(seeded[i])parts.push('['+fmtDur(i*60)+'–'+fmtDur(Math.min(dur,(i+1)*60))+'] '+String(seeded[i]).replace(/\n+/g,' '))}
+ const txt=parts.join('\n').trim();
+ return txt||null;
+}
+/* ---------- frame sampling on this page's own <video> ----------
+   Every ~10s, capped at 40 frames, ~160px wide JPEGs. The frames
+   feed the analysis AND serve as the review cards' thumbnails. */
+async function ksSampleFrames(){
+ const v=ks$('ks-video');const dur=ks.duration||0;
+ ks.frames=[];
+ if(!v||!dur||!v.videoWidth)return ks.frames;
+ const n=Math.max(2,Math.min(40,Math.floor(dur/10)));
+ const cw=160,ch=Math.max(2,Math.round(160*v.videoHeight/v.videoWidth));
+ const c=document.createElement('canvas');c.width=cw;c.height=ch;const x=c.getContext('2d');
+ const prevT=v.currentTime,wasPaused=v.paused;if(!wasPaused)try{v.pause()}catch(e){}
+ const seek=t=>new Promise(res=>{let dn=false;const fin=()=>{if(dn)return;dn=true;v.removeEventListener('seeked',fin);res()};v.addEventListener('seeked',fin);try{v.currentTime=t}catch(e){fin()}setTimeout(fin,1600)});
+ for(let i=0;i<n;i++){
+  const t=dur*(i+0.5)/n;
+  await seek(Math.min(t,Math.max(0,dur-0.05)));
+  try{x.drawImage(v,0,0,cw,ch);ks.frames.push({t:Math.round(t*10)/10,url:c.toDataURL('image/jpeg',0.7)})}catch(e){}
+  ksSetProg(50+Math.round(20*(i+1)/n),'🖼️ ပုံများ ယူနေပါတယ်',(i+1)+'/'+n);
+ }
+ try{v.currentTime=prevT}catch(e){}
+ return ks.frames;
+}
+/* ---------- analysis ---------- */
+async function ksAnalyse(){
+ const ed=ksEd();
+ if(!ed||!ed.file){showNotice('⚠️ Video ဖိုင် လိုပါတယ် — 🎬 Recaps page မှာ အရင် video ရွေးပါ','err');return}
+ const key=getApiKey();
+ if(!key){showNotice('⚠️ ဒီ အလုပ်အတွက် Gemini API Key လိုပါတယ် — 🎬 Recaps page အောက်ခြေ toolbar က 🔑 Key မှာ သင့် key ထည့်ပါ','err');return}
+ if(ks.busy)return;
+ ksEnter();
+ const dur=ks.duration||ed.duration||0;
+ if(!dur){showNotice('⚠️ Video ကြာချိန် မသိရပါ — video ကို ခဏ play လုပ်ပြီး ပြန် ကြိုးစားပါ','err');return}
+ ks.busy=true;ks.progMax=0;
+ const btn=ks$('ksAnalyse');ksBusyBtn(btn,true,'✂️ ရွေးနေပါတယ်…');
+ wlAcquire();
+ try{
+  ksSetProg(2,'🎧 အသံကို စာသား ပြောင်းနေပါတယ်','');
+  const transcript=await ksGetTranscript(key,(d,t)=>{if(t)ksSetProg(2+Math.round(48*d/t),'🎧 အသံကို စာသား ပြောင်းနေပါတယ်',t>1?(d+'/'+t):'')});
+  if(transcript)ksSetStatus('✅ စာသား ရပါပြီ');else ksSetStatus('🔇 အသံ မပါ / မကြားရလို့ ပုံများဖြင့်သာ ရွေးပါမယ်');
+  const frames=await ksSampleFrames();
+  const sendFrames=frames.slice(0,30);
+  ksSetProg(72,'🤖 AI အဓိက အခန်းများ ရွေးနေပါတယ်','');
+  const tgtTxt=ks.target>0?('The total duration of all scenes together should be close to '+ks.target+' seconds — do not exceed it by much.'):('Choose a tight highlight set — only the truly essential scenes, roughly 15–25% of the whole video.');
+  let prompt='You are picking the KEY SCENES of a video for a highlight cut. Video duration: '+Math.round(dur)+' seconds.\n'
+  +'The images are frames sampled from the video in time order, at these times (seconds): '+sendFrames.map(f=>f.t).join(', ')+'.\n'
+  +tgtTxt+'\nEach scene must be 5–60 seconds long, inside [0, '+Math.round(dur)+'], in timeline order, with no overlaps.\n'
+  +'Give each scene a short title in Burmese (Myanmar language) and a one-line reason in Burmese for why it matters.\n';
+  if(transcript)prompt+='\nTimestamped transcript of the audio (use it to judge what matters):\n'+transcript.slice(0,12000)+'\n';
+  prompt+='\nOutput ONLY a JSON array — no other text — exactly like: [{"start":12,"end":38,"title":"...","why":"..."}]';
+  const parts=[{text:prompt}];
+  for(const f of sendFrames)parts.push({inlineData:{mimeType:'image/jpeg',data:f.url.split(',')[1]}});
+  const reply=await geminiGen(key,parts,0.2,t=>ksSetStatus(t));
+  ksSetProg(95,'📋 စာရင်း စစ်ဆေးနေပါတယ်','');
+  let arr=null;
+  try{const a=reply.indexOf('['),b=reply.lastIndexOf(']');if(a>=0&&b>a)arr=JSON.parse(reply.slice(a,b+1))}catch(e){}
+  if(!Array.isArray(arr))throw new Error('AI မှ စာရင်း ပုံစံ မှန်ကန်စွာ ပြန်မရပါ — ပြန် ကြိုးစားပါ');
+  ks.scenes=ksSanitizeScenes(arr,dur);
+  ks.edited=false;
+  ksRenderList();
+  ksSetProg(100,'✅ ပြီးပါပြီ','');
+  setTimeout(ksHideProg,700);
+  if(ks.scenes.length){ksSetStatus('✅ အခန်း '+ks.scenes.length+' ခု ရွေးပြီးပါပြီ — အောက်မှာ စစ်ပြီး ပြင်နိုင်ပါတယ်');showNotice('✅ အခန်း '+ks.scenes.length+' ခု ရွေးပြီးပါပြီ','ok')}
+  else{ksSetStatus('⚠️ အခန်း မရွေးနိုင်ပါ — ပြန် ကြိုးစားပါ');showNotice('⚠️ အခန်း မရွေးနိုင်ပါ','err')}
+  if(typeof recapsStat==='function')recapsStat('keyscenes_analyse');
+ }catch(e){
+  ksSetStatus('❌ '+humanErr(e));showNotice('❌ '+humanErr(e),'err');ksHideProg();
+ }finally{
+  wlRelease();ks.busy=false;ksBusyBtn(btn,false,'✂️ အဓိက အခန်း ရွေးမယ်');
+ }
+}
+/* ---------- export: per-scene re-encode cuts + concat DEMUXER join
+   (never a concat filter graph — see the V246 brief / past bug) --- */
+function ksSetExpProg(pct,label){pct=Math.max(0,Math.min(100,Math.round(pct||0)));const b=ks$('ksExpProg');if(b)b.style.display='block';const p=ks$('ksExpProgPct');if(p)p.textContent=pct+'%';const f=ks$('ksExpProgFill');if(f)f.style.width=pct+'%';if(label!=null){const l=ks$('ksExpProgLabel');if(l)l.textContent=label}}
+function ksSetExpStatus(t){const s=ks$('ksExpStatus');if(s)s.textContent=t}
+function ksCancelErr(){const e=new Error('Export ကို ရပ်လိုက်ပါပြီ');e.cancelled=true;return e}
+async function ksExport(){
+ const ed=ksEd();
+ if(!ed||!ed.file){showNotice('⚠️ Video ဖိုင် လိုပါတယ် — 🎬 Recaps page မှာ အရင် video ရွေးပါ','err');return}
+ const inc=ksIncluded().slice().sort((a,b)=>a.start-b.start);
+ if(!inc.length){showNotice('⚠️ ထုတ်ရန် အခန်း မရှိပါ — အခန်း ရွေးပြီး "✓ ပါမယ်" ဖွင့်ထားပါ','err');return}
+ if(ks.expBusy)return;
+ ksEnter();
+ ks.expBusy=true;ks.cancel=false;
+ const btn=ks$('ksExport'),cn=ks$('ksCancel'),rp=ks$('ksResult');
+ ksBusyBtn(btn,true,'🎬 ထုတ်နေပါတယ်…');if(cn)cn.style.display='block';if(rp)rp.style.display='none';
+ wlAcquire();
+ const ff=await getFFmpeg(()=>{});
+ const written=[];
+ try{
+  const fetchFile=window.FFmpegUtil&&window.FFmpegUtil.fetchFile;
+  await ff.writeFile('ks_in.mp4',fetchFile?await fetchFile(ed.file):new Uint8Array(await ed.file.arrayBuffer()));written.push('ks_in.mp4');
+  const vw=ed.videoW||0,vh=ed.videoH||0,shortS=Math.min(vw||Infinity,vh||Infinity);
+  const scale=(vw&&vh&&shortS>ks.res)?('scale=w=\'if(gt(iw,ih),-2,'+ks.res+')\':h=\'if(gt(iw,ih),'+ks.res+',-2)\''):null;
+  const total=inc.length+1;let doneU=0;const segNames=[];
+  for(let i=0;i<inc.length;i++){
+   if(ks.cancel)throw ksCancelErr();
+   const s=inc[i],fn='ks_seg_'+String(i).padStart(2,'0')+'.mp4',segDur=Math.max(0.1,s.end-s.start);
+   const args=['-ss',s.start.toFixed(2),'-i','ks_in.mp4','-t',segDur.toFixed(2)];
+   if(scale)args.push('-vf',scale);
+   args.push('-c:v','libx264','-preset','veryfast','-crf','20','-pix_fmt','yuv420p');
+   if(ks.keepAudio)args.push('-c:a','aac','-b:a','128k');else args.push('-an');
+   args.push(fn);
+   ksSetExpStatus('✂️ အခန်း '+(i+1)+'/'+inc.length+' ဖြတ်နေပါတယ်…');
+   const code=await ffExecP(ff,args,600000,segDur,f=>{ksSetExpProg((doneU+f)/total*100,'🎬 ဖြတ်ဆက် ထုတ်နေပါတယ်')});
+   if(code!==0)throw new Error('အခန်း '+(i+1)+' ဖြတ်ရာတွင် ffmpeg exit code '+code);
+   segNames.push(fn);written.push(fn);doneU++;
+   ksSetExpProg(doneU/total*100,'🎬 ဖြတ်ဆက် ထုတ်နေပါတယ်');
+  }
+  if(ks.cancel)throw ksCancelErr();
+  ksSetExpStatus('🔗 အခန်းများ ဆက်နေပါတယ်…');
+  await ff.writeFile('ks_list.txt',segNames.map(n=>'file \''+n+'\'').join('\n'));written.push('ks_list.txt');
+  const code2=await ffExecP(ff,['-f','concat','-safe','0','-i','ks_list.txt','-c','copy','ks_out.mp4'],600000,0,f=>{ksSetExpProg((doneU+f)/total*100,'🔗 ဆက်နေပါတယ်')});
+  if(code2!==0)throw new Error('အခန်းများ ဆက်ရာတွင် ffmpeg exit code '+code2);
+  written.push('ks_out.mp4');
+  const data=await ffReadU8(ff,'ks_out.mp4');
+  if(ks.dlUrl){try{URL.revokeObjectURL(ks.dlUrl)}catch(e){}}
+  ks.dlUrl=URL.createObjectURL(new Blob([data],{type:'video/mp4'}));
+  const dl=ks$('ksDownload');if(dl)dl.href=ks.dlUrl;
+  if(rp)rp.style.display='block';
+  ksSetExpProg(100,'✅ ပြီးပါပြီ');
+  ksSetExpStatus('✅ ပြီးပါပြီ — အောက်က ခလုတ်ဖြင့် ဒေါင်းပါ');
+  showDone('✅ ပြီးပါပြီ','အခန်း '+inc.length+' ခု ဖြတ်ဆက်ထားသော video ရပါပြီ — "⬇️ Video ဒေါင်း" ကို နှိပ်ပါ');
+  if(typeof recapsStat==='function')recapsStat('keyscenes_export');
+ }catch(e){
+  if(e&&e.cancelled){ksSetExpStatus('⏹️ ရပ်လိုက်ပါပြီ');showNotice('⏹️ Export ရပ်လိုက်ပါပြီ','info')}
+  else{ksSetExpStatus('❌ '+humanErr(e));showNotice('❌ Export မအောင်မြင်ပါ: '+humanErr(e),'err')}
+  const b=ks$('ksExpProg');if(b)b.style.display='none';
+ }finally{
+  for(const n of written){try{await ff.deleteFile(n)}catch(e){}}
+  wlRelease();ks.expBusy=false;ksBusyBtn(btn,false,'🎬 ဖြတ်ဆက် ထုတ်မယ်');if(cn)cn.style.display='none';
+ }
+}
+/* ---------- wiring ---------- */
+(function ksWire(){
+ const mb=ks$('ksMenuBtn');if(mb)mb.addEventListener('click',ksOpenDrawer);
+ const db=ks$('drawerBg');if(db)db.addEventListener('click',ksCloseDrawer);
+ const dc=ks$('drawerClose');if(dc)dc.addEventListener('click',ksCloseDrawer);
+ const diR=ks$('drItemRecap');if(diR)diR.addEventListener('click',()=>ksSwitchPage('recap'));
+ const diS=ks$('drItemScenes');if(diS)diS.addEventListener('click',()=>ksSwitchPage('keyscenes'));
+ const bk=ks$('ksBack');if(bk)bk.addEventListener('click',()=>ksSwitchPage('recap'));
+ const tbBtn=ks$('recap-toolScenes');if(tbBtn)tbBtn.addEventListener('click',()=>ksSwitchPage('keyscenes'));
+ const anBtn=ks$('ksAnalyse');if(anBtn)anBtn.addEventListener('click',()=>ksAnalyse());
+ const exBtn=ks$('ksExport');if(exBtn)exBtn.addEventListener('click',()=>ksExport());
+ const cnBtn=ks$('ksCancel');if(cnBtn)cnBtn.addEventListener('click',()=>{ks.cancel=true;ksSetExpStatus('⏹️ ရပ်နေပါတယ်…')});
+ const rsBtn=ks$('ksReset');if(rsBtn)rsBtn.addEventListener('click',()=>ksArm(rsBtn,()=>{ks.scenes=[];ks.edited=false;ks.previewEnd=null;ksRenderList();ksSetStatus('');const r=ks$('ksResult');if(r)r.style.display='none';showNotice('↺ အခန်း စာရင်း ရှင်းပြီးပါပြီ','info')}));
+ const rrBtn=ks$('ksRerun');if(rrBtn)rrBtn.addEventListener('click',()=>{if(ks.edited)ksArm(rrBtn,()=>ksAnalyse());else ksAnalyse()});
+ const addBtn=ks$('ksAdd');if(addBtn)addBtn.addEventListener('click',()=>{
+  const ed=ksEd();
+  if(!ed||!ed.file){showNotice('⚠️ Video အရင် ရွေးပါ — 🎬 Recaps page မှာ video တင်ပါ','err');return}
+  const v=ks$('ks-video');const d=ks.duration||ed.duration||0;
+  let st=v?+(v.currentTime||0):0;
+  st=Math.max(0,d>0?Math.min(st,Math.max(0,d-1)):st);
+  const en=d>0?Math.min(d,st+10):st+10;
+  ks.scenes.push({start:Math.round(st*100)/100,end:Math.round(en*100)/100,title:'အခန်း အသစ်',why:'',include:true});
+  ks.scenes.sort((a,b)=>a.start-b.start);ks.edited=true;ksRenderList();
+  showNotice('➕ အခန်း ထည့်ပြီးပါပြီ — အချိန် ညှိပြီး သုံးနိုင်ပါတယ်','ok');
+ });
+ const at=ks$('ksAudioTgl');if(at)at.addEventListener('click',()=>{ks.keepAudio=!ks.keepAudio;at.classList.toggle('on',ks.keepAudio)});
+ ksChipRow('ks-targetRow',v=>{ks.target=+v||0});
+ ksChipRow('ksResRow',v=>{ks.res=+v||1080});
+ const kv=ks$('ks-video');
+ if(kv){
+  kv.addEventListener('timeupdate',()=>{if(ks.previewEnd!=null&&kv.currentTime>=ks.previewEnd){try{kv.pause()}catch(e){}ks.previewEnd=null}});
+  kv.addEventListener('loadedmetadata',()=>{if(kv.duration&&isFinite(kv.duration)){ks.duration=kv.duration;const ed=ksEd(),fi=ks$('ks-fileinfo');if(fi&&ed&&ed.file)fi.textContent=ed.file.name+' · '+fmtDur(ks.duration)}});
+ }
+ const list=ks$('ksList');
+ if(list){
+  list.addEventListener('click',e=>{
+   const t=e.target;const b=t&&t.closest?t.closest('button'):null;if(!b)return;
+   const i=+b.dataset.i,act=b.dataset.act,s=ks.scenes[i];if(!s)return;
+   if(act==='preview'){ksPreview(s);return}
+   if(act==='toggle'){s.include=!s.include;ks.edited=true;ksRenderList();return}
+   if(act==='del'){ksArm(b,()=>{ks.scenes.splice(i,1);ks.edited=true;ksRenderList();showNotice('🗑️ အခန်း ဖျက်ပြီးပါပြီ','info')});return}
+   const d=ks.duration||0;
+   if(act==='s-')s.start=Math.max(0,Math.min(s.start-1,s.end-1));
+   else if(act==='s+')s.start=Math.min(s.start+1,s.end-1);
+   else if(act==='e-')s.end=Math.max(s.end-1,s.start+1);
+   else if(act==='e+')s.end=Math.min(d>0?d:s.end+1,s.end+1);
+   else return;
+   s.start=Math.round(s.start*100)/100;s.end=Math.round(s.end*100)/100;
+   ks.edited=true;ksRenderList();
+  });
+  list.addEventListener('input',e=>{
+   const t=e.target;const inp=t&&t.closest?t.closest('.ks-sc-title'):null;if(!inp)return;
+   const s=ks.scenes[+inp.dataset.i];if(s){s.title=inp.value;ks.edited=true}
+  });
+ }
+ ksSyncDrawer();
 })();
 </script>
 </body>

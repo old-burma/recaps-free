@@ -1025,7 +1025,11 @@ const txOf=()=>opts.align==='left'?(opts.pad||24):(W/2+((opts.cx!=null)?(opts.cx
 const lwMain=Math.max(6,fs/6),lwHalo=lwMain+12;
 if(hasKw){x.textAlign='left';x.lineJoin='round';kwLines.forEach((atoms,i)=>{const y=y0+i*lh;const wOf=a=>(a.w!=null?a.w:x.measureText(a.t).width);const lw=atoms.reduce((s,a)=>s+wOf(a),0);let cx0=opts.align==='left'?(opts.pad||24):(W/2+((opts.cx!=null)?(opts.cx-0.5)*W:0)-lw/2);for(const a of atoms){const w=wOf(a);if(a.t!==' '){x.lineWidth=lwHalo;x.strokeStyle='rgba(0,0,0,0.45)';x.strokeText(a.t,cx0,y);x.lineWidth=lwMain;x.strokeStyle='rgba(0,0,0,0.85)';x.strokeText(a.t,cx0,y);x.fillStyle=a.kw?opts.kw:(opts.color||'#ffffff');x.fillText(a.t,cx0,y)}cx0+=w}})}
 else{x.lineJoin='round';lines.forEach((ln,i)=>{const y=y0+i*lh;const txo=txOf();x.lineWidth=lwHalo;x.strokeStyle='rgba(0,0,0,0.45)';x.strokeText(ln,txo,y);x.lineWidth=lwMain;x.strokeStyle='rgba(0,0,0,0.85)';x.strokeText(ln,txo,y);x.fillStyle=opts.color||'#ffffff';x.fillText(ln,txo,y)})}
-return new Promise(res=>c.toBlob(b=>b.arrayBuffer().then(ab=>res(new Uint8Array(ab))),'image/png'))}
+/* V241 (audit F2): a null blob (or a rejected arrayBuffer) used to
+   throw inside this callback and leave the promise unsettled —
+   export prep hung forever at that cue with no error. Reject with a
+   real message instead (buildLogoPNG already guards its null). */
+return new Promise((res,rej)=>c.toBlob(b=>{if(!b){rej(new Error('ပုံ ထုတ်မရပါ — PNG encode မရပါ'));return}b.arrayBuffer().then(ab=>res(new Uint8Array(ab)),rej)},'image/png'))}
 /* V217: the ONE place subtitle PNG params are derived from the editor —
    body colour + contrasting «keyword» colour + band flag (used by
    exportOne and asserted by the harness) */
@@ -1169,9 +1173,14 @@ async function synthLine(ed,text,statusFn){
  return{bytes:await geminiTTS(getApiKey(),text,ed.voice),ext:'wav'};
 }
 async function assembleLineChunks(raws){
+ /* V241 (audit F3): the decode context is closed on BOTH exits —
+    it used to leak one AudioContext per assembly, and browsers cap
+    concurrent contexts (~6), so a long session's later Voice Create
+    / export assemblies silently degraded to the concat fallback */
+ let _actx=null;
  try{
   const Ctx=window.AudioContext||window.webkitAudioContext;if(!Ctx)throw new Error('AudioContext မရှိပါ');
-  const ctx=new Ctx();const bufs=[];
+  const ctx=_actx=new Ctx();const bufs=[];
   for(const r of raws){const ab=r.bytes.buffer.slice(r.bytes.byteOffset||0,(r.bytes.byteOffset||0)+r.bytes.byteLength);bufs.push(await ctx.decodeAudioData(ab))}
   if(!bufs.length)throw new Error('အသံ chunk မရှိပါ');
   const sr=bufs[0].sampleRate||24000,pauseN=Math.round(VOICE_LINE_PAUSE*sr);
@@ -1187,8 +1196,10 @@ async function assembleLineChunks(raws){
    for(let i=0;i<n;i++){const s=Math.max(-1,Math.min(1,t.d[t.s0+i]));dv.setInt16(off,s<0?s*0x8000:s*0x7FFF,true);off+=2}
    if(bi<trims.length-1)off+=pauseN*2;
   });
+  try{ctx.close()}catch(e2){}
   return{bytes:pcmBytesToWav(pcm,sr),ext:'wav',chunkDurs:trims.map(t=>(t.s1-t.s0)/t.rate),pause:VOICE_LINE_PAUSE};
  }catch(e){
+  if(_actx){try{_actx.close()}catch(e2){}}
   /* decode fallback: plain byte concatenation (the old assembly) with
      per-chunk durations probed; the recorded pause is 0 because the
      fallback inserts none — cue timings stay exact against the audio
@@ -1287,7 +1298,7 @@ function hwProbe(){
    }}
    _hwStatus={ok:false,reason:'ဒီ device မှာ Hardware H.264 encoder မရပါ'};
   }catch(e){_hwStatus={ok:false,reason:'Hardware encoder စစ် မရပါ'}}
-  finally{try{if(!ed.busy&&E('expEngines')&&typeof window!=='undefined'&&window.__recapExpSetup)window.__recapExpSetup()}catch(e){}} /* renderExpSetup lives in the studio block's closure — re-render via its bridge */
+  finally{try{if(typeof window!=='undefined'&&window.__recapExpSetup)window.__recapExpSetup()}catch(e){}} /* renderExpSetup lives in the studio block's closure — re-render via its bridge. V241 (audit F4): the old guard referenced bare ed/E, undeclared in this scope — the ReferenceError was swallowed by this same try/catch, so the chooser never re-rendered when the probe finished and the Hardware row stayed dimmed for the whole sheet session */
   return _hwStatus;
  })();
  return _hwProbeP;
@@ -2317,8 +2328,13 @@ async function hwMixedAudio(ff,ed,seg,voiceFile,idx,onMix){
   if(code!==0)throw new Error('ffmpeg exit code '+code+' (အသံ ရောရာတွင်)');
   return out;
  }
- let code=await ffExecP(ff,['-i','in.mp4','-map','0:a?','-vn','-c:a','copy','-t',dur.toFixed(2),out],3600000,dur,onMix||null);
- if(code!==0)code=await ffExecP(ff,['-i','in.mp4','-map','0:a?','-vn','-af','atrim=0:'+dur.toFixed(2)+',asetpts=PTS-STARTPTS','-c:a','aac','-b:a','128k','-t',dur.toFixed(2),out],3600000,dur,onMix||null);
+ /* V241 (audit F1): the segment SEEK was missing here — the video
+    frames are encoded from seg.start, so the original audio must be
+    taken from seg.start too (exportOne's buildArgs seeks the same
+    way); without it, a trim start > 0 desynced audio from picture
+    by seg.start seconds on the Hardware engine */
+ let code=await ffExecP(ff,['-ss',seg.start.toFixed(2),'-i','in.mp4','-map','0:a?','-vn','-c:a','copy','-t',dur.toFixed(2),out],3600000,dur,onMix||null);
+ if(code!==0)code=await ffExecP(ff,['-ss',seg.start.toFixed(2),'-i','in.mp4','-map','0:a?','-vn','-af','atrim=0:'+dur.toFixed(2)+',asetpts=PTS-STARTPTS','-c:a','aac','-b:a','128k','-t',dur.toFixed(2),out],3600000,dur,onMix||null);
  if(code!==0)return null;
  return out;
 }

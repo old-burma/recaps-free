@@ -878,7 +878,7 @@ const homes='<div id="'+p+'-sheetHomes" style="display:none">'
 +'<div id="'+p+'-homeVoice">'+voiceBoxInner+'</div>'
 +'<div id="'+p+'-homeSubs">'+subsHome+'</div>'
 +'<div id="'+p+'-homeMixer">'+mixerHome+'</div>'
-+'<div id="'+p+'-homeTrim">'+pickRow+urlBox+trimInner+'</div>'
++'<div id="'+p+'-homeTrim">'+pickRow+trimInner+'</div>'
 +'<div id="'+p+'-homeAspect">'+aspectField+'</div>'
 +'<div id="'+p+'-homeTitle">'+titleField+'</div>'
 +'<div id="'+p+'-homeText">'+textHome+'</div>'
@@ -912,6 +912,7 @@ const homes='<div id="'+p+'-sheetHomes" style="display:none">'
    (Main row). ---- */
 return ''
 +'<div class="vid-sticky" id="'+p+'-framePin">'+frameInner+'</div>'
++urlBox /* V251: the 🔗 URL box lives in the MAIN page flow, directly under the stage and above the script-mode cards — it used to park inside #homeTrim, so it only appeared after opening the Trim sheet and users never found it */
 +mainRowInner
 +timelineInner
 +spacerInner
@@ -1172,6 +1173,7 @@ function makeEditor(p){
   const xo=E('textOvl');if(xo)xo.style.fontFamily=fontStackCss('text');
  }
  window.__fontUiRefresh=()=>{renderAllFontChips();applyFontChoices()};
+ window.__renderFontChips=area=>{renderFontChips(area)}; /* V251: per-area bridge — renderFontChips is nested inside makeEditor, so cross-scope callers (openFeatureSheet in the studio IIFE) must go through window, exactly like __fontUiRefresh */
  let fontPickCtx=null;
  const fontFileInp=document.createElement('input');
  fontFileInp.type='file';fontFileInp.accept='.ttf,.otf,.woff,.woff2,font/*';fontFileInp.style.display='none';
@@ -5258,9 +5260,9 @@ window.__recapProject={collect:projCollect,apply:applyProject,sigMatch:projSigMa
     replaced by another sheet — because closeSheet always flushes) */
  function openFeatureSheet(homeId,title){
   disarmClear();
-  if(homeId==='homeSubs'){ensureCues();updateVoiceWarn();renderFontChips('sub')}
-  if(homeId==='homeTitle')renderFontChips('title');
-  if(homeId==='homeText')renderFontChips('text');
+  if(homeId==='homeSubs'){ensureCues();updateVoiceWarn();if(window.__renderFontChips)window.__renderFontChips('sub')}
+  if(homeId==='homeTitle'&&window.__renderFontChips)window.__renderFontChips('title');
+  if(homeId==='homeText'&&window.__renderFontChips)window.__renderFontChips('text');
   const home=E(homeId);if(!home)return;
   openSheetNodes(title,home);
   const ret=sheetOnClose;sheetOnClose=()=>{if(ret)ret();markToolSel(null)};

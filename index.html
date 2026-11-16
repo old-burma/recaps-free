@@ -1012,6 +1012,11 @@ const exportInner='<div id="'+p+'-expSetup">'
 +'</div></div>'
 +'<div class="switch-row" id="'+p+'-expIncTitleRow"><div><b style="font-size:14px">ခေါင်းစဉ် ထည့်မယ်</b><div style="font-size:12px;color:#9A9A9A">ဒီ Export တစ်ခုအတွက်သာ — Title setting မပြောင်းပါ</div></div><div class="tgl on" id="'+p+'-expIncTitle"></div></div>'
 +'<div class="switch-row" id="'+p+'-expIncLogoRow"><div><b style="font-size:14px">Logo ထည့်မယ်</b><div style="font-size:12px;color:#9A9A9A">ဒီ Export တစ်ခုအတွက်သာ — Logo setting မပြောင်းပါ</div></div><div class="tgl on" id="'+p+'-expIncLogo"></div></div>'
++'<div class="switch-row" id="'+p+'-expPartsRow"><div><b style="font-size:14px">အပိုင်းခွဲ Export</b><div style="font-size:12px;color:#9A9A9A">Video ရှည်ရင် အပိုင်းတွေ ခွဲပြီး တစ်ဖိုင်စီ ထုတ်ပေးမယ် — အပိုင်း တစ်ခု ပြီးတိုင်း တန်း သိမ်းပေးပါတယ်</div></div><div class="tgl" id="'+p+'-expParts"></div></div>'
++'<div class="field" id="'+p+'-expPartsLenRow" style="display:none"><label>✂️ တစ်ပိုင်း အရှည်</label><div class="scroll-row aspect-opts" id="'+p+'-expPartsLen">'
++'<button class="opt" data-pmin="3"><b>၃ မိနစ်</b><span>ဥပမာ ၁၀ မိနစ် → ၃ ပိုင်း</span></button>'
++'<button class="opt" data-pmin="5"><b>၅ မိနစ်</b><span>ဥပမာ ၁၀ မိနစ် → ၂ ပိုင်း</span></button>'
++'</div><p class="hint" id="'+p+'-expPartsPrev"></p></div>'
 +'<div class="field"><label>🖼️ Cover ပုံ</label><button class="btn light" id="'+p+'-expCover" type="button" style="width:100%">🖼️ လက်ရှိ frame ကို Cover အဖြစ် ယူမယ်</button><p class="hint">Stage မှာ ပေါ်နေသော frame ကို PNG cover အဖြစ် ဒေါင်းပေးပါမယ် — လိုသော နေရာကို အရင် play/seek ထားပါ</p></div>'
 +'<button class="btn" id="'+p+'-expStart" style="width:100%;margin-top:10px">🎬 Export စတင်</button>'
 +'<button class="btn light" id="'+p+'-expSetupReset" style="width:100%;margin-top:8px">↺ Export ရွေးချယ်မှု မူလ ပြန်ထား</button>'
@@ -2615,25 +2620,50 @@ hwProbe(); /* V223: probe the Hardware (WebCodecs) engine once, up front, so the
    estimate with increases clamped to +2s per display tick —
    decreases are free — so in a steady encode it counts down and can
    never run away upward the way the global estimate did. */
-const etaSt={active:false,expect:0,samples:[],rate:0,disp:null};
-function etaRunBegin(expectSec){etaSt.active=true;etaSt.expect=expectSec||0;etaSt.samples=[];etaSt.rate=0;etaSt.disp=null}
+/* V262: the V221 ETA still exploded once in the field (user's
+   12-minute Hardware export, 2026-11-16 22:25: the bar sat at 99%
+   showing "နောက်ထပ် ~35:02 လောက်" at 215 s elapsed). Two feeds
+   poisoned it: the HW engine's MUX run reported through the same
+   mkRun channel, so the mux's media-µs stream RESET the encode
+   tracker and its first slow samples produced a huge raw remainder
+   that etaRunText took verbatim (disp was null after the reset);
+   and a rate measured over only ~1.5 s collapses whenever the
+   encoder stalls at a phase tail, inflating (expect-done)/rate
+   without bound. The tracker now: (a) is fed ONLY by encode runs —
+   the HW mux reports on the V262 mux phase channel instead;
+   (b) blends the whole-run average rate with the recent-window
+   rate over a ~6 s sample window; (c) needs ~5 s of samples before
+   it shows anything; (d) hides when the newest sample is over 3 s
+   old (a stalled tail is not a slow encode); and (e) is hard-clamped
+   by the caller to the export's own elapsed seconds — a remainder
+   larger than everything spent so far is never displayed. */
+const etaSt={active:false,expect:0,t0:0,samples:[],rate:0,disp:null,lastM:0};
+function etaRunBegin(expectSec){etaSt.active=true;etaSt.expect=expectSec||0;etaSt.t0=Date.now();etaSt.samples=[];etaSt.rate=0;etaSt.disp=null;etaSt.lastM=0}
 function etaRunSample(timeUs){
  if(!etaSt.active||!isFinite(timeUs))return;
  const m=timeUs/1000000,now=Date.now(),last=etaSt.samples[etaSt.samples.length-1];
- if(last&&m<last[1]-0.5){etaSt.samples=[];etaSt.rate=0;etaSt.disp=null} /* a retry restarted the run — forget the old stream */
- etaSt.samples.push([now,m]);
- while(etaSt.samples.length>2&&now-etaSt.samples[0][0]>1500)etaSt.samples.shift();
+ if(last&&m<last[1]-0.5){etaSt.samples=[];etaSt.rate=0;etaSt.disp=null;etaSt.t0=now;etaSt.lastM=0} /* a retry restarted the run — forget the old stream */
+ etaSt.samples.push([now,m]);etaSt.lastM=m;
+ while(etaSt.samples.length>2&&now-etaSt.samples[0][0]>6000)etaSt.samples.shift(); /* ~6 s window (V221: 1.5 s — too twitchy at phase tails) */
+ let recent=0;
  if(etaSt.samples.length>=2){const a=etaSt.samples[0],b=etaSt.samples[etaSt.samples.length-1],dw=(b[0]-a[0])/1000;
-  if(dw>=0.5&&b[1]>a[1])etaSt.rate=(b[1]-a[1])/dw}
+  if(dw>=0.5&&b[1]>a[1])recent=(b[1]-a[1])/dw}
+ const avg=(now-etaSt.t0>500&&m>0)?m/((now-etaSt.t0)/1000):0; /* whole-run average — a momentary stall cannot crater it */
+ etaSt.rate=(recent>0&&avg>0)?(recent+avg)/2:(recent||avg);
 }
 function etaRunEnd(){etaSt.active=false;etaSt.disp=null}
-function etaRunText(){
+function etaRunText(maxRemSec){
  if(!etaSt.active||!etaSt.rate||etaSt.samples.length<2)return'';
- if(etaSt.samples[etaSt.samples.length-1][0]-etaSt.samples[0][0]<1000)return''; /* under a second of signal — no estimate yet */
- const doneM=etaSt.samples[etaSt.samples.length-1][1],rem=(etaSt.expect-doneM)/etaSt.rate;
+ const now=Date.now(),lastS=etaSt.samples[etaSt.samples.length-1];
+ if(now-lastS[0]>3000)return''; /* stale stream (phase tail / mux / save) — no ETA is better than a frozen one */
+ if(lastS[0]-etaSt.samples[0][0]<5000)return''; /* under ~5 s of signal — no estimate yet (V221: 1 s) */
+ const rem=(etaSt.expect-etaSt.lastM)/etaSt.rate;
  if(!isFinite(rem)||rem<2)return'';
- const disp=(etaSt.disp==null)?rem:(rem<etaSt.disp?rem:Math.min(rem,etaSt.disp+2));
+ const cap=(isFinite(maxRemSec)&&maxRemSec>0)?maxRemSec:Infinity;
+ const clamped=Math.min(rem,cap); /* never promise more than the export has already taken */
+ const disp=(etaSt.disp==null)?clamped:(clamped<etaSt.disp?clamped:Math.min(clamped,etaSt.disp+2));
  etaSt.disp=disp;
+ if(disp<2)return'';
  return 'နောက်ထပ် ~'+(disp<60?Math.round(disp)+' စက္ကန့်':fmtDur(Math.round(disp)))+' လောက်'}
 async function ffReadU8(ff,name){const d=await ff.readFile(name);if(d instanceof Uint8Array)return d;if(typeof d==='string'){const u=new Uint8Array(d.length);for(let i=0;i<d.length;i++)u[i]=d.charCodeAt(i)&0xff;return u}return new Uint8Array(d.buffer||d)}
 /* V218: run one ffmpeg exec under a progress context. The loaded build is
@@ -2833,7 +2863,7 @@ function expPhaseLog(log,label,t0){if(typeof log!=='function'||t0==null)return;c
    engine (+ pacing for Hardware) + resolution, from the chooser's
    _expOpts snapshot (absent snapshot = the pre-V221 programmatic
    default: standard engine at 1080). */
-function expStartLine(opts){const o=opts||{};const eng=o.engine==='hw'?'Hardware':(o.engine==='mt'?'Multi-thread':'ပုံမှန်');return '🎬 Export: '+eng+(o.engine==='hw'?(' · '+(o.hwPace==='rt'?'▶️ Real-time':'⚡ Fast')):'')+' · '+(o.res||1080)}
+function expStartLine(opts){const o=opts||{};const eng=o.engine==='hw'?'Hardware':(o.engine==='mt'?'Multi-thread':'ပုံမှန်');return '🎬 Export: '+eng+(o.engine==='hw'?(' · '+(o.hwPace==='rt'?'▶️ Real-time':'⚡ Fast')):'')+' · '+(o.res||1080)+(o.parts?(' · ✂️ အပိုင်းခွဲ '+(o.partMin||3)+' မိနစ်'):'')}
 /* ================= V256: Auto Hook (user request 2026-11-16 18:04) =================
    The analyser (studio closure) scores every 5 s window of the
    CURRENT trim segment and stores the ranked candidate starts on
@@ -3015,7 +3045,11 @@ async function exportHookClip(ff,ed,hookAbs,log,needAudio){
 async function joinHookClip(ff,ed,seg,idx,mainBlob,log,segProgs){
  const hookAbs=seg.start+(ed.hookStart||0);
  log('🎬 Hook (အစပျိုး) ထည့်နေပါတယ် — '+fmtDur(hookAbs)+' – '+fmtDur(hookAbs+HOOK_DUR)+' (မူရင်း အသံ နဲ့)…');
- if(segProgs&&segProgs.run)segProgs.run(1,'🎬 Hook ထည့်နေပါတယ်…');
+ /* V262: the join is output assembly — it reports on the MUX
+    phase channel (its own sub-range of the segment's share),
+    not as a final encode event */
+ const muxJ=(segProgs&&(segProgs.muxJoin||segProgs.mux))||null;
+ if(muxJ)muxJ(0,'🔀 အသံနဲ့ ပေါင်းနေပါတယ်…');
  const temps=['hk_main.mp4','hk_hook.mp4','hk_list.txt','hk_join.mp4'];
  try{
   await ff.writeFile('hk_main.mp4',new Uint8Array(await mainBlob.arrayBuffer()));
@@ -3023,10 +3057,11 @@ async function joinHookClip(ff,ed,seg,idx,mainBlob,log,segProgs){
   const lt="file 'hk_hook.mp4'\nfile 'hk_main.mp4'\n";const u8=new Uint8Array(lt.length);for(let i=0;i<lt.length;i++)u8[i]=lt.charCodeAt(i)&0xff;
   await ff.writeFile('hk_list.txt',u8);
   const totS=HOOK_DUR+(seg.end-seg.start)/segSpeedOf(ed);
-  let code=await ffExecP(ff,['-f','concat','-safe','0','-i','hk_list.txt','-c','copy','-movflags','+faststart','hk_join.mp4'],3600000,totS,null);
-  if(code!==0){log('ℹ️ Hook ဆက်ရာ copy မရပါ — ပြန် encode ပြီး ဆက်နေပါတယ်…');code=await ffExecP(ff,['-f','concat','-safe','0','-i','hk_list.txt','-c:v','libx264','-preset','ultrafast','-crf','25','-pix_fmt','yuv420p','-c:a','aac','-b:a','128k','-movflags','+faststart','hk_join.mp4'],3600000,totS,null)}
+  let code=await ffExecP(ff,['-f','concat','-safe','0','-i','hk_list.txt','-c','copy','-movflags','+faststart','hk_join.mp4'],3600000,totS,muxJ?(f)=>muxJ(f):null);
+  if(code!==0){log('ℹ️ Hook ဆက်ရာ copy မရပါ — ပြန် encode ပြီး ဆက်နေပါတယ်…');code=await ffExecP(ff,['-f','concat','-safe','0','-i','hk_list.txt','-c:v','libx264','-preset','ultrafast','-crf','25','-pix_fmt','yuv420p','-c:a','aac','-b:a','128k','-movflags','+faststart','hk_join.mp4'],3600000,totS,muxJ?(f)=>muxJ(f):null)}
   if(code!==0)throw new Error('Hook ဆက်ရာ မအောင်မြင်ပါ (ffmpeg exit '+code+') — Hook မပါဘဲ မထုတ်ပါ; အခြား Export engine ပြောင်း ကြိုးစားပါ');
   const data=await ff.readFile('hk_join.mp4');
+  if(muxJ)muxJ(1);
   log('🎬 Hook ပါပြီး — စုစုပေါင်း အရှည် '+fmtDur(totS)+' ခန့် (Hook ၅ စက္ကန့် အပါ)');
   return new Blob([data.buffer||data],{type:'video/mp4'});
  }finally{for(const nm of temps){try{await ff.deleteFile(nm)}catch(e){}}}
@@ -3244,7 +3279,11 @@ async function exportOne(ff,ed,seg,idx,total,log,progs){
  if(code!==0)throw new Error('ffmpeg exit code '+code+' — အသေးစိတ်ကို log တွင် ကြည့်ပါ');
  expPhaseLog(log,'Encode ချိန်',_tEnc);
  if(runP)runP(1);
+ /* V262: the output read is the single-pass engines' assembly
+    step — it reports on the MUX phase channel, not the encode */
+ if(progs&&progs.mux)progs.mux(0,'🔀 အသံနဲ့ ပေါင်းနေပါတယ်…');
  const data=await ff.readFile('out'+idx+'.mp4');
+ if(progs&&progs.mux)progs.mux(1);
  const blob=new Blob([data.buffer||data],{type:'video/mp4'});
  await fsClean();
  return blob;
@@ -4026,14 +4065,15 @@ async function exportOneHw(ff,ed,seg,idx,total,log,progs){
  let hookEnc=null;
  if(hookOn){
   log('🎬 Hook (အစပျိုး) ထုတ်နေပါတယ် — ၅ စက္ကန့်…');
-  const hProg=runP?(f,info)=>runP(f*0.9*hookShare,info):null;
+  const hProg=runP?(f,info)=>runP(f*hookShare,info):null; /* V262: the pumps own the WHOLE encode share now — the mux has its own phase channel (pre-V262 the mux was squeezed into the encode's last 10%) */
   hookEnc=hwPaceRt?await hwEncodeSegmentRt(ed,hookSeg,hookPlan,hookLayers,hProg)
                   :await hwEncodeSegmentFast(ed,hookSeg,hookPlan,hookLayers,hProg,log);
  }
- const mProg=runP?(f,info)=>runP((hookShare+f*(1-hookShare))*0.9,info):null;
+ const mProg=runP?(f,info)=>runP(hookShare+f*(1-hookShare),info):null;
  const enc=hwPaceRt?await hwEncodeSegmentRt(ed,seg,plan,layers,mProg)
                    :await hwEncodeSegmentFast(ed,seg,plan,layers,mProg,log);
  expPhaseLog(log,'Encode ချိန်',_tEnc);
+ if(runP)runP(1); /* V262: the encode ledger is complete BEFORE the mux phase opens */
  await ff.writeFile('hw_v'+idx+'.h264',hookEnc?hwConcat([hookEnc.stream,enc.stream]):enc.stream);
  /* V253: segment speed on this engine = the mux frame rate. The
     pumps composite the media-time grid exactly as before (subtitle /
@@ -4045,10 +4085,14 @@ async function exportOneHw(ff,ed,seg,idx,total,log,progs){
     hook's frames / 5 s, so the main part keeps its exact rate. */
  const fpsStr=(((hookEnc?hookEnc.frames:0)+enc.frames)/Math.max(0.01,(hookOn?HOOK_DUR:0)+durOutMain)).toFixed(3);
  const _tMux=expNow();
- const code=await ffExecP(ff,hwMuxArgs(fpsStr,finalMix,idx),3600000,dur,runP?(f,info)=>runP(0.9+0.1*f,info):null);
+ /* V262: the mux reports on the MUX phase channel — it no longer
+    feeds the encode progress or the encode ETA. Its media-µs
+    stream resetting the ETA tracker (and the +faststart tail
+    then freezing both) was the user's stuck-at-99% + ~35:02 ETA. */
+ const code=await ffExecP(ff,hwMuxArgs(fpsStr,finalMix,idx),3600000,dur,(progs&&progs.mux)?(f)=>progs.mux(f,'🔀 အသံနဲ့ ပေါင်းနေပါတယ်…'):null);
  expPhaseLog(log,'Mux ချိန်',_tMux);
  if(code!==0){await fsCleanHw();throw new Error('ffmpeg exit code '+code+' (mux) — အသေးစိတ်ကို log တွင် ကြည့်ပါ')}
- if(runP)runP(1);
+ if(progs&&progs.mux)progs.mux(1);
  const data=await ff.readFile('out'+idx+'.mp4');
  const blob=new Blob([data.buffer||data],{type:'video/mp4'});
  await fsCleanHw(); /* V249 (M4) */
@@ -4091,6 +4135,39 @@ async function exportEditor(ed){
  if(window.__recapShowExport)window.__recapShowExport(); /* V230: the Export view is a bottom-sheet pop-up now */
  if(window.__recapExpSetup)window.__recapExpSetup(ed);
 }
+/* ================= V263: segmented (split-parts) export =================
+   (user request 2026-11-16 23:27: a 10+ minute video should export
+   split — "၃မိနစ်ကျော် ၃ပိုင်း / ၅မိနစ် ၂ပိုင်း": 10 min → 3 parts
+   of 3+ minutes, or 2 parts of 5). segPartsPlan is PURE and
+   harness-tested: the part count is floor(dur / partLen) — every
+   part then lands AT or ABOVE the chosen length (10:00 @3 min →
+   3 × 3:20; 10:00 @5 min → 2 × 5:00; 12:16 @3 min → 4 × 3:04) —
+   and all parts are EQUAL length, so the last part is never a
+   tiny stub. A range that fits a single part (or the toggle OFF)
+   exports exactly as before: one file. */
+function segPartsPlan(dur,partLenSec){
+ const d=Math.max(0,+dur||0),L=Math.max(1,+partLenSec||180);
+ if(!(d>0))return{parts:1,len:0,bounds:[[0,0]]};
+ const n=Math.max(1,Math.floor(d/L));
+ const len=d/n,bounds=[];
+ for(let i=0;i<n;i++)bounds.push([+(i*len).toFixed(3),+((i+1)*len).toFixed(3)]);
+ bounds[n-1][1]=+d.toFixed(3);
+ return{parts:n,len,bounds};
+}
+/* Blur regions are timed from the TRIM start; a part shows the
+   slice [relStart, relStart+relDur) of that timeline — intersect
+   + rebase (the hookRegionsFor pattern, arbitrary window).
+   Full-range regions stay full. PURE, harness-tested. */
+function partRegionsFor(regions,relStart,relDur){
+ const out=[];const w0=relStart||0,w1=w0+(relDur||0);
+ (regions||[]).forEach(r=>{if(!r||!r.on||!(r.w>0)||!(r.h>0))return;
+  if(r.full||!(r.end>r.start)){out.push(Object.assign({},r));return}
+  const s=Math.max(r.start||0,w0),e=Math.min(r.end,w1);if(e-s<0.05)return;
+  out.push(Object.assign({},r,{start:+(s-w0).toFixed(3),end:+(e-w0).toFixed(3),full:false}))});
+ return out;
+}
+/* Latin digits -> Burmese digits, for the split preview line */
+const myNum=s=>String(s).replace(/[0-9]/g,c=>'၀၁၂၃၄၅၆၇၈၉'[+c]);
 async function runExport(ed){
  if(ed.busy)return;const p=ed.p,E=id=>$('#'+p+'-'+id);
  /* V256: Hook ON but no current analysis (or an analysis is still
@@ -4101,8 +4178,16 @@ async function runExport(ed){
  const start=parseFloat(E('start').value),end=parseFloat(E('end').value);
  const lines=(E('subs').value||'').split('\n').map(s=>s.trim()).filter(Boolean);
  const dur=end-start;
- /* segments */
- const segments=[{start,end}];
+ /* segments — V263: the chooser's snapshot (ed._expOpts.parts /
+    partMin) asks for ~partMin-minute parts; segPartsPlan balances
+    them. OFF — or a range that fits one part — keeps the exact
+    single segment [{start,end}] and every V262 path below is
+    untouched. */
+ const segOn=!!(ed._expOpts&&ed._expOpts.parts);
+ const segPlan=segPartsPlan(dur,((ed._expOpts&&ed._expOpts.partMin)||3)*60);
+ const nParts=segOn?segPlan.parts:1;
+ const partsMode=nParts>1;
+ const segments=partsMode?segPlan.bounds.map(b=>({start:+(start+b[0]).toFixed(3),end:+(start+b[1]).toFixed(3)})):[{start,end}];
  /* cues: the SAME cue list the SRT editor/SRT download use (unifiedCues —
     canonical one-line texts; voice-chunk timings in voice mode, char-
     weighted spread otherwise). If the stored cue list's signature
@@ -4155,23 +4240,101 @@ async function runExport(ed){
  const LOAD_W=2,FIN_W=1;
  const prepWOf=sg=>Math.max(1,Math.min(6,0.08*Math.max(1,sg.end-sg.start)));
  let expTotal=LOAD_W+FIN_W+segments.reduce((a,sg)=>a+prepWOf(sg)+(sg.end-sg.start),0);
- if(hookActiveFor(ed))expTotal+=7*segments.length; /* V256: hook render + join weight per segment */
- const expS={pos:0,ceil:0,fracMax:0,lastReal:Date.now(),done:false};
+ if(hookActiveFor(ed))expTotal+=7*(partsMode?1:segments.length); /* V256: hook render + join weight per segment — V263: in parts mode the hook rides Part 1 only, so it is weighted once */
+ const expS={pos:0,ceil:0,fracMax:0,lastReal:Date.now(),done:false,muxF:0,muxCeilF:0,saveF:0,saveCeilF:0,saveDoneB:0,saveProdB:0,_savePendB:0};
+ /* V262: PHASE-WEIGHTED display. The pre-V262 mapping (pos/total,
+    flat-capped at 99) sat at 99% for minutes whenever an export's
+    tail ran without progress events — the Hardware mux's
+    +faststart rewrite, the output read, the background save of a
+    large blob — while the stage label kept saying "Video
+    ထုတ်နေပါတယ်" (user's 12-minute export, 2026-11-16 22:25). The
+    bar now maps three explicit phases: ENCODE (engine load +
+    voice + prep + encodes + hook joins — the unit ledger above,
+    FIN_W excluded) fills 0→90%; MUX / output assembly fills
+    90→96%; SAVE (the per-segment background save, bytes stored ÷
+    bytes produced) fills 96→100%. The displayed fraction stays
+    monotonic (fracMax), the % is still capped at 99, and 100
+    appears only when expDone() fires — after every segment's
+    save has completed. The phase label follows whichever phase
+    is actually running, and the ticker creeps each phase toward
+    its ceiling, so neither the number nor the label can sit
+    frozen while work continues. */
  const expRender=()=>{
-  const fr=expS.done?1:Math.min(0.995,expS.pos/Math.max(1,expTotal));
+  const encF=expS.done?1:Math.min(1,expS.pos/Math.max(1,expTotal-FIN_W));
+  const fr=expS.done?1:(partsMode?partsFr():(0.90*encF+0.06*expS.muxF+0.04*expS.saveF));
   if(fr>expS.fracMax)expS.fracMax=fr;
   const pct=expS.done?100:Math.min(99,Math.round(expS.fracMax*100));
   if(expPctEl)expPctEl.textContent=pct+'%';
   if(expBarEl)expBarEl.style.width=pct+'%';
  };
- const expSet=(u,stage)=>{const nu=Math.max(expS.pos,Math.min(u,expTotal));if(nu>expS.pos){expS.pos=nu;expS.lastReal=Date.now()}if(expS.pos>expS.ceil)expS.ceil=expS.pos;if(stage&&expStageEl)expStageEl.textContent=stage;expRender()};
- const expCeil=(u,stage)=>{expS.ceil=Math.max(expS.ceil,Math.min(u,expTotal));if(stage&&expStageEl)expStageEl.textContent=stage};
+ const expSet=(u,stage)=>{const nu=Math.max(expS.pos,Math.min(u,expTotal));if(nu>expS.pos){expS.pos=nu;expS.lastReal=Date.now()}if(expS.pos>expS.ceil)expS.ceil=expS.pos;if(stage)setStage(stage);expRender()};
+ const expCeil=(u,stage)=>{expS.ceil=Math.max(expS.ceil,Math.min(u,expTotal));if(stage)setStage(stage)};
  const phProg=(base,weight,stage)=>(f,st)=>{expCeil(base+weight);expSet(base+Math.max(0,Math.min(1,f||0))*weight,st||stage)};
  /* V221: an encode-run progress callback — phProg for the bar, plus
     the run's raw media-µs stream into the per-run ETA tracker */
  const mkRun=(base,weight,stage,expectSec)=>{const inner=phProg(base,weight,stage);let begun=false;return(f,info)=>{inner(f);if(!begun){begun=true;etaRunBegin(expectSec)}if(info&&isFinite(info.timeUs))etaRunSample(info.timeUs);if(f>=1)etaRunEnd()}};
  const expDone=()=>{expS.done=true;etaRunEnd();if(expStageEl)expStageEl.textContent='✅ ပြီးပါပြီ';if(expEtaEl)expEtaEl.textContent='';expRender()};
+ /* V263: in parts mode every IN-PROGRESS stage label names its
+    part ("အပိုင်း 2/4 — 🎬 Video ထုတ်နေပါတယ်…"); the done /
+    cancel / error labels stay global and keep writing the element
+    directly. Single-file exports get the raw text, byte-identical
+    to V262. */
+ const setStage=t=>{if(expStageEl)expStageEl.textContent=(partsMode&&expCurPart>=0)?('အပိုင်း '+(expCurPart+1)+'/'+nParts+' — '+t):t};
+ /* V262: MUX phase channel. Segment i owns (its seconds ÷
+    muxTotal) of the 90→96 band; a callback over the sub-range
+    (a,b) of that share lets one segment split its assembly
+    between writers (ffmpeg engines: output read, then the hook
+    join). Per-segment fractions are max-kept, so overlapping
+    writers never move the bar backwards, and a segment's first
+    mux event raises the phase ceiling so the ticker can creep
+    the band while a long read/mux runs event-free. Opening the
+    mux also ENDS any encode ETA — mux throughput must never
+    feed the encode tracker (the 35:02 bug). */
+ const muxTotal=segments.reduce((a,sg)=>a+Math.max(0.1,sg.end-sg.start),0);
+ const segMuxFrac=segments.map(()=>0);let muxBegun=false;
+ const expMuxSet=(i,a,b,f,stage)=>{
+  const share=Math.max(0.1,segments[i].end-segments[i].start);
+  const before=segments.slice(0,i).reduce((s,sg)=>s+Math.max(0.1,sg.end-sg.start),0);
+  if(!muxBegun){muxBegun=true;etaRunEnd()}
+  segMuxFrac[i]=Math.max(segMuxFrac[i],a+(b-a)*Math.max(0,Math.min(1,f||0)));
+  expS.muxCeilF=Math.min(1,(before+share)/muxTotal);
+  expS.muxF=Math.min(1,segments.reduce((s,sg,j)=>s+Math.max(0.1,sg.end-sg.start)*segMuxFrac[j],0)/muxTotal);
+  expS.lastReal=Date.now();
+  if(stage)setStage(stage);
+  expRender();
+ };
+ const segMux=(i,a,b)=>(f,stage)=>expMuxSet(i,a,b,f,stage);
+ /* V262: SAVE phase channel — bytes stored ÷ bytes produced.
+    The produced total grows as segment blobs land (exact from
+    the first blob on for the app's single-segment exports);
+    Begin raises the ceiling + switches the label, End commits
+    the stored bytes. A failed background save commits nothing —
+    the post-loop pin still closes the phase, since the file
+    itself is delivered through the result links either way. */
+ const expSaveBegin=(size,stage)=>{expS.saveProdB+=size;expS._savePendB=size;expS.saveCeilF=expS.saveProdB>0?Math.min(1,(expS.saveDoneB+size)/expS.saveProdB):1;expS.lastReal=Date.now();etaRunEnd();if(partsMode&&expCurPart>=0)partSaveSt[expCurPart]=1;if(stage)setStage(stage);expRender()};
+ const expSaveEnd=ok=>{if(ok)expS.saveDoneB+=expS._savePendB||0;expS._savePendB=0;if(expS.saveProdB>0)expS.saveF=Math.min(1,expS.saveDoneB/expS.saveProdB);if(partsMode&&expCurPart>=0){partSaveF[expCurPart]=1;partSaveSt[expCurPart]=2}expS.lastReal=Date.now();expRender()};
  let expTimer=null,voiceW=0,GEN_W=0;
+ /* V263: per-part phase fractions (parts mode only — single-file
+    exports never touch any of this). Each part owns an EQUAL 1/N
+    share of the bar and the V262 bands apply INSIDE the share
+    (encode .90 / mux .06 / save .04). encPartF reads the SAME unit
+    ledger (expS.pos) against per-part bases: Part 1's encode share
+    also carries the shared pre-roll (engine load + voice
+    generation), later parts start at their segBase. The mux share
+    reuses segMuxFrac; the save share is per part (in flight →
+    done), so one part's big file can no longer spend the whole
+    save band early. expCurPart is the loop's current part (-1
+    before the loop: pre-roll stages stay unprefixed). */
+ let expCurPart=-1,partBase0=0;
+ const partW=segments.map(sg=>prepWOf(sg)+(sg.end-sg.start));
+ const partSaveF=segments.map(()=>0),partSaveSt=segments.map(()=>0);
+ const encPartF=i=>{
+  const b0=partBase0||(LOAD_W+GEN_W+voiceW);
+  const base=i===0?0:b0+partW.slice(0,i).reduce((a,b)=>a+b,0);
+  const wdt=i===0?b0+partW[0]:partW[i];
+  return Math.max(0,Math.min(1,(expS.pos-base)/Math.max(1,wdt)));
+ };
+ const partsFr=()=>segments.reduce((a,sg,i)=>a+(0.90*encPartF(i)+0.06*segMuxFrac[i]+0.04*partSaveF[i]),0)/segments.length;
  if(expProgEl)expProgEl.style.display='block';
  if(expSetupEl)expSetupEl.style.display='none'; /* V221: the chooser steps aside while the render runs */
  /* V220 cancel: arm the token + race for this export and show the
@@ -4187,10 +4350,14 @@ async function runExport(ed){
   const elSec=(Date.now()-expT0)/1000;
   if(expElapsedEl)expElapsedEl.textContent=Math.round(elSec)+'s';
   if(!expS.done&&Date.now()-expS.lastReal>2000&&expS.pos<expS.ceil){expS.pos+=(expS.ceil-expS.pos)*0.02;expRender()}
-  if(expEtaEl)expEtaEl.textContent=expS.done?'':etaRunText();
+  if(!expS.done&&Date.now()-expS.lastReal>2000&&expS.muxF<expS.muxCeilF){expS.muxF+=(expS.muxCeilF-expS.muxF)*0.02;expRender()} /* V262: the mux band creeps too — a +faststart rewrite emits no events for minutes */
+  if(!expS.done&&Date.now()-expS.lastReal>2000&&expS.saveF<expS.saveCeilF){expS.saveF+=(expS.saveCeilF-expS.saveF)*0.02;expRender()} /* V262: same for the save band */
+  if(partsMode&&!expS.done&&expCurPart>=0&&partSaveSt[expCurPart]===1&&Date.now()-expS.lastReal>2000&&partSaveF[expCurPart]<0.9){partSaveF[expCurPart]+=(0.9-partSaveF[expCurPart])*0.02;expRender()} /* V263: an in-flight part save creeps inside its own share, same rule as the V262 save band */
+  if(expEtaEl)expEtaEl.textContent=expS.done?'':etaRunText(elSec); /* V262: the ETA is hard-clamped to the elapsed seconds */
  },250);
  const baseName=(ed.file.name||'recap').replace(/\.[^.]+$/,'').replace(/[^\w\- ]+/g,'').trim()||'recap';
  wlAcquire(); /* V237: screen stays on for the whole export (incl. its voice phase) */
+ const made=[]; /* V263: hoisted out of the try — the catch mounts the parts that DID finish when a later part fails or is cancelled */
  try{
   log(expStartLine(ed._expOpts));
   if(cueDriftMsg)log(cueDriftMsg); /* V249 (M1): manual-cue drift, surfaced in the export log */
@@ -4199,11 +4366,11 @@ async function runExport(ed){
   expPhaseLog(log,'Engine တင်ချိန်',_tLoad);
   if(expTok.hit)throw expCancelError();
   expSet(LOAD_W);
+  if(partsMode)log('✂️ အပိုင်းခွဲ Export — '+fmtDur(dur)+' → '+nParts+' ပိုင်း (≈'+fmtDur(segPlan.len)+' စီ)');
   /* V259: the user CHOSE Multi-thread but this run is on the
      standard core (no cross-origin isolation, or the MT load
      failed / timed out) — say so visibly, not only in the Log */
   if(typeof SETTINGS!=='undefined'&&SETTINGS&&SETTINGS.expEngine==='mt'&&ffInstanceEngine==='st'){log('⚠️ Multi-thread engine မရပါ — ပုံမှန် engine ဖြင့် ထုတ်နေပါတယ်');showNotice('⚠️ Multi-thread engine မရပါ — ပုံမှန် engine ဖြင့် ထုတ်နေပါတယ်','info')}
-  const made=[];
   ed._cachedVoice=null;ed._cachedVoiceExt=null;
   if(ed.audioMode==='voice'){
    const _tVoice=expNow();
@@ -4238,26 +4405,84 @@ async function runExport(ed){
      cues were not hand-timed, re-derive them from the voice's own chunk
      timeline so the burned subtitles match the speech exactly. */
   if(ed.audioMode==='voice'&&ed.voiceCache&&ed.voiceCache.chunkDurs&&!ed.cuesManual){cues=unifiedCues(ed);ed.cues=cues;ed.cuesSig=cueSigFor(ed);assignCues(cues)}
+  /* V263: in parts mode each part needs its OWN slice of the
+     effective voice — the voice track's t=0 is the trim start
+     (voiceCueTimings anchors the first line there), so part i
+     speaks from (seg.start − start). The slices are cut once,
+     here, with output seeking (decode-accurate) and handed to the
+     per-part editor views in the loop. The single-file path never
+     slices and keeps the whole-range voice exactly as V262. */
+  let partVoice=null;
+  if(partsMode&&ed.audioMode==='voice'&&ed._cachedVoice){
+   expSet(expS.pos,'✂️ အသံကို အပိုင်းခွဲ ဖြတ်နေပါတယ်…');
+   const vFull='vfull.'+(ed._cachedVoiceExt||'wav');
+   await ff.writeFile(vFull,ffCopy(ed._cachedVoice));
+   partVoice=[];
+   for(let i=0;i<segments.length;i++){
+    if(expTok.hit)throw expCancelError();
+    const off=segments[i].start-start,len=segments[i].end-segments[i].start;
+    const sc=await ffExecP(ff,['-i',vFull,'-ss',off.toFixed(3),'-t',(len+0.05).toFixed(3),'-vn','-af','apad','-c:a','pcm_s16le','vpart'+i+'.wav'],3600000,len,null); /* apad: a part past the narration's end (voice shorter than the range) must still get a full-length silent slice, never a header-only WAV */
+    if(sc!==0)throw new Error('အသံ အပိုင်း '+(i+1)+' ဖြတ်ရာ မအောင်မြင်ပါ (ffmpeg exit '+sc+')');
+    partVoice.push(await ffReadU8(ff,'vpart'+i+'.wav'));
+    try{await ff.deleteFile('vpart'+i+'.wav')}catch(e){}
+   }
+   try{await ff.deleteFile(vFull)}catch(e){}
+   log('✂️ အသံကို '+nParts+' ပိုင်း ခွဲပြီးပါပြီ');
+  }
+  /* V263: the per-part editor view (parts mode only). A shallow
+     clone carries the part's differences; everything else (file,
+     _expOpts, _expCancel, _effVoice, the DOM prefix) is shared by
+     reference — the same Object.assign pattern exportOneHw uses
+     for its hook pass. Fade-in rides Part 1 only, fade-out the
+     LAST part only — no black frames at the cuts. The Hook rides
+     Part 1 only (hookOn false elsewhere; the ffmpeg join in the
+     loop is likewise gated to Part 1). Timed blur regions and
+     timed text overlays are intersected + rebased onto the part's
+     window; for Part 1 the region window also stretches over the
+     hook window (Part-1 local time IS range time, and the engines
+     clamp region ends to the part duration, so the stretch can
+     never paint outside Part 1). */
+  const edForPart=i=>{
+   if(!partsMode)return ed;
+   const sg=segments[i],rel=sg.start-start,relDur=sg.end-sg.start;
+   const winDur=(i===0&&hookActiveFor(ed))?Math.max(relDur,(ed.hookStart||0)+HOOK_DUR-rel):relDur;
+   const cl=Object.assign({},ed,{fadeIn:i===0?ed.fadeIn:0,fadeOut:i===nParts-1?ed.fadeOut:0,hookOn:i===0?ed.hookOn:false,blurRegions:partRegionsFor(ed.blurRegions,rel,winDur)});
+   if(partVoice){cl._cachedVoice=partVoice[i];cl._cachedVoiceExt='wav'}
+   const shiftWin=(on,s,e)=>{
+    if(!on)return{on:false};
+    const s0=s||0,e0=(e>s0)?e:dur;
+    if(e0<=rel||s0>=rel+relDur)return{on:false};
+    return{on:true,start:Math.max(0,+(s0-rel).toFixed(3)),end:(e0>=rel+relDur)?0:+((e0-rel).toFixed(3))};
+   };
+   const tw=shiftWin(ed.textOn,ed.textStart||0,ed.textEnd||0);
+   cl.textOn=tw.on;if(tw.on){cl.textStart=tw.start;cl.textEnd=tw.end}
+   for(const tk of['2','3']){
+    const w2=shiftWin(ed['txt'+tk+'On'],ed['txt'+tk+'Start']||0,ed['txt'+tk+'End']||0);
+    cl['txt'+tk+'On']=w2.on;if(w2.on){cl['txt'+tk+'Start']=w2.start;cl['txt'+tk+'End']=w2.end}
+   }
+   return cl;
+  };
   let segBase=LOAD_W+GEN_W+voiceW;
-  for(let i=0;i<segments.length;i++){if(expTok.hit)throw expCancelError();const segDurI=segments[i].end-segments[i].start;const pwI=prepWOf(segments[i]);const segProgs={prep:phProg(segBase,pwI),run:mkRun(segBase+pwI,segDurI,'🎬 Video ထုတ်နေပါတယ် ('+(i+1)+'/'+segments.length+')',segDurI)};
+  partBase0=segBase; /* V263: Part 1's encode share starts at the pre-roll */
+  for(let i=0;i<segments.length;i++){if(expTok.hit)throw expCancelError();expCurPart=i;const edI=edForPart(i);const hookI=i===0&&hookActiveFor(ed);const segDurI=segments[i].end-segments[i].start;const pwI=prepWOf(segments[i]);const segProgs={prep:phProg(segBase,pwI),run:mkRun(segBase+pwI,segDurI,partsMode?'🎬 Video ထုတ်နေပါတယ်…':'🎬 Video ထုတ်နေပါတယ် ('+(i+1)+'/'+segments.length+')',segDurI),mux:segMux(i,0,hookI&&!(ed._expOpts&&ed._expOpts.engine==='hw')?0.45:1),muxJoin:segMux(i,0.45,1)}; /* V262: mux = this segment's assembly share (the ffmpeg engines' output read takes the first 45% when a hook join follows; the join owns the rest; otherwise the read/HW mux owns the whole share) — V263: the join follows the hook, and the hook rides Part 1 only (hookI) */
    /* V223: the chooser's engine snapshot decides per segment — the
       Hardware engine on failure shows its TRUE error (runExport's
       catch) plus this hint; it never silently switches engines */
    let blob;
    if(ed._expOpts&&ed._expOpts.engine==='hw'){
-    try{blob=await exportOneHw(ff,ed,segments[i],i,segments.length,log,segProgs)}
+    try{blob=await exportOneHw(ff,edI,segments[i],i,segments.length,log,segProgs)}
     catch(he){if(!(he&&he.cancelled))log('⚠️ Hardware engine မအောင်မြင်ပါ — Export setup မှာ ⚡ Multi-thread / 🎬 ပုံမှန် engine ပြောင်း ကြိုးစားပါ');throw he}
-   }else blob=await exportOne(ff,ed,segments[i],i,segments.length,log,segProgs);
+   }else blob=await exportOne(ff,edI,segments[i],i,segments.length,log,segProgs);
    /* V256: ffmpeg engines prepend the hook as a separate render
       joined by the concat demuxer; the Hardware engine already
       contains it (encoded first inside exportOneHw). A join failure
       throws — the whole export fails instead of delivering a
       hook-less file. */
-   if(hookActiveFor(ed)&&!(ed._expOpts&&ed._expOpts.engine==='hw'))blob=await joinHookClip(ff,ed,segments[i],i,blob,log,segProgs);
+   if(i===0&&hookActiveFor(ed)&&!(ed._expOpts&&ed._expOpts.engine==='hw'))blob=await joinHookClip(ff,ed,segments[i],i,blob,log,segProgs); /* V263: Part 1 only — later parts never re-join the hook */
    segBase+=pwI+segDurI;
    const name=baseName+(segments.length>1?'_part'+(i+1):'')+'.mp4';
-   const segSrt=segments[i].cues.length?buildSRT(segments[i].cues,segments[i].start,segments[i].end):'';try{await idbAdd({name,date:Date.now(),size:blob.size,blob,srt:segSrt})}catch(e){log('⚠️ နောက်ခံ သိမ်းဆည်းမှု မအောင်မြင်ပါ — ဒေါင်း link မှ ယူပါ')}made.push({name,blob});log('✅ '+name+' — '+fmtSize(blob.size))}
-  expSet(expTotal-FIN_W,'💾 ဖိုင် ပြင်ဆင်နေပါတယ်…');
+   const segSrt=segments[i].cues.length?buildSRT(segments[i].cues,segments[i].start,segments[i].end):'';expSaveBegin(blob.size,'💾 ဖုန်းထဲ သိမ်းနေပါတယ်…');let segSaved=false;try{await idbAdd({name,date:Date.now(),size:blob.size,blob,srt:segSrt});segSaved=true}catch(e){log('⚠️ နောက်ခံ သိမ်းဆည်းမှု မအောင်မြင်ပါ — ဒေါင်း link မှ ယူပါ')}expSaveEnd(segSaved);made.push({name,blob});log('✅ '+name+' — '+fmtSize(blob.size))}
+  expSet(expTotal-FIN_W);expS.muxF=1;expS.muxCeilF=1;expS.saveF=1;expS.saveCeilF=1;if(partsMode){for(let j=0;j<segments.length;j++){segMuxFrac[j]=1;partSaveF[j]=1;partSaveSt[j]=2}}expRender(); /* V262: every phase is complete — expDone() below turns this into the only 100% (V263: the per-part fractions pin shut the same way) */
   const res=E('result');res.innerHTML='<b style="font-size:14px">✅ ပြီးပါပြီ — အောက်မှာ တန်းစီ ဒေါင်းနိုင်ပါတယ်</b>';
   /* V253 (bug 2): each result gets the shared save controls — the
      blob anchor (browser + shell hook) AND, in the app, a direct
@@ -4269,7 +4494,19 @@ async function runExport(ed){
   recapsStat('export_done',{engine:(ed._expOpts&&ed._expOpts.engine)||'',resolution:(ed._expOpts&&ed._expOpts.res)||0}); /* V244: anonymous counter */
   showDone('✅ အသံ ရပါပြီ — Export ပြီးပါပြီ','Video '+made.length+' ပိုင်း ထုတ်ပြီးပါပြီ — အောက်က ဒေါင်း link များမှ ယူပါ။');
  }catch(err){
-  if(err&&err.cancelled){expS.pos=0;expS.ceil=0;expS.fracMax=0;etaRunEnd();expRender();if(expStageEl)expStageEl.textContent='⛔ ရပ်လိုက်ပါပြီ';if(expEtaEl)expEtaEl.textContent='';log('⛔ Export ကို ရပ်လိုက်ပါပြီ');showNotice('⛔ Export ကို ရပ်လိုက်ပါပြီ','info')}
+  /* V263: parts mode keeps what finished — the completed parts
+     are mounted as normal results (each already saved to the
+     in-app store in the loop, and each carries its own direct
+     save + download controls), and the header says exactly which
+     parts completed and where it stopped. */
+  if(partsMode&&made.length){
+   const doneN=made.length,rng=doneN>=nParts?'အပိုင်း အားလုံး':(doneN===1?'အပိုင်း 1':'အပိုင်း 1–'+doneN);
+   const head='✅ '+rng+' ပြီးပါပြီ'+(doneN<nParts?(' — အပိုင်း '+(doneN+1)+((err&&err.cancelled)?' ရပ်လိုက်ပါပြီ':' မအောင်မြင်ပါ')):'');
+   const resP=E('result');resP.innerHTML='<b style="font-size:14px">'+head+'</b><div style="font-size:12px;color:#9A9A9A;margin-top:4px">ပြီးသော အပိုင်းတွေ အောက်မှာ ဒေါင်းနိုင်ပါတယ်</div>';
+   made.forEach(m=>{mountResultSave(resP,m.blob,m.name)});
+   log(head);
+  }
+  if(err&&err.cancelled){expS.pos=0;expS.ceil=0;expS.fracMax=0;expS.muxF=0;expS.muxCeilF=0;expS.saveF=0;expS.saveCeilF=0;etaRunEnd();expRender();if(expStageEl)expStageEl.textContent='⛔ ရပ်လိုက်ပါပြီ';if(expEtaEl)expEtaEl.textContent='';log('⛔ Export ကို ရပ်လိုက်ပါပြီ');showNotice('⛔ Export ကို ရပ်လိုက်ပါပြီ','info')}
   else{etaRunEnd();console.error(err);log('❌ '+humanErr(err));if(expStageEl)expStageEl.textContent='❌ မအောင်မြင်ပါ';logBox.style.display='block';if(logTgl)logTgl.textContent='📄 Log ဖျောက်ရန်';showNotice('❌ Export မအောင်မြင်ပါ: '+humanErr(err),'err')}
  }
  finally{wlRelease();if(expTimer)clearInterval(expTimer);expCancelRace=null;ed._expCancel=null;etaRunEnd();if(expCancelBtn)expCancelBtn.style.display='none';if(expEtaEl)expEtaEl.textContent='';if(expSetupEl)expSetupEl.style.display='';ed.busy=false;ed._cachedVoice=null;ed._cachedVoiceExt=null;btn.disabled=false;if(window.__refreshFeatureSummaries)window.__refreshFeatureSummaries();if(window.__syncExportAttn)window.__syncExportAttn() /* V258: busy cleared — the glow returns if the project is still ready */}
@@ -5998,6 +6235,10 @@ window.__recapProject={collect:projCollect,apply:applyProject,sigMatch:projSigMa
      BLOCKS (never a silent hook-less file); Hook ပါသော video ကို
      🎬 Export (engine သုံးခုလုံး) မှ ထုတ်နိုင်ပါတယ် */
   if(ed.hookOn){showNotice('⚠️ Hook ဖွင့်ထားပါတယ် — Hook ပါသော video ကို 🎬 Export မှ ထုတ်ပါ (ဒီ "ထည့်မယ်" မှာ Hook မပါပါ)','err');return}
+  /* V263: the Insert render cannot split into parts either — with
+     အပိုင်းခွဲ Export ON it BLOCKS the same way (never a silent
+     single file); အပိုင်းခွဲ video ကို 🎬 Export မှ ထုတ်နိုင်ပါတယ် */
+  if(SETTINGS.segParts){showNotice('⚠️ အပိုင်းခွဲ Export ဖွင့်ထားပါတယ် — အပိုင်းခွဲ video ကို 🎬 Export မှ ထုတ်ပါ (ဒီ "ထည့်မယ်" မှာ အပိုင်းခွဲ မရပါ)','err');return}
   if(!c.dur)c.dur=await probeAudioDur(c.bytes,c.ext);
   const info=voiceDurInfo();
   if(info&&info.over){updateVoiceWarn();const w=E('voiceWarn');if(w)w.scrollIntoView({behavior:'smooth',block:'center'});showNotice('⚠️ အသံ ('+info.effDur.toFixed(1)+' စက္ကန့်) က video အပိုင်း ('+info.seg.toFixed(1)+' စက္ကန့်) ထက် ရှည်နေပါတယ် — အသံကို ဖြတ်မပစ်ပါ။ အမြန် စုစုပေါင်း '+info.need.toFixed(2)+'× အထိ တင်ပြီးမှ ပြန်ထည့်ပါ','err');return}
@@ -6604,6 +6845,16 @@ window.__recapProject={collect:projCollect,apply:applyProject,sigMatch:projSigMa
   const paceRow=E('expPaceRow');if(paceRow)paceRow.style.display=chosen==='hw'?'':'none';
   const pace=expChosenPace();
   $$('#'+p+'-expPaceOpts .opt').forEach(b=>{b.classList.toggle('sel',b.dataset.pace===pace);b.onclick=()=>{SETTINGS.hwPace=b.dataset.pace==='rt'?'rt':'fast';saveSettings();renderExpSetup()}});
+  /* V263: segmented (split-parts) export — the toggle + part-length
+     chips persist in SETTINGS like engine/res/pace; the preview
+     line recomputes from the CURRENT trim fields on every render
+     of this setup (the sheet re-renders on open and on each tap) */
+  const pTgl=E('expParts'),pLenRow=E('expPartsLenRow'),pPrev=E('expPartsPrev');
+  const partsOn=!!SETTINGS.segParts,pMin=SETTINGS.segPartMin===5?5:3;
+  if(pTgl){pTgl.classList.toggle('on',partsOn);pTgl.onclick=()=>{SETTINGS.segParts=!SETTINGS.segParts;saveSettings();renderExpSetup()}}
+  if(pLenRow)pLenRow.style.display=partsOn?'':'none';
+  $$('#'+p+'-expPartsLen .opt').forEach(b=>{b.classList.toggle('sel',parseInt(b.dataset.pmin,10)===pMin);b.onclick=()=>{SETTINGS.segPartMin=parseInt(b.dataset.pmin,10)===5?5:3;saveSettings();renderExpSetup()}});
+  if(pPrev){const s0=parseFloat(E('start').value),e0=parseFloat(E('end').value),dd=(isFinite(s0)&&isFinite(e0)&&e0>s0)?e0-s0:0;const pl=segPartsPlan(dd,pMin*60);pPrev.textContent=!partsOn||dd<=0?'':(pl.parts>1?('✂️ '+myNum(fmtDur(dd))+' → '+myNum(pl.parts)+' ပိုင်း (≈'+myNum(fmtDur(pl.len))+' စီ) — အပိုင်း တစ်ခု ပြီးတိုင်း တန်း သိမ်းပေးပါမယ်'):('✂️ '+myNum(fmtDur(dd))+' — တစ်ပိုင်းစာ အဖြစ် ဖိုင် တစ်ဖိုင်တည်း ထွက်ပါမယ်'))}
   const hasTitle=E('titleTgl').classList.contains('on')&&!!(E('title').value||'').trim();
   const tRow=E('expIncTitleRow'),lRow=E('expIncLogoRow'),tTgl=E('expIncTitle'),lTgl=E('expIncLogo');
   if(tRow)tRow.style.display=hasTitle?'':'none';
@@ -6615,7 +6866,7 @@ window.__recapProject={collect:projCollect,apply:applyProject,sigMatch:projSigMa
  }
  window.__recapExpSetup=()=>renderExpSetup();
  const expStartBtn=E('expStart');if(expStartBtn)expStartBtn.onclick=()=>{
-  ed._expOpts={engine:expChosenEngine(),res:expChosenRes(),hwPace:expChosenPace(),incTitle:!(E('expIncTitle')&&!E('expIncTitle').classList.contains('on')),incLogo:!(E('expIncLogo')&&!E('expIncLogo').classList.contains('on'))};
+  ed._expOpts={engine:expChosenEngine(),res:expChosenRes(),hwPace:expChosenPace(),incTitle:!(E('expIncTitle')&&!E('expIncTitle').classList.contains('on')),incLogo:!(E('expIncLogo')&&!E('expIncLogo').classList.contains('on')),parts:!!SETTINGS.segParts,partMin:(SETTINGS.segPartMin===5?5:3)};
   runExport(ed)};
  /* V253: 🖼️ Cover picker — capture the CURRENT stage frame as a PNG
     cover and save it through the same save paths as export results
@@ -6634,7 +6885,7 @@ window.__recapProject={collect:projCollect,apply:applyProject,sigMatch:projSigMa
   }catch(e){showNotice('❌ Cover ယူ၍ မရပါ: '+humanErr(e),'err')}
  };
  const expSetupResetBtn=E('expSetupReset');if(expSetupResetBtn)expSetupResetBtn.onclick=()=>{
-  SETTINGS.expEngine=expBestEngine();SETTINGS.expRes=1080;SETTINGS.hwPace='fast';saveSettings();
+  SETTINGS.expEngine=expBestEngine();SETTINGS.expRes=1080;SETTINGS.hwPace='fast';SETTINGS.segParts=false;SETTINGS.segPartMin=3;saveSettings();
   const tTgl=E('expIncTitle'),lTgl=E('expIncLogo');if(tTgl)tTgl.classList.add('on');if(lTgl)lTgl.classList.add('on');
   renderExpSetup();showNotice('↺ Export ရွေးချယ်မှု မူလ ပြန်ထားပါပြီ','info')};
  /* ================= V230 Main-page quick toggles =================

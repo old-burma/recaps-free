@@ -205,6 +205,26 @@ body.locked{overflow:hidden}
 .frame-border{position:absolute;inset:0;border:3px solid #FFE92E;border-radius:14px;pointer-events:none;display:none;z-index:7}
 /* ===== V253: fade preview layer + PiP overlay + extra text overlays ===== */
 .fade-layer{position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;z-index:4}
+/* V257 (FIX 4): the change-video control as a floating ICON-ONLY
+   button on the stage's top-right corner (user order 2026-11-16
+   18:36 — moved out of the quick row, no text). It lives inside
+   .vid-wrap so it rides the stage at every aspect; z-index 9 keeps
+   it above the stage overlays yet far below sheets (100+) and the
+   notice (200). Monochrome like the rest of the UI. */
+.vid-wrap .stage-change{position:absolute;top:8px;right:8px;z-index:9;width:38px;height:38px;border-radius:50%;border:1.5px solid rgba(255,255,255,.38);background:rgba(18,18,18,.72);color:#fff;font-size:17px;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;font-family:inherit}
+.vid-wrap .stage-change:active{transform:scale(.92)}
+/* V257 (FIX 6): the Crop editing layer — shown only while the Crop
+   sheet is open (JS toggles display); the rect dims everything
+   outside itself with the classic 9999px shadow, clipped by the
+   wrap's own overflow:hidden. z-index 6: above the video/blur
+   layers, below the stage-change button (9) and the sheets. */
+.vid-wrap .crop-layer{position:absolute;inset:0;z-index:6}
+.vid-wrap .crop-rect{position:absolute;border:1.5px solid #fff;box-shadow:0 0 0 9999px rgba(0,0,0,.55);cursor:move;touch-action:none;box-sizing:border-box}
+.vid-wrap .crop-rect .cr-handle{position:absolute;width:18px;height:18px;border:2px solid #fff;border-radius:50%;background:rgba(18,18,18,.85);box-sizing:border-box;touch-action:none;z-index:2}
+.vid-wrap .crop-rect .cr-handle[data-h="nw"]{left:-10px;top:-10px;cursor:nwse-resize}
+.vid-wrap .crop-rect .cr-handle[data-h="ne"]{right:-10px;top:-10px;cursor:nesw-resize}
+.vid-wrap .crop-rect .cr-handle[data-h="sw"]{left:-10px;bottom:-10px;cursor:nesw-resize}
+.vid-wrap .crop-rect .cr-handle[data-h="se"]{right:-10px;bottom:-10px;cursor:nwse-resize}
 /* V254: draggable like the logo (pointer-events auto + grab cursor +
    touch-action none), and hard bounds so the preview can never become
    an oversized slab: height auto (natural aspect), max-height 94% of
@@ -304,6 +324,17 @@ body.locked{overflow:hidden}
 .deck-ttl{font-size:13.5px;font-weight:800;color:#F2F2F2;margin-bottom:8px}
 .mode-btns{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .mode-btn{padding:8px 8px;border-radius:13px;border:1.5px solid #2C2C2C;background:#1B1B1B;font-family:inherit;cursor:pointer;text-align:center;width:100%}
+/* V257 (FIX 5): "pick one" invitation — while NEITHER mode is chosen
+   yet, the two cards take turns breathing a soft white glow (the
+   second card is offset by half a cycle, so the pulse sweeps across
+   the pair). Monochrome only, transform/opacity/box-shadow-class
+   properties only, and it stops for good the moment a mode is
+   chosen (.attn is removed by syncModeAttn). Paused while a sheet
+   is open (body.locked), like the app's other ambient motion. */
+.mode-btn.attn{animation:modeAttn 1.8s ease-in-out infinite}
+.mode-btns .mode-btn.attn:nth-child(2){animation-delay:.9s}
+@keyframes modeAttn{0%,100%{box-shadow:0 0 0 0 rgba(255,255,255,0);border-color:#2C2C2C}50%{box-shadow:0 0 16px 3px rgba(255,255,255,.30);border-color:rgba(255,255,255,.70)}}
+body.locked .mode-btn.attn{animation-play-state:paused}
 .mode-btn b{display:block;font-size:13.5px;color:#F2F2F2}
 .mode-btn span{display:block;font-size:10.5px;color:#9A9A9A;margin-top:1px;font-weight:600}
 .mode-btn.sel{border-color:#FFFFFF;background:rgba(255,255,255,.14)}
@@ -471,7 +502,7 @@ function effVideoDims(ed){const w=(ed&&ed.videoW)||1280,h=(ed&&ed.videoH)||720;r
 function canvasGeom(ed){const vd=effVideoDims(ed);const vw=vd.w;const ev=n=>Math.max(2,Math.round(n/2)*2);
  if(ed&&ed.aspect==='16:9')return{W:1920,H:1080};
  if(ed&&ed.aspect==='1:1')return{W:1080,H:1080};
- if(ed&&ed.aspect==='Original'){const sc=Math.min(1,1920/vw);return{W:ev(vw*sc),H:ev(vd.h*sc)}}
+ if(ed&&ed.aspect==='Original'){const sd=effSrcDims(ed);const sc=Math.min(1,1920/sd.w);return{W:ev(sd.w*sc),H:ev(sd.h*sc)}} /* V257 (FIX 6): an Original canvas follows the CROPPED frame */
  return{W:1080,H:1920}}
 /* V221: export resolution — the chooser's 640/720/1080 is the canvas
    SHORT side in px. canvasGeom stays the AUTHORING geometry (preview
@@ -483,7 +514,7 @@ function canvasGeom(ed){const vd=effVideoDims(ed);const vw=vd.w;const ev=n=>Math
 function scaledGeom(W,H,res){const ev=n=>Math.max(2,Math.round(n/2)*2);const s=Math.min(1,(res||1080)/Math.min(W,H));if(s>=1)return{W:W,H:H};return{W:ev(W*s),H:ev(H*s)}}
 function exportGeom(ed){const G=canvasGeom(ed);const res=(ed&&ed._expOpts&&ed._expOpts.res)||1080;return scaledGeom(G.W,G.H,res)}
 /* the standing special case: 9:16 canvas + landscape source */
-function aspectSpecial916(ed){if(ed&&ed.aspect&&ed.aspect!=='9:16')return false;const vd=effVideoDims(ed);return vd.w>vd.h}
+function aspectSpecial916(ed){if(ed&&ed.aspect&&ed.aspect!=='9:16')return false;const vd=effSrcDims(ed);return vd.w>vd.h} /* V257 (FIX 6): the special case judges the CROPPED frame — the crop is the source for every composition */
 /* V233: THE subtitle geometry — the ONE source of truth shared by the
    ffmpeg export (exportOne), the Hardware plan (hwFramePlan) and the
    stage overlay (applySubPos), replacing the three duplicated formula
@@ -715,7 +746,7 @@ function editorHTML(p){
    embedded beside it. */
 const transportInner='<div class="transport" id="'+p+'-transport"><div class="tp-row"><button class="tp-play" id="'+p+'-tpPlay" aria-label="Play / Pause">▶</button><button class="tp-skip" id="'+p+'-tpBack" aria-label="5 စက္ကန့် နောက်ပြန်">⏪</button><span class="tp-time" id="'+p+'-tpCur">0:00</span><span class="tp-time tp-right" id="'+p+'-tpDur">0:00</span><button class="tp-skip" id="'+p+'-tpFwd" aria-label="5 စက္ကန့် ရှေ့တိုး">⏩</button></div><input type="range" class="tp-seek" id="'+p+'-tpSeek" min="0" max="1000" value="0"></div>';
 const frameInner='<input type="file" id="'+p+'-file" accept="video/*" style="display:none">'
-+'<div class="vid-wrap"><div class="ph-box" id="'+p+'-ph"><div class="ph-ic">🎬</div><div class="ph-t">Tap to Upload Video</div><div class="ph-s">နှိပ်ပြီး video ဖိုင် ရွေးပါ</div></div><video class="preview-bg" id="'+p+'-videoBg" playsinline muted style="display:none"></video><video class="preview framed" id="'+p+'-video" playsinline style="display:none"></video><div class="mode-pill hide" id="'+p+'-modePill">🎬 Movie Recap Mode</div><div class="title-overlay" id="'+p+'-titleOvl"></div><div class="logo-overlay" id="'+p+'-logoOvl"></div><div class="blur-layer" id="'+p+'-blurLayer"></div><div class="sub-overlay" id="'+p+'-overlay"></div><div class="text-overlay" id="'+p+'-textOvl"></div><div class="text-overlay pos-preset" id="'+p+'-textOvl2"></div><div class="text-overlay pos-preset" id="'+p+'-textOvl3"></div><img class="pip-overlay" id="'+p+'-pipOvl" alt=""><div class="fade-layer" id="'+p+'-fadeLayer"></div><div class="frame-border" id="'+p+'-borderOvl"></div></div>'+transportInner;
++'<div class="vid-wrap"><div class="ph-box" id="'+p+'-ph"><div class="ph-ic">🎬</div><div class="ph-t">Tap to Upload Video</div><div class="ph-s">နှိပ်ပြီး video ဖိုင် ရွေးပါ</div></div><video class="preview-bg" id="'+p+'-videoBg" playsinline muted style="display:none"></video><video class="preview framed" id="'+p+'-video" playsinline style="display:none"></video><div class="mode-pill hide" id="'+p+'-modePill">🎬 Movie Recap Mode</div><div class="title-overlay" id="'+p+'-titleOvl"></div><div class="logo-overlay" id="'+p+'-logoOvl"></div><div class="blur-layer" id="'+p+'-blurLayer"></div><div class="crop-layer" id="'+p+'-cropLayer" style="display:none"><div class="crop-rect" id="'+p+'-cropRect"><span class="cr-handle" data-h="nw"></span><span class="cr-handle" data-h="ne"></span><span class="cr-handle" data-h="sw"></span><span class="cr-handle" data-h="se"></span></div></div><div class="sub-overlay" id="'+p+'-overlay"></div><div class="text-overlay" id="'+p+'-textOvl"></div><div class="text-overlay pos-preset" id="'+p+'-textOvl2"></div><div class="text-overlay pos-preset" id="'+p+'-textOvl3"></div><img class="pip-overlay" id="'+p+'-pipOvl" alt=""><div class="fade-layer" id="'+p+'-fadeLayer"></div><div class="frame-border" id="'+p+'-borderOvl"></div><button type="button" class="stage-change" id="'+p+'-stageChange" title="Video လဲမယ်" aria-label="Video လဲမယ်">🎬</button></div>'+transportInner;
 const pickRow='<div class="pick-row"><button class="btn light small" id="'+p+'-pick">📱 Video ရွေးရန်</button><div class="file-info" id="'+p+'-fileinfo">ဖိုင် မရွေးရသေးပါ</div></div>';
 const urlBox='<div class="card" style="margin:12px 0"><h3 style="margin-bottom:8px">🔗 Link မှ Video ယူရန်</h3>'
 +'<div class="field"><label>Video Link</label><input type="url" id="'+p+'-urlInput" placeholder="https://…" autocomplete="off"></div>'
@@ -726,6 +757,24 @@ const urlBox='<div class="card" style="margin:12px 0"><h3 style="margin-bottom:8
 +'<p class="hint" style="margin-top:6px">YouTube / TikTok link ဒေါင်းတာက App (APK) version မှာပဲ ရပါတယ် — .mp4 link တိုက်ရိုက် ဆိုရင် ဒီကပဲ ယူနိုင်ပါတယ်</p></div>';
 const trimInner='<div class="row2"><div class="field" id="'+p+'-f-start"><label>စချိန် (စက္ကန့်)</label><input type="number" id="'+p+'-start" value="0" min="0" step="0.1"><div class="err-text" id="'+p+'-e-start"></div></div><div class="field" id="'+p+'-f-end"><label>ဆုံးချိန် (စက္ကန့်)</label><input type="number" id="'+p+'-end" value="0" min="0" step="0.1"><div class="err-text" id="'+p+'-e-end"></div></div></div>'
 +'<div class="field"><label>စချိန် slider</label><input type="range" id="'+p+'-rstart" value="0" min="0" max="100" step="0.1"></div><div class="field"><label>ဆုံးချိန် slider</label><input type="range" id="'+p+'-rend" value="0" min="0" max="100" step="0.1"></div><p class="hint" style="font-size:12px;color:#9A9A9A">ကြာချိန်: <b id="'+p+'-durinfo">—</b></p><button class="btn light" id="'+p+'-trimReset" style="width:100%">↺ အပြည့် ပြန်ထား (Video တစ်ခုလုံး)</button>';
+/* V256 🎬 Auto Hook home (user request 2026-11-16 18:04): a section
+   inside the Trim sheet (the bottom nav is full; the hook is a trim-
+   relative choice, so it lives with Trim). The analyser picks the
+   best 5 s window of the CURRENT trim segment (audio energy 0.6 +
+   visual activity 0.4, dead-air/black openings penalised) and Export
+   prepends it — with its ORIGINAL audio — ahead of the main render.
+   State: ed.hookOn / ed.hookStart (segment-relative) / ed.hookCands /
+   ed.hookIdx / ed.hookSig, persisted via SETTINGS + project files. */
+const hookHome='<div style="border-top:1px solid #2A2A2A;margin-top:18px;padding-top:14px"><div class="switch-row"><div><b style="font-size:14px">🎬 အစပျိုး (Hook)</b><div style="font-size:12px;color:#9A9A9A">Video ရဲ့ အကောင်းဆုံး ၅ စက္ကန့်ကို Auto ရွေးပြီး အရှေ့ဆုံး ထည့်ပေးမည်</div></div><div class="tgl" id="'+p+'-hookTgl"></div></div>'
++'<div id="'+p+'-hookBody" style="display:none">'
++'<button class="btn primary" id="'+p+'-hookFind" style="width:100%">🔍 အကောင်းဆုံး အခန်း ရှာမယ်</button>'
++'<div class="gen-prog" id="'+p+'-hookProg" style="display:none"><div class="gen-prog-head"><span id="'+p+'-hookProgLabel">စစ်နေပါတယ်…</span><span id="'+p+'-hookProgPct">0%</span></div><div class="gen-bar"><i id="'+p+'-hookProgFill"></i></div></div>'
++'<div class="file-info" id="'+p+'-hookInfo" style="margin-top:8px">အကောင်းဆုံး အခန်း မရှာရသေးပါ</div>'
++'<div class="btn-row2" style="margin-top:8px"><button class="btn light" id="'+p+'-hookPrev" type="button">▶ Hook ကြည့်မယ်</button><button class="btn light" id="'+p+'-hookNext" type="button">⏭ နောက်တစ်နေရာ</button></div>'
++'<button class="btn light" id="'+p+'-hookCancel" style="width:100%;margin-top:8px;display:none">⏹ ရပ်မယ်</button>'
++'<p class="hint">Hook က မူရင်း Video ရဲ့ အသံ နဲ့ပဲ ပါမည် (အသံထည့် / စာတန်း / Title မပါ)။ Export ထုတ်ရင် စုစုပေါင်း အရှည် ၅ စက္ကန့် ပိုရှည်ပါမည်။ Trim ပြောင်းရင် ပြန်ရှာရန် လိုပါတယ်</p>'
++'<button class="btn light" id="'+p+'-hookReset" style="width:100%;margin-top:6px">↺ Hook မူလ (ပိတ်) ပြန်ထား</button>'
++'</div></div>';
 const aspectField='<div class="field"><label>Aspect</label><div class="scroll-row aspect-opts" id="'+p+'-aspectOpts">'+Object.keys(ASPECTS).map(k=>'<button class="opt'+(k===SETTINGS.aspect?' sel':'')+'" data-v="'+k+'"><b>'+ASPECTS[k].label+'</b><span>'+ASPECTS[k].desc+'</span></button>').join('')+'</div></div><div class="field"><label>Blur အား — <span id="'+p+'-blurVal"></span></label><input type="range" id="'+p+'-blur" min="5" max="60" step="1"><p class="hint">Blur pad သုံးသော ပုံစံတွင်သာ သက်ရောက်ပါတယ်</p></div><button class="btn light" id="'+p+'-aspectReset" style="width:100%">↺ Aspect မူလ (9:16) ပြန်ထား</button>';
 const fontBlock=area=>'<div class="field"><label>Font (စာလုံးပုံစံ)</label><div class="style-row" id="'+p+'-fontChips-'+area+'"></div><div class="picker-row" style="margin-top:8px"><button type="button" class="btn light small" id="'+p+'-fontUp-'+area+'">📁 Font တင်</button><button type="button" class="btn light small" id="'+p+'-fontDel-'+area+'">🗑️ Font ဖျက်</button><button type="button" class="btn light small" id="'+p+'-fontReset-'+area+'">↺ Font မူလ ပြန်ထား</button></div><p class="hint">ကိုယ်ပိုင် Font file (.ttf / .otf / .woff) တင်ပြီး သုံးနိုင်ပါတယ် — အများဆုံး ၃ ခု၊ နေရာ တစ်ခု စီ အတွက် သီးသန့် ရွေးနိုင်ပါတယ်</p></div>';
 const titleField='<div class="switch-row"><div><b style="font-size:14px">ခေါင်းစဉ် (Title)</b><div style="font-size:12px;color:#9A9A9A">Video ပေါ်တွင် ပြပြီး လက်ဖြင့် ရွှေ့နိုင်သည်</div></div><div class="tgl on" id="'+p+'-titleTgl"></div></div><div class="field" id="'+p+'-f-title"><label>ခေါင်းစဉ် စာသား</label><input type="text" id="'+p+'-title" placeholder="ဥပမာ — အံ့ဩဖွယ် ဖြစ်ရပ်"><div class="err-text" id="'+p+'-e-title"></div></div><div class="field"><label>စာလုံး အရွယ် — <span id="'+p+'-titleSizeVal">52</span></label><input type="range" id="'+p+'-titleSize" min="30" max="80" step="2" value="52"></div><div class="field"><label>ခေါင်းစဉ် အရောင်</label><input type="color" class="clr-inp" id="'+p+'-titleColor" value="#FFE92E"></div>'+fontBlock('title')+'<button class="btn light" id="'+p+'-titleReset" style="width:100%">↺ Title Setting မူလ ပြန်ထား</button>';
@@ -843,6 +892,13 @@ const rotHome='<div class="field"><label>🔄 Video လှည့် (Rotate)</la
 +'<div class="switch-row"><div><b style="font-size:14px">🪞 ဘေးလှန် (Mirror)</b><div style="font-size:12px;color:#9A9A9A">ဘယ်-ညာ ပြောင်းပြန် လှန်ပါတယ်</div></div><div class="tgl" id="'+p+'-rotFlip"></div></div>'
 +'<p class="hint">Stage preview မှာ တန်း မြင်ရပြီး Export engine သုံးခုလုံး (🎬 ထည့်မယ် Insert အပါအဝင်) မှာ ပါပါတယ် — စာတန်း / Title / Logo / PiP တွေကတော့ ပုံမှန် အတိုင်း တည့်တည့် ထွက်ပါမယ်</p>'
 +'<button class="btn light" id="'+p+'-rotReset" style="width:100%;margin-top:6px">↺ Rotate မူလ (0°) ပြန်ထား</button>';
+/* V257 (FIX 6) ⛶ Crop home (user request 2026-11-16 18:48, from his
+   gallery editor's Crop tool): aspect preset chips + a readout +
+   Reset. The rectangle itself is edited ON THE STAGE (the
+   .crop-layer over the full source picture, shown while this sheet
+   is open) — drag inside to move, corner handles to resize. */
+const cropHome='<div class="field"><label>⛶ Crop — ဖြတ်မည့် အပိုင်း ရွေးရန်</label><div class="style-row" id="'+p+'-cropAsps"><button class="style-chip" data-v="free">Free</button><button class="style-chip" data-v="orig">Original</button><button class="style-chip" data-v="9:16">9:16</button><button class="style-chip" data-v="16:9">16:9</button><button class="style-chip" data-v="1:1">1:1</button><button class="style-chip" data-v="4:5">4:5</button></div><p class="hint">Stage ပေါ်က အကွက်ကို ဆွဲရွှေ့ပါ — ထောင့် လက်ကိုင်တွေနဲ့ အရွယ် ပြောင်းနိုင်ပါတယ်။ Crop သည် Rotate ပြီးနောက်၊ Aspect မဖွဲ့ခင် သက်ရောက်ပြီး Export engine အားလုံးမှာ ပါပါတယ်</p><div class="file-info" id="'+p+'-cropState" style="margin-top:8px">အပြည့် (Crop မရှိ)</div></div>'
++'<button class="btn light" id="'+p+'-cropReset" style="width:100%;margin-top:6px">↺ Crop မူလ (အပြည့်) ပြန်ထား</button>';
 const textHome='<div class="switch-row"><div><b style="font-size:14px">Text ပြရန်</b><div style="font-size:12px;color:#9A9A9A">Video ပေါ်တွင် ပြပြီး လက်ဖြင့် ရွှေ့နိုင်သည် — Export တွင်လည်း ပါမည်</div></div><div class="tgl" id="'+p+'-textTgl"></div></div><div class="field"><label>စာသား</label><input type="text" id="'+p+'-textStr" placeholder="ဥပမာ — ဆက်ကြည့်ပါ"></div><div class="field"><label>စာလုံး အရွယ် — <span id="'+p+'-textSizeVal">44</span></label><input type="range" id="'+p+'-textSize" min="24" max="72" step="2" value="44"></div><div class="field" style="margin-bottom:0"><label>စာသား အရောင်</label><input type="color" class="clr-inp" id="'+p+'-textColor" value="#FFFFFF"></div>'
 +'<div class="row2" style="margin-top:12px"><div class="field"><label>ပြ စချိန် (စက္ကန့်)</label><input type="number" id="'+p+'-textStart" min="0" step="0.5" value="0"></div><div class="field"><label>ပြ ဆုံးချိန် (စက္ကန့်)</label><input type="number" id="'+p+'-textEnd" min="0" step="0.5" value="0"></div></div><p class="hint" style="margin-top:-6px">အချိန်များသည် Trim အစ မှ စတွက်ပါသည် — ဆုံးချိန် 0 = အပိုင်း ဆုံးထိ</p>'
 +fontBlock('text')
@@ -910,12 +966,12 @@ const timelineInner='<div class="tl-wrap" id="'+p+'-timeline"><div class="tl-scr
    toolbar below it is pinned to the very bottom of the viewport. */
 const mainRowInner='<div class="main-row" id="'+p+'-mainRow">'
 +modeInner
-+'<div class="quick-row"><button type="button" class="qtgl on" id="'+p+'-qtSrt">🎨 SRT</button><button type="button" class="qtgl" id="'+p+'-qtVoice">🎙️ Voice</button><button type="button" class="qtgl" id="'+p+'-qtExport"><span class="btn-label">🎬 Export</span></button><button type="button" class="qtgl" id="'+p+'-qtChange">🎬 Video လဲ</button><span class="create-mini"><span class="dot"></span><span id="'+p+'-createStatus">အသင့်ဖြစ်ပါပြီ</span></span></div>'
++'<div class="quick-row"><button type="button" class="qtgl on" id="'+p+'-qtSrt">🎨 SRT</button><button type="button" class="qtgl" id="'+p+'-qtVoice">🎙️ Voice</button><button type="button" class="qtgl" id="'+p+'-qtExport"><span class="btn-label">🎬 Export</span></button><span class="create-mini"><span class="dot"></span><span id="'+p+'-createStatus">အသင့်ဖြစ်ပါပြီ</span></span></div>'
 +'</div>';
 const spacerInner='<div class="col-spacer" id="'+p+'-spacer"><div class="gen-prog" id="'+p+'-genProg" style="display:none"><div class="gen-prog-pct" id="'+p+'-genProgPct">0%</div><div class="gen-prog-bar"><div class="gen-prog-fill" id="'+p+'-genProgFill"></div></div><div class="gen-prog-meta"><span id="'+p+'-genProgLabel"></span><span class="gen-prog-unit" id="'+p+'-genProgUnit"></span></div></div></div>';
 function tb(id,ic,t){return '<button class="tool-btn" id="'+p+'-tool'+id+'"><span class="tic">'+ic+'</span>'+t+'</button>'}
 const toolbarInner='<nav class="toolbar" id="'+p+'-toolbar">'
-+tb('Script','📝','Script')+tb('Subs','🎨','စာတန်း')+tb('Voice','🎙️','Voice Create')+tb('Mixer','🔊','Mixer')+tb('Trim','✂️','Trim')+tb('Aspect','🌫️','Aspect')+tb('Title','📝','Title')+tb('Text','➕','Text')+tb('Logo','🛡️','Logo')+tb('Border','📐','Border')+tb('Blur','🫥','Blur')+tb('Adjust','🎚️','Adjust')+tb('Speed','⏩','Speed')+tb('Fade','🌅','Fade')+tb('Pip','🖼️','PiP')+tb('Rotate','🔄','လှည့်')
++tb('Script','📝','Script')+tb('Subs','🎨','စာတန်း')+tb('Voice','🎙️','Voice Create')+tb('Mixer','🔊','Mixer')+tb('Trim','✂️','Trim')+tb('Aspect','🌫️','Aspect')+tb('Title','📝','Title')+tb('Text','➕','Text')+tb('Logo','🛡️','Logo')+tb('Border','📐','Border')+tb('Blur','🫥','Blur')+tb('Adjust','🎚️','Adjust')+tb('Speed','⏩','Speed')+tb('Fade','🌅','Fade')+tb('Pip','🖼️','PiP')+tb('Rotate','🔄','လှည့်')+tb('Crop','⛶','Crop')
 +'<button class="tool-btn" id="'+p+'-toolKey"><span class="tic">🔑</span>Key</button>'
 +'</nav>';
 const exportInner='<div id="'+p+'-expSetup">'
@@ -954,7 +1010,7 @@ const homes='<div id="'+p+'-sheetHomes" style="display:none">'
 +'<div id="'+p+'-homeVoice">'+voiceBoxInner+'</div>'
 +'<div id="'+p+'-homeSubs">'+subsHome+'</div>'
 +'<div id="'+p+'-homeMixer">'+mixerHome+'</div>'
-+'<div id="'+p+'-homeTrim">'+pickRow+trimInner+'</div>'
++'<div id="'+p+'-homeTrim">'+pickRow+trimInner+hookHome+'</div>'
 +'<div id="'+p+'-homeSource"><button class="btn primary" id="'+p+'-srcPick" type="button" style="width:100%">📱 Video ဖိုင် ရွေးရန်</button>'+urlBox+'</div>'
 +'<div id="'+p+'-homeAspect">'+aspectField+'</div>'
 +'<div id="'+p+'-homeTitle">'+titleField+'</div>'
@@ -967,6 +1023,7 @@ const homes='<div id="'+p+'-sheetHomes" style="display:none">'
 +'<div id="'+p+'-homeFade">'+fadeHome+'</div>'
 +'<div id="'+p+'-homePip">'+pipHome+'</div>'
 +'<div id="'+p+'-homeRotate">'+rotHome+'</div>'
++'<div id="'+p+'-homeCrop">'+cropHome+'</div>'
 +'<div id="'+p+'-homeKey">'+keyHome+'</div>'
 +'<div id="'+p+'-homeExport">'+exportInner+'</div>'
 +'</div>';
@@ -1019,7 +1076,16 @@ function makeEditor(p){
     every other sheet home): 📱 file pick OR the 🔗 URL box — the
     user's order of 2026-11-16, replacing V251's main-flow urlBox
     card (and the placeholder's old straight-to-picker jump). */
- function openSourceSheet(){const hs=E('homeSource');if(!hs)return;openSheetNodes('🎬 Video ယူရန်',hs)}
+ /* V257 (FIX 4): the source sheet can be opened as a deliberate
+    CHANGE (the stage-corner 🎬 button, with a video already loaded)
+    or as a first load (the placeholder). srcChangeArm carries that
+    one distinction into the sheet's 📱 pick: armed = the pick wipes
+    the old project first (the old quick-row 🎬 Video လဲ semantics);
+    unarmed = the plain first-load pick, byte-identical to before.
+    The 🔗 URL route needs no flag — it always loads with change
+    semantics (acceptVideoFile(file, true)). */
+ let srcChangeArm=false;
+ function openSourceSheet(){srcChangeArm=false;const hs=E('homeSource');if(!hs)return;openSheetNodes('🎬 Video ယူရန်',hs)}
  ed.openSourceSheet=openSourceSheet;
  const phB=E('ph');if(phB)phB.onclick=()=>{openSourceSheet()};
  /* V255: ONE function owns the stage placeholder's visibility: it is
@@ -1039,22 +1105,29 @@ function makeEditor(p){
     never fights the stage voice sync or a user's own seek. */
  function primeStageFrame(){const v=E('video');if(!v)return;try{if(v.paused&&v.currentTime===0&&isFinite(v.duration)&&v.duration>0)v.currentTime=Math.min(0.05,v.duration/2)}catch(e){}}
  /* the sheet's own 📱 file button: close the sheet first (the parked
-    home returns to #sheetHomes), then run the EXACT pick flow the
-    placeholder used before — same _changeWipe=false semantics, same
-    #file input, same change handler */
- const srcPickBtn=E('srcPick');if(srcPickBtn)srcPickBtn.onclick=()=>{closeSheet();ed._changeWipe=false;E('file').click()};
- /* V236: 🎬 Video လဲ (Main quick row) — the SAME picker as the
-    initial load, but the selection it produces is a deliberate
-    CHANGE: the old project is fully wiped first (wipeForChange,
-    run inside the change handler below while ed.file is still the
-    old file). Clearing the input's value first makes re-picking
-    the SAME file fire 'change' too (a same-file change still
-    wipes). Cancelling the picker fires no change event, so
-    nothing is wiped; and the pick/placeholder buttons above clear
-    the flag, so a change armed here can never leak into a later
-    ordinary pick. */
- const chBtn=E('qtChange');if(chBtn)chBtn.onclick=()=>{ed._changeWipe=true;try{E('file').value=''}catch(e){}E('file').click()};
- function acceptVideoFile(f,wasChange){if(wasChange&&ed.file&&window.__recapWipeForChange)window.__recapWipeForChange();ed.file=f;if(ed.url)URL.revokeObjectURL(ed.url);ed.url=URL.createObjectURL(f);const v=E('video');v.src=ed.url;v.style.display='block';syncPlaceholder();v.addEventListener('loadeddata',primeStageFrame);E('fileinfo').textContent=f.name+' · '+fmtSize(f.size);if(f.size>200*1048576)showNotice('⚠️ ဖိုင် 200 MB ထက် ကြီးနေပါတယ် ('+fmtSize(f.size)+') — browser ထဲတွင် Export ကြာနိုင် / မအောင်မြင်နိုင်ပါတယ်။ ဖိုင် သေးတာ သုံးရန် အကြံပြုပါတယ်။','info');v.onloadedmetadata=()=>{if(ed.url&&v.src!==ed.url)return; /* an inserted-voice preview is loaded, not a new source file */ ed.duration=v.duration;ed.videoW=v.videoWidth||0;ed.videoH=v.videoHeight||0;primeStageFrame();if(ed.syncRotPreview)ed.syncRotPreview();E('start').value=0;E('end').value=Math.floor(v.duration*10)/10;E('rstart').max=v.duration;E('rend').max=v.duration;E('rstart').value=0;E('rend').value=v.duration;refreshLabels();if(window.__recapNavRefresh)window.__recapNavRefresh();showNotice(wasChange?'🎬 Video လဲပြီးပါပြီ — အရင် project အကုန် ရှင်းပြီးပါပြီ':'✅ Video တင်ပြီးပါပြီ — ကြာချိန် '+fmtDur(v.duration),'ok');if(ed.pendingCreate&&ed.modeChosen){ed.pendingCreate=false;if(window.__recapPendingCreate)window.__recapPendingCreate()}}}
+    home returns to #sheetHomes), then run the pick flow — the same
+    #file input and change handler as always; _changeWipe follows
+    srcChangeArm (false for a first load, exactly as before; true
+    when the sheet was opened as a change from the stage-corner
+    button, in which case the input is also cleared first so
+    re-picking the SAME file still fires 'change' and wipes) */
+ const srcPickBtn=E('srcPick');if(srcPickBtn)srcPickBtn.onclick=()=>{closeSheet();ed._changeWipe=srcChangeArm;srcChangeArm=false;if(ed._changeWipe)try{E('file').value=''}catch(e){}E('file').click()};
+ /* V236 → V257 (FIX 4): the change-video control. V236 put it in
+    the Main quick row as "🎬 Video လဲ" and sent its tap straight
+    to the file picker with the wipe armed. The user (2026-11-16
+    18:36) ordered it OUT of the quick row and onto the stage's
+    top-right corner, ICON ONLY — and the tap now opens the settled
+    V252 source-choice sheet (📱 file pick OR 🔗 URL fetch, the
+    same sheet the placeholder opens), with srcChangeArm set when a
+    video is loaded so a pick from it keeps the V236 deliberate-
+    change semantics: the old project is fully wiped first
+    (wipeForChange, run inside the change handler below while
+    ed.file is still the old file). Cancelling the sheet/picker
+    fires no change event, so nothing is wiped; openSourceSheet
+    clears the arm on every open, so a stale arm can never leak
+    into a later ordinary pick. */
+ const scBtn=E('stageChange');if(scBtn)scBtn.onclick=()=>{openSourceSheet();srcChangeArm=!!ed.file};
+ function acceptVideoFile(f,wasChange){if(wasChange&&ed.file&&window.__recapWipeForChange)window.__recapWipeForChange();ed.file=f;if(ed.url)URL.revokeObjectURL(ed.url);ed.url=URL.createObjectURL(f);const v=E('video');v.src=ed.url;v.style.display='block';syncPlaceholder();v.addEventListener('loadeddata',primeStageFrame);E('fileinfo').textContent=f.name+' · '+fmtSize(f.size);if(f.size>200*1048576)showNotice('⚠️ ဖိုင် 200 MB ထက် ကြီးနေပါတယ် ('+fmtSize(f.size)+') — browser ထဲတွင် Export ကြာနိုင် / မအောင်မြင်နိုင်ပါတယ်။ ဖိုင် သေးတာ သုံးရန် အကြံပြုပါတယ်။','info');v.onloadedmetadata=()=>{if(ed.url&&v.src!==ed.url)return; /* an inserted-voice preview is loaded, not a new source file */ ed.duration=v.duration;ed.videoW=v.videoWidth||0;ed.videoH=v.videoHeight||0;primeStageFrame();if(ed.syncRotPreview)ed.syncRotPreview();if(ed.syncCropPreview)ed.syncCropPreview();E('start').value=0;E('end').value=Math.floor(v.duration*10)/10;E('rstart').max=v.duration;E('rend').max=v.duration;E('rstart').value=0;E('rend').value=v.duration;refreshLabels();if(window.__recapNavRefresh)window.__recapNavRefresh();showNotice(wasChange?'🎬 Video လဲပြီးပါပြီ — အရင် project အကုန် ရှင်းပြီးပါပြီ':'✅ Video တင်ပြီးပါပြီ — ကြာချိန် '+fmtDur(v.duration),'ok');if(ed.pendingCreate&&ed.modeChosen){ed.pendingCreate=false;if(window.__recapPendingCreate)window.__recapPendingCreate()}}}
  E('file').addEventListener('change',()=>{const f=E('file').files[0];if(!f)return;const wasChange=!!ed._changeWipe;ed._changeWipe=false;acceptVideoFile(f,wasChange)});
  /* ================= V250: 🔗 URL video box =================
     One input + one fetch button. Placement history: V250 parked it
@@ -1402,13 +1475,14 @@ function makeEditor(p){
      the .stg-orig CSS fits the frame inside the fixed 50dvh region
      with this unitless ratio (canvasGeom's aspect for the file) */
   if(fixed){wrap.style.removeProperty('--stg-ar')}
-  else{const vd=effVideoDims(ed);wrap.style.setProperty('--stg-ar',String(Math.round(vd.w/vd.h*10000)/10000))} /* V255: Original's frame ratio follows the ROTATED frame, like canvasGeom */
+  else{const vd=effSrcDims(ed);wrap.style.setProperty('--stg-ar',String(Math.round(vd.w/vd.h*10000)/10000))} /* V255: Original's frame ratio follows the ROTATED frame, like canvasGeom · V257 (FIX 6): and the crop */
   if(bg){
-   if(fixed){bg.style.display='block';const src=v.currentSrc||v.src;if(src&&bg.src!==src)bg.src=src;bg.style.filter='blur('+Math.max(2,Math.round((ed.blur||28)/2))+'px) brightness(.92) saturate(.85)';if(!v.paused&&bg.paused)bg.play().catch(()=>{})}
+   if(fixed){bg.style.display='block';const src=v.currentSrc||v.src;if(src&&bg.src!==src)bg.src=src;const bgBase='blur('+Math.max(2,Math.round((ed.blur||28)/2))+'px) brightness(.92) saturate(.85)';bg.dataset.adjBase=bgBase;const adjF=adjCssOf(ed);bg.style.filter=bgBase+(adjF?' '+adjF:'');if(!v.paused&&bg.paused)bg.play().catch(()=>{})}
    else bg.style.display='none';
   }
   if(typeof syncPinGeometry==='function')syncPinGeometry();
   if(ed.syncRotPreview)ed.syncRotPreview(); /* V255: the fit scale depends on the stage aspect — re-derive it with the stage */
+  if(ed.syncCropPreview)ed.syncCropPreview(); /* V257 (FIX 6): the crop box/clip geometry follows the stage aspect too */
  }
  ed.applyStage=applyStage;
  const bgEl=E('videoBg'),vidEl0=E('video');
@@ -1683,6 +1757,68 @@ function subPngOpts(ed,S){const gold=!!ed&&ed.subColor==='gold';/* V230: the cus
 /* V217: effective mixer gains WITH the per-track mutes applied — one
    derivation shared by exportOne and the insert render */
 function mixGains(ed){return{bgm:(ed&&ed.bgmMute)?0:Math.max(0,Math.min(100,(ed&&ed.bgmVol)||0))/100,voice:(ed&&ed.voiceMute)?0:Math.max(0,Math.min(300,(ed&&ed.voiceVol==null?100:ed.voiceVol)))/100}}
+/* ================= V257 (FIX 3): voiceover loudness =================
+   User report 2026-11-16 18:32: the exported voiceover is too quiet.
+   The mix graphs used to feed the voice stem straight into the
+   user's Voice% slider, so a quietly-recorded TTS stem (peaks around
+   −20 dBFS are common) stayed quiet at the default 100%. Now every
+   export mix NORMALISES the voice stem first: its peak is measured
+   once (WAV fast path — generated voices are already PCM WAV in
+   memory, so no extra decode; other formats fall back to one
+   decodeAudioData), a gain is computed to land the peak at
+   −1.0 dBFS (clamped to [−12, +24] dB), and the chain placed on the
+   voice branch is:  volume=<gain>dB , volume=<user Voice%> ,
+   alimiter (ceiling −1 dBFS). The user's slider therefore stays
+   meaningful — it scales the NORMALISED stem — and even at 300%
+   the limiter keeps the stem clean instead of clipping. The
+   original/BGM branch is untouched. Approach note: loudnorm's
+   two-pass form is impossible inside these single-pass graphs and
+   its single-pass form would add an unmeasurable dynamic stage;
+   peak-normalise + limiter is deterministic and unit-testable. */
+const VOICE_NORM_TARGET_DB=-1,VOICE_NORM_MAX_DB=24,VOICE_NORM_MIN_DB=-12;
+const VOICE_LIMIT_CH='alimiter=limit=0.891:level=false';
+function wavPeakDb(bytes){
+ try{
+  if(!bytes||bytes.length<44)return null;
+  const dv=new DataView(bytes.buffer,bytes.byteOffset||0,bytes.byteLength);
+  const tag=o=>String.fromCharCode(bytes[o],bytes[o+1],bytes[o+2],bytes[o+3]);
+  if(tag(0)!=='RIFF'||tag(8)!=='WAVE')return null;
+  let fmt=null,dataOff=-1,dataLen=0,off=12;
+  while(off+8<=bytes.length){const id=tag(off),sz=dv.getUint32(off+4,true);if(id==='fmt ')fmt={form:dv.getUint16(off+8,true),ch:dv.getUint16(off+10,true),bits:dv.getUint16(off+22,true)};else if(id==='data'){dataOff=off+8;dataLen=Math.min(sz,bytes.length-dataOff)}if(dataOff>=0&&fmt)break;off+=8+sz+(sz%2)}
+  if(!fmt||dataOff<0||!(fmt.bits>0))return null;
+  const bytesPer=fmt.bits/8,total=Math.floor(dataLen/bytesPer);
+  if(!(total>0))return null;
+  /* speech-length files: a straight scan is a few ms; past ~20M
+     samples, stride so the scan stays bounded (a strided peak is
+     within a fraction of a dB for speech) */
+  const stride=total>20000000?Math.ceil(total/20000000):1;
+  let peak=0;
+  if(fmt.form===1&&fmt.bits===16){for(let i=0;i<total;i+=stride){const v=Math.abs(dv.getInt16(dataOff+i*2,true));if(v>peak)peak=v}return peak>0?20*Math.log10(peak/32768):-Infinity}
+  if(fmt.form===1&&fmt.bits===8){for(let i=0;i<total;i+=stride){const v=Math.abs(bytes[dataOff+i]-128);if(v>peak)peak=v}return peak>0?20*Math.log10(peak/128):-Infinity}
+  if(fmt.form===3&&fmt.bits===32){for(let i=0;i<total;i+=stride){const v=Math.abs(dv.getFloat32(dataOff+i*4,true));if(v>peak)peak=v}return peak>0?20*Math.log10(peak):-Infinity}
+  return null;
+ }catch(e){return null}
+}
+async function voicePeakDbOf(bytes){
+ if(!bytes||!bytes.length)return null;
+ const w=wavPeakDb(bytes);if(w!=null)return w;
+ try{
+  const Ctx=window.AudioContext||window.webkitAudioContext;if(!Ctx)return null;
+  const ctx=new Ctx();
+  try{
+   const ab=bytes.buffer.slice(bytes.byteOffset||0,(bytes.byteOffset||0)+bytes.byteLength);
+   const buf=await ctx.decodeAudioData(ab);
+   let peak=0;for(let c=0;c<buf.numberOfChannels;c++){const d=buf.getChannelData(c);for(let i=0;i<d.length;i++){const v=Math.abs(d[i]);if(v>peak)peak=v}}
+   return peak>0?20*Math.log10(peak):-Infinity;
+  }finally{try{ctx.close()}catch(e){}}
+ }catch(e){return null}
+}
+function voiceNormGainDb(peakDb){
+ if(peakDb==null||!isFinite(peakDb))return 0;
+ const g=VOICE_NORM_TARGET_DB-peakDb;
+ return Math.max(VOICE_NORM_MIN_DB,Math.min(VOICE_NORM_MAX_DB,g));
+}
+function voiceNormPre(gainDb){return Math.abs(gainDb)>=0.05?('volume='+gainDb.toFixed(1)+'dB,'):''}
 /* V217 logo PNG: draw the chosen image (own upload, else the built-in
    brand badge) at the size/opacity settings onto a transparent canvas.
    Falls back to the classic text watermark if no image can be loaded
@@ -1734,6 +1870,111 @@ function rotFilterOf(ed){
  const steps={90:'transpose=clock',180:'transpose=clock,transpose=clock',270:'transpose=cclock'}[r]||'';
  const parts=[];if(f)parts.push('hflip');if(steps)parts.push(steps);
  return parts.join(',');
+}
+/* V257 (FIX 6) Crop — ONE state: ed.crop = {x,y,w,h} fractions of
+   the ROTATED frame (null = the full frame) + ed.cropAsp, the Crop
+   sheet's aspect lock. Pipeline position (user order 2026-11-16
+   18:48): AFTER Rotate/Flip, BEFORE the aspect composition — the
+   ffmpeg chains take cropFilterOf immediately after rotFilterOf,
+   the Hardware compositor draws the crop's raw-source rect, and
+   the cropped frame is what canvasGeom / aspectSpecial916 compose.
+   Identity state emits NO crop step anywhere, so untouched
+   projects keep the exact old graphs. */
+function normCrop(c){
+ if(!c||typeof c!=='object')return{x:0,y:0,w:1,h:1};
+ let x=(typeof c.x==='number'&&isFinite(c.x))?c.x:0,y=(typeof c.y==='number'&&isFinite(c.y))?c.y:0;
+ let w=(typeof c.w==='number'&&isFinite(c.w)&&c.w>0)?c.w:1,h=(typeof c.h==='number'&&isFinite(c.h)&&c.h>0)?c.h:1;
+ w=Math.min(1,Math.max(0.02,w));h=Math.min(1,Math.max(0.02,h));
+ x=Math.min(1-w,Math.max(0,x));y=Math.min(1-h,Math.max(0,y));
+ return{x:x,y:y,w:w,h:h};
+}
+function cropIsIdentity(c){const n=normCrop(c);return n.x===0&&n.y===0&&n.w===1&&n.h===1}
+function cropFilterOf(ed){
+ if(!ed||cropIsIdentity(ed.crop))return'';
+ const c=normCrop(ed.crop),f=v=>v.toFixed(4);
+ return 'crop=iw*'+f(c.w)+':ih*'+f(c.h)+':iw*'+f(c.x)+':ih*'+f(c.y);
+}
+/* the composed source's dims: the rotated frame, cropped */
+function effSrcDims(ed){const vd=effVideoDims(ed);const c=normCrop(ed&&ed.crop);return{w:vd.w*c.w,h:vd.h*c.h}}
+/* the crop window mapped BACK to raw-source fractions (undo the
+   quarter turn, then the mirror — the transform order is mirror
+   first, so the inverse runs rotation-first): the Hardware
+   compositor's source rect, correct in raw pixel space */
+function cropSrcRect(ed){
+ let r=normCrop(ed&&ed.crop);
+ const rot=((ed&&ed.rot)||0),flip=!!(ed&&ed.flipH);
+ if(rot===90)r={x:r.y,y:1-r.x-r.w,w:r.h,h:r.w};
+ else if(rot===180)r={x:1-r.x-r.w,y:1-r.y-r.h,w:r.w,h:r.h};
+ else if(rot===270)r={x:1-r.y-r.h,y:r.x,w:r.h,h:r.w};
+ if(flip)r={x:1-r.x-r.w,y:r.y,w:r.w,h:r.h};
+ return r;
+}
+/* the largest centred rect of a preset PIXEL aspect on the rotated
+   source ('orig' / unknown = the source's own aspect = full frame) */
+function cropPresetRect(ed,asp){
+ const vd=effVideoDims(ed),va=vd.w/Math.max(1,vd.h);
+ const r={'9:16':9/16,'16:9':16/9,'1:1':1,'4:5':4/5}[asp];
+ if(!r)return{x:0,y:0,w:1,h:1};
+ const k=r/va; /* the rect's w/h ratio in FRACTION space */
+ let w,h;if(k>=1){w=1;h=1/k}else{w=k;h=1}
+ return{x:+((1-w)/2).toFixed(4),y:+((1-h)/2).toFixed(4),w:+w.toFixed(4),h:+h.toFixed(4)};
+}
+/* clamp a candidate rect into the frame (minimum size 0.02) and,
+   when lockK (a preset's fraction-space w/h) is given, hold the
+   locked aspect by deriving h from w — the drag/resize math core */
+function clampCropRect(c,lockK){
+ const n=normCrop(c);
+ if(lockK&&lockK>0){
+  n.h=n.w/lockK;
+  if(n.h>1){n.h=1;n.w=Math.min(1,lockK)}
+  if(n.h<0.02){n.h=0.02;n.w=Math.min(1,lockK*0.02)}
+  n.y=Math.min(1-n.h,Math.max(0,n.y));
+ }
+ return n;
+}
+/* the composed FG picture rect (canvas fractions) for a GIVEN crop
+   value — mirrors hwFramePlan's fg math; the special case's picY
+   is the established 0.21875 fraction (subBlockGeom), which does
+   not depend on the source */
+function picRectFracFor(ed,cropVal){
+ if(ed&&ed.aspect==='Original')return{x:0,y:0,w:1,h:1};
+ const vd0=effVideoDims(ed),c=normCrop(cropVal),vw=vd0.w*c.w,vh=vd0.h*c.h;
+ const G=canvasGeom(ed),W=G.W,H=G.H;
+ const special=(!ed||!ed.aspect||ed.aspect==='9:16')&&vw>vh;
+ let x,y,w,h,sc;
+ if(special){sc=Math.min(W/vw,W/vh);w=vw*sc;h=vh*sc;x=(W-w)/2;y=Math.round(H*0.21875)}
+ else{sc=Math.min(W/vw,H/vh);w=vw*sc;h=vh*sc;x=(W-w)/2;y=(H-h)/2}
+ return{x:x/W,y:y/H,w:w/W,h:h/H};
+}
+/* the blurred backdrop's COVER rect (canvas fractions) for a crop */
+function coverRectFracFor(ed,cropVal){
+ const vd0=effVideoDims(ed),c=normCrop(cropVal),vw=vd0.w*c.w,vh=vd0.h*c.h;
+ const G=canvasGeom(ed),W=G.W,H=G.H,sc=Math.max(W/vw,H/vh),w=vw*sc,h=vh*sc;
+ return{x:((W-w)/2)/W,y:((H-h)/2)/H,w:w/W,h:h/H};
+}
+/* Blur regions are CANVAS fractions (V217): a region covers the
+   source content showing at that canvas rect. When the crop
+   changes, that content moves — intersect the region's source
+   coverage with the new crop window and rebase it onto the new
+   composition, the same intersect+rebase hookRegionsFor performs
+   on the time axis. A region whose content is cropped away is
+   dropped; a full-canvas region lands on the new picture rect.
+   Runs ONCE, when the crop is applied, so every region consumer
+   (stage, exportOne, Hardware, Hook) keeps using stored regions
+   exactly as before. */
+function rebaseRegionsForCrop(regions,ed,oldCrop,newCrop){
+ const pf=picRectFracFor(ed,oldCrop),pt=picRectFracFor(ed,newCrop);
+ const oc=normCrop(oldCrop),nc=normCrop(newCrop);
+ const out=[];
+ (regions||[]).forEach(r=>{
+  if(!r||!(r.w>0)||!(r.h>0)){out.push(r);return}
+  const sx=oc.x+((r.x-pf.x)/pf.w)*oc.w, sy=oc.y+((r.y-pf.y)/pf.h)*oc.h;
+  const sw=(r.w/pf.w)*oc.w, sh=(r.h/pf.h)*oc.h;
+  const ix=Math.max(sx,nc.x),iy=Math.max(sy,nc.y),ix2=Math.min(sx+sw,nc.x+nc.w),iy2=Math.min(sy+sh,nc.y+nc.h);
+  if(ix2-ix<0.01||iy2-iy<0.01)return;
+  out.push(Object.assign({},r,{x:+(pt.x+((ix-nc.x)/nc.w)*pt.w).toFixed(4),y:+(pt.y+((iy-nc.y)/nc.h)*pt.h).toFixed(4),w:+(((ix2-ix)/nc.w)*pt.w).toFixed(4),h:+(((iy2-iy)/nc.h)*pt.h).toFixed(4)}));
+ });
+ return out;
 }
 /* the stage-preview transform for the same state: the element holds
    the source contain-fitted in the stage box; rotating the ELEMENT
@@ -1959,7 +2200,7 @@ function voiceTrimRange(d,sr){
 }
 const ttsLineCache=new Map();
 const ttsInflight=new Map(); /* V249 (m2): module-scope in-flight synthesis map — duplicate suppression spans invocations, so a Voice Create and an export-triggered generation cannot synth the same line twice concurrently */
-function ttsLineKey(ed,text){return [ed.ttsEngine,ed.ttsEngine==='edge'?ed.edgeVoice:ed.voice,genSpeedFactor(ed.p).toFixed(3),String(text)].join('|')} /* V249 (m1): the cache key is the exact tuple, not a hash of it — a same-length hash collision can no longer silently return the wrong line's audio */
+function ttsLineKey(ed,text){return [ed.ttsEngine,ed.ttsEngine==='edge'?ed.edgeVoice:ed.voice,String(text)].join('|')} /* V249 (m1): the cache key is the exact tuple, not a hash of it — a same-length hash collision can no longer silently return the wrong line's audio. V257 (FIX 2a): the generation-speed factor is NO LONGER part of the key. Neither synthesis route takes a speed (edgeServerTTS posts {text, voice}; geminiTTS posts text + voice) — the raw chunk bytes are speed-independent, and the speed is applied AFTER assembly by renderVoiceSpeed from voiceCache.genSpeed. Including the slider's current value here meant any gen-speed difference between Voice Create and a later export-triggered regeneration (a nudged slider, a Voice Reset) busted EVERY cached line and re-spoke the whole script over the network for byte-identical audio. */
 async function synthLine(ed,text,statusFn){
  if(ed.ttsEngine==='edge')return{bytes:await edgeServerTTS(text,ed.edgeVoice,statusFn),ext:'mp3'};
  return{bytes:await geminiTTS(getApiKey(),text,ed.voice),ext:'wav'};
@@ -2373,8 +2614,10 @@ function effSpeedOf(ed){const c=ed.voiceCache;return (c?(c.genSpeed||1):1)*(ed.a
    generated (Voice Create, or an export's stale-voice regeneration),
    speed it so its duration matches the video (trim segment) duration
    EXACTLY. Only the post-generation adjustment speed is written
-   (adjSpeed; effSpeedOf = genSpeed x adjSpeed) — genSpeed is baked
-   into the per-line chunk cache key and is never touched; cue
+   (adjSpeed; effSpeedOf = genSpeed x adjSpeed) — genSpeed is
+   recorded on the voice cache, applied at render, and never
+   touched by the fit (V257: it is not part of the per-line chunk
+   cache key — the chunks are speed-independent); cue
    timings derive from chunk durations / effSpeedOf, so they follow
    automatically, and the speed slider + its % label move to match.
    needed = natural / target, clamped to [0.77, 1.30]: past the clamp
@@ -2454,6 +2697,224 @@ function expPhaseLog(log,label,t0){if(typeof log!=='function'||t0==null)return;c
    _expOpts snapshot (absent snapshot = the pre-V221 programmatic
    default: standard engine at 1080). */
 function expStartLine(opts){const o=opts||{};const eng=o.engine==='hw'?'Hardware':(o.engine==='mt'?'Multi-thread':'ပုံမှန်');return '🎬 Export: '+eng+(o.engine==='hw'?(' · '+(o.hwPace==='rt'?'▶️ Real-time':'⚡ Fast')):'')+' · '+(o.res||1080)}
+/* ================= V256: Auto Hook (user request 2026-11-16 18:04) =================
+   The analyser (studio closure) scores every 5 s window of the
+   CURRENT trim segment and stores the ranked candidate starts on
+   ed.hookCands (segment-relative seconds); ed.hookStart is the
+   chosen one. Export then prepends that window — cut from the
+   SOURCE at trim-start + hookStart, with its ORIGINAL audio —
+   ahead of the main render, through the same base-frame pipeline
+   (aspect composition, Adjust, Rotate/Flip, blur regions, border)
+   but WITHOUT segment speed, fades, subtitles, Title, overlays or
+   voiceover. The main render's internal cue timings never change;
+   the exported total grows by exactly HOOK_DUR seconds. ffmpeg
+   engines join with the concat DEMUXER (house rule — never the
+   concat filter with interleaved labels); the Hardware engine
+   encodes the hook's frames first through the same compositor and
+   muxes one frame sequence over hook+main durations. If Hook is ON
+   but the analysis is missing or stale (trim changed), every
+   export path BLOCKS with a Burmese notice — never a silent
+   hook-less export. */
+const HOOK_DUR=5,HOOK_STEP=1,HOOK_BUCKET=0.1,HOOK_W_AUDIO=0.6,HOOK_W_VISUAL=0.4;
+function hookTrimOf(ed){const s=parseFloat(($('#'+ed.p+'-start')||{}).value)||0,e=parseFloat(($('#'+ed.p+'-end')||{}).value)||0;return{start:Math.min(s,e),end:Math.max(s,e)}}
+function hookSigOf(ed){if(!ed||!ed.file)return'';const r=hookTrimOf(ed);return ed.file.name+'|'+ed.file.size+'|'+(ed.file.lastModified||0)+'|'+r.start.toFixed(2)+'|'+r.end.toFixed(2)}
+function hookStateFor(ed){
+ if(!ed||!ed.hookOn)return{ok:false,off:true,msg:''};
+ if(!ed.file)return{ok:false,msg:'Hook ဖွင့်ထားပေမယ့် Video မတင်ရသေးပါ'};
+ const r=hookTrimOf(ed),segDur=r.end-r.start;
+ if(!(segDur>=HOOK_DUR))return{ok:false,msg:'Hook အတွက် Trim အပိုင်းက ၅ စက္ကန့်ထက် ရှည်ရပါမယ် — အခု '+segDur.toFixed(1)+' စက္ကန့်ပဲ ရှိပါတယ်'};
+ if(ed.hookStart==null||!ed.hookSig||ed.hookSig!==hookSigOf(ed))return{ok:false,msg:'Hook ဖွင့်ထားပေမယ့် အကောင်းဆုံး အခန်း မရှာရသေးပါ (သို့) Trim ပြောင်းသွားလို့ ပြန်ရှာရန် လိုပါတယ် — ✂️ Trim ထဲက 🎬 Hook မှာ "🔍 အကောင်းဆုံး အခန်း ရှာမယ်" နှိပ်ပါ'};
+ return{ok:true,start:ed.hookStart,abs:r.start+ed.hookStart};
+}
+function hookActiveFor(ed){return hookStateFor(ed).ok}
+/* Pure window scorer (unit-tested by the harness). rms = per-0.1 s
+   RMS buckets for the segment (or null when the source has no
+   audio); visMap = Map windowIndex -> {act, luma} for the windows
+   that were visually sampled (top audio candidates only — a window
+   without a visual sample gets visual term 0, so visual activity
+   can only BOOST a measured candidate). Audio and visual terms are
+   min-max normalised across windows and combined 0.6 / 0.4. A
+   window whose first second is near-silent (dead air) or
+   near-black is multiplied by 0.35 — a hook must not open on
+   silence or a black frame. Deterministic: ties keep window order. */
+function hookScoreWindows(rms,visMap,segDur){
+ const out=[];if(!(segDur>=HOOK_DUR))return out;
+ const per=Math.round(HOOK_DUR/HOOK_BUCKET);
+ const rb=k=>(rms&&k>=0&&k<rms.length)?(rms[k]||0):0;
+ const lastStart=Math.max(0,segDur-HOOK_DUR);
+ const nWin=Math.floor(lastStart/HOOK_STEP+1e-6)+1;
+ const raw=[];
+ for(let i=0;i<nWin;i++){
+  const off=Math.round(i*HOOK_STEP/HOOK_BUCKET);let sum=0,lead=0;
+  for(let k=0;k<per;k++){const v=rb(off+k);sum+=v*v;if(k<10)lead+=v*v}
+  raw.push({i,start:+(i*HOOK_STEP).toFixed(3),rms:Math.sqrt(sum/per),lead:Math.sqrt(lead/10)});
+ }
+ let mxA=0,mnA=Infinity;raw.forEach(w=>{if(w.rms>mxA)mxA=w.rms;if(w.rms<mnA)mnA=w.rms});
+ raw.forEach(w=>{w.deadA=w.lead<Math.max(0.015,0.05*mxA)});
+ let mxV=0,mnV=Infinity;
+ raw.forEach(w=>{const v=visMap?visMap.get(w.i):null;if(v){if(v.act>mxV)mxV=v.act;if(v.act<mnV)mnV=v.act}});
+ raw.forEach(w=>{
+  const aN=mxA>mnA?(w.rms-mnA)/(mxA-mnA):(mxA>0?0.5:0);
+  const v=visMap?visMap.get(w.i):null;
+  const vN=v?(mxV>mnV?(v.act-mnV)/(mxV-mnV):(mxV>0?0.5:0)):0;
+  const deadB=!!(v&&typeof v.luma==='number'&&v.luma<12);
+  let score=HOOK_W_AUDIO*aN+HOOK_W_VISUAL*vN;
+  const dead=w.deadA||deadB;if(dead)score*=0.35;
+  out.push({i:w.i,start:w.start,score:+score.toFixed(4),aN:+aN.toFixed(4),vN:+vN.toFixed(4),dead});
+ });
+ out.sort((a,b)=>(b.score-a.score)||(a.i-b.i));
+ return out;
+}
+/* Blur regions are timed relative to the MAIN segment; the hook
+   window shows the slice [relStart, relStart+5) of that timeline —
+   intersect and rebase. Full-segment regions stay full. */
+function hookRegionsFor(regions,relStart){
+ const out=[];const w0=relStart||0,w1=w0+HOOK_DUR;
+ (regions||[]).forEach(r=>{if(!r||!r.on||!(r.w>0)||!(r.h>0))return;
+  if(r.full||!(r.end>r.start)){out.push(Object.assign({},r));return}
+  const s=Math.max(r.start||0,w0),e=Math.min(r.end,w1);if(e-s<0.05)return;
+  out.push(Object.assign({},r,{start:+(s-w0).toFixed(3),end:+(e-w0).toFixed(3),full:false}))});
+ return out;
+}
+function hookCancelError(){const e=new Error('cancelled');e.cancelled=true;return e}
+/* Phase-1 audio: true RMS per 0.1 s bucket over the trim segment,
+   decoded with the same sliced-ffmpeg pattern as the waveform
+   extractor (a 30-min segment = 15 slices of <=120 s, never one
+   giant decode). Cached on ed keyed by the hook signature.
+   Returns null when the source has no audio track. */
+async function hookExtractRms(ed,r,onProg,tok){
+ const sig=hookSigOf(ed);
+ if(ed._hookRms&&ed._hookRmsSig===sig)return ed._hookRms;
+ const ff=await getFFmpeg();const segDur=r.end-r.start;
+ const totB=Math.max(1,Math.round(segDur/HOOK_BUCKET));
+ const sums=new Float64Array(totB),cnts=new Uint32Array(totB);
+ let produced=false,off=0;
+ while(off<segDur-0.001){
+  if(tok&&tok.hit)throw hookCancelError();
+  const len=Math.min(120,segDur-off);
+  const code=await ff.exec(['-ss',(r.start+off).toFixed(3),'-i','in.mp4','-t',len.toFixed(3),'-vn','-ac','1','-ar','8000','-f','s16le','hk_a.pcm']);
+  if(code!==0){if(!produced)return null;break}
+  const data=await ffReadU8(ff,'hk_a.pcm');try{await ff.deleteFile('hk_a.pcm')}catch(e){}
+  if(!data||!data.length){if(!produced)return null;break}
+  produced=true;
+  const dv=new DataView(data.buffer,data.byteOffset,data.byteLength);const n=Math.floor(data.byteLength/2);
+  const baseB=Math.round(off/HOOK_BUCKET);
+  for(let i=0;i<n;i++){const v=dv.getInt16(i*2,true)/32768;const b=baseB+Math.floor(i/800);if(b<totB){sums[b]+=v*v;cnts[b]++}}
+  off+=len;
+  if(onProg)onProg(Math.min(1,off/segDur),'🔊 အသံ အား စစ်နေပါတယ်…');
+ }
+ if(!produced)return null;
+ const rms=new Array(totB);for(let b=0;b<totB;b++)rms[b]=cnts[b]?Math.sqrt(sums[b]/cnts[b]):0;
+ ed._hookRms=rms;ed._hookRmsSig=sig;
+ return rms;
+}
+/* The hook clip itself: source window [hookAbs, hookAbs+5) through
+   exportOne's base-frame pipeline (aspect composition incl. the
+   special 9:16 crop, Adjust, Rotate/Flip, blur regions rebased to
+   the window, border) at speed 1 with NO fades and NO overlays,
+   plus the source's own audio for that window. needAudio (voice
+   mode: the main render always carries audio) falls back to a
+   generated silence track so the concat join's stream layouts
+   match; without needAudio a source with no audio yields a
+   video-only hook, matching an original-mode main render. */
+async function exportHookClip(ff,ed,hookAbs,log,needAudio){
+ const G=exportGeom(ed);const W=G.W,H=G.H,S=W/720;
+ const rotF=rotFilterOf(ed),rotChain=rotF?','+rotF:'',cropF=cropFilterOf(ed),cropChain=cropF?','+cropF:''; /* V257 (FIX 6): the hook clip uses the same base pipeline — the crop lands after Rotate/Flip in every branch (the Original branch reorders when a crop is active: its rotChain historically sat after the canvas scale) */
+ const adjEq=adjEqOf(ed);
+ const special=aspectSpecial916(ed);
+ const SG=subBlockGeom(ed,G,'');const picY=SG.picY;
+ const fetchFile=window.FFmpegUtil&&window.FFmpegUtil.fetchFile;
+ await ff.writeFile('in.mp4',fetchFile?await fetchFile(ed.file):new Uint8Array(await ed.file.arrayBuffer()));
+ const blur=Math.max(2,Math.round(ed.blur/2*S));
+ const hEnd=hookAbs+HOOK_DUR;
+ let fc='',base;
+ if(special){
+  base='[0:v]trim=start='+hookAbs+':end='+hEnd+',setpts=PTS-STARTPTS'+rotChain+cropChain+',scale='+W+':-2,crop='+W+':'+H+':0:(ih-'+H+')/2';
+ }else if(ed.aspect==='Original'){
+  base='[0:v]trim=start='+hookAbs+':end='+hEnd+',setpts=PTS-STARTPTS'+(cropF?rotChain+cropChain+',scale='+W+':'+H:',scale='+W+':'+H+rotChain);
+ }else{
+  base='[0:v]split=2[ba][bb];[ba]trim=start='+hookAbs+':end='+hEnd+',setpts=PTS-STARTPTS,scale='+W+':'+H+':force_original_aspect_ratio=increase,crop='+W+':'+H+',gblur=sigma='+blur+'[bg];[bb]trim=start='+hookAbs+':end='+hEnd+',setpts=PTS-STARTPTS,scale='+W+':'+H+':force_original_aspect_ratio=decrease'+rotChain+cropChain+'[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2';
+ }
+ fc=base;
+ if(adjEq)fc+=','+adjEq;
+ fc+='[vin]';let cur='vin';
+ const regs=hookRegionsFor(ed.blurRegions,ed.hookStart||0);
+ regs.forEach((r,ri)=>{
+  const st=(r.start||0),en=(r.end!=null?r.end:HOOK_DUR);
+  const enExpr=":enable='between(t,"+st.toFixed(2)+','+en.toFixed(2)+")'";
+  if(r.shape==='ellipse'){
+   fc+=';[0:v]trim=start='+hookAbs+':end='+hEnd+',setpts=PTS-STARTPTS,scale='+W+':'+H+':force_original_aspect_ratio=decrease'+rotChain+cropChain+',crop=iw*'+r.w+':ih*'+r.h+':iw*'+r.x+':ih*'+r.y+',avgblur=10,format=yuva420p,geq=lum=\'p(X,Y)\':a=\'255*clip((1-hypot((X-W/2)/(W/2),(Y-H/2)/(H/2)))/0.25,0,1)\'[p'+ri+'];['+cur+'][p'+ri+']overlay='+Math.round(r.x*W)+':'+picY+'+'+Math.round(r.y*H)+enExpr+'[v'+ri+']';
+  }else{
+   fc+=';[0:v]trim=start='+hookAbs+':end='+hEnd+',setpts=PTS-STARTPTS,scale='+W+':'+H+':force_original_aspect_ratio=decrease'+rotChain+cropChain+',crop=iw*'+r.w+':ih*'+r.h+':iw*'+r.x+':ih*'+r.y+',avgblur=10[p'+ri+'];['+cur+'][p'+ri+']overlay='+Math.round(r.x*W)+':'+picY+'+'+Math.round(r.y*H)+enExpr+'[v'+ri+']';
+  }
+  cur='v'+ri;
+ });
+ if(ed.borderOn&&ed.borderW>0){fc+=';['+cur+']drawbox=x=0:y=0:w=iw:h=ih:t='+Math.max(1,Math.round(ed.borderW*S))+':color='+ed.borderColor.replace('#','0x')+'@1[vout]'}
+ else fc+=';['+cur+']null[vout]';
+ fc=fc.replace(/;+$/,'');
+ const enc=['-c:v','libx264','-preset','ultrafast','-crf','25','-pix_fmt','yuv420p','-movflags','+faststart'];
+ try{
+  let code=await ffExecP(ff,['-i','in.mp4','-filter_complex',fc+';[0:a]atrim=start='+hookAbs+':end='+hEnd+',asetpts=PTS-STARTPTS[aout]','-map','[vout]','-map','[aout]','-t',String(HOOK_DUR)].concat(enc).concat(['-c:a','aac','-b:a','128k','hk_hook.mp4']),3600000,HOOK_DUR,null);
+  if(code===0)return{audio:true};
+  if(needAudio){
+   code=await ffExecP(ff,['-i','in.mp4','-filter_complex',fc+';anullsrc=channel_layout=stereo:sample_rate=44100,atrim=0:'+HOOK_DUR+',asetpts=PTS-STARTPTS[aout]','-map','[vout]','-map','[aout]','-t',String(HOOK_DUR)].concat(enc).concat(['-c:a','aac','-b:a','128k','hk_hook.mp4']),3600000,HOOK_DUR,null);
+   if(code===0)return{audio:true};
+  }else{
+   code=await ffExecP(ff,['-i','in.mp4','-filter_complex',fc,'-map','[vout]','-t',String(HOOK_DUR)].concat(enc).concat(['hk_hook.mp4']),3600000,HOOK_DUR,null);
+   if(code===0)return{audio:false};
+  }
+  throw new Error('Hook clip ထုတ်ရာ မအောင်မြင်ပါ (ffmpeg exit '+code+')');
+ }finally{try{await ff.deleteFile('in.mp4')}catch(e){}}
+}
+/* ffmpeg engines: render the hook, then join [hook]+[main] with
+   the concat DEMUXER (stream copy first; a re-encode join as the
+   fallback). Any failure THROWS — the export fails loudly rather
+   than delivering a hook-less file. */
+async function joinHookClip(ff,ed,seg,idx,mainBlob,log,segProgs){
+ const hookAbs=seg.start+(ed.hookStart||0);
+ log('🎬 Hook (အစပျိုး) ထည့်နေပါတယ် — '+fmtDur(hookAbs)+' – '+fmtDur(hookAbs+HOOK_DUR)+' (မူရင်း အသံ နဲ့)…');
+ if(segProgs&&segProgs.run)segProgs.run(1,'🎬 Hook ထည့်နေပါတယ်…');
+ const temps=['hk_main.mp4','hk_hook.mp4','hk_list.txt','hk_join.mp4'];
+ try{
+  await ff.writeFile('hk_main.mp4',new Uint8Array(await mainBlob.arrayBuffer()));
+  await exportHookClip(ff,ed,hookAbs,log,ed.audioMode==='voice');
+  const lt="file 'hk_hook.mp4'\nfile 'hk_main.mp4'\n";const u8=new Uint8Array(lt.length);for(let i=0;i<lt.length;i++)u8[i]=lt.charCodeAt(i)&0xff;
+  await ff.writeFile('hk_list.txt',u8);
+  const totS=HOOK_DUR+(seg.end-seg.start)/segSpeedOf(ed);
+  let code=await ffExecP(ff,['-f','concat','-safe','0','-i','hk_list.txt','-c','copy','-movflags','+faststart','hk_join.mp4'],3600000,totS,null);
+  if(code!==0){log('ℹ️ Hook ဆက်ရာ copy မရပါ — ပြန် encode ပြီး ဆက်နေပါတယ်…');code=await ffExecP(ff,['-f','concat','-safe','0','-i','hk_list.txt','-c:v','libx264','-preset','ultrafast','-crf','25','-pix_fmt','yuv420p','-c:a','aac','-b:a','128k','-movflags','+faststart','hk_join.mp4'],3600000,totS,null)}
+  if(code!==0)throw new Error('Hook ဆက်ရာ မအောင်မြင်ပါ (ffmpeg exit '+code+') — Hook မပါဘဲ မထုတ်ပါ; အခြား Export engine ပြောင်း ကြိုးစားပါ');
+  const data=await ff.readFile('hk_join.mp4');
+  log('🎬 Hook ပါပြီး — စုစုပေါင်း အရှည် '+fmtDur(totS)+' ခန့် (Hook ၅ စက္ကန့် အပါ)');
+  return new Blob([data.buffer||data],{type:'video/mp4'});
+ }finally{for(const nm of temps){try{await ff.deleteFile(nm)}catch(e){}}}
+}
+/* Hardware engine audio: the hook's mix is the source window with
+   ORIGINAL audio (forced original mode, speed 1, no fades, via
+   hwMixedAudio); the muxed audio is [hook mix]+[main mix] joined
+   with the concat demuxer, with a generated silence standing in
+   for whichever side has no audio so both parts stay aligned. */
+async function hwSilenceM4a(ff,name,dur){
+ const code=await ffExecP(ff,['-f','lavfi','-i','anullsrc=channel_layout=stereo:sample_rate=44100','-t',Math.max(0.1,dur).toFixed(2),'-c:a','aac','-b:a','128k',name],3600000,dur,null);
+ if(code!==0)throw new Error('Hook အသံ (တိတ်ဆိတ်) ထုတ်ရာ မအောင်မြင်ပါ (ffmpeg exit '+code+')');
+ return name;
+}
+async function hwConcatAudio(ff,idx,files){
+ const list='hw_hlist'+idx+'.txt',out='hw_mixfull'+idx+'.m4a';
+ const txt=files.map(f=>"file '"+f+"'").join('\n')+'\n';const u8=new Uint8Array(txt.length);for(let i=0;i<txt.length;i++)u8[i]=txt.charCodeAt(i)&0xff;
+ await ff.writeFile(list,u8);
+ let code=await ffExecP(ff,['-f','concat','-safe','0','-i',list,'-c','copy',out],3600000,0,null);
+ if(code!==0)code=await ffExecP(ff,['-f','concat','-safe','0','-i',list,'-c:a','aac','-b:a','128k',out],3600000,0,null);
+ if(code!==0)throw new Error('Hook အသံ ဆက်ရာ မအောင်မြင်ပါ (ffmpeg exit '+code+')');
+ return out;
+}
+async function hwHookAudio(ff,idx,hookMix,mixFile,mainDur){
+ if(hookMix&&mixFile)return hwConcatAudio(ff,idx,[hookMix,mixFile]);
+ if(!hookMix&&mixFile){const sil=await hwSilenceM4a(ff,'hw_sil'+idx+'.m4a',HOOK_DUR);return hwConcatAudio(ff,idx,[sil,mixFile])}
+ if(hookMix&&!mixFile){const sil=await hwSilenceM4a(ff,'hw_sil'+idx+'.m4a',Math.max(0.1,mainDur));return hwConcatAudio(ff,idx,[hookMix,sil])}
+ return null;
+}
+
 async function exportOne(ff,ed,seg,idx,total,log,progs){
  /* V220: progress is split — progs.prep(f,stage) covers everything BEFORE
     the encode (input write, voice write, title/subtitle/logo/text PNG
@@ -2487,7 +2948,7 @@ async function exportOne(ff,ed,seg,idx,total,log,progs){
     before the split/scale composition), so the aspect logic, the blur
     fill and every overlay operate on the rotated frame; W/H above
     already come from the rotated geometry (effVideoDims) */
- const rotF=rotFilterOf(ed),rotChain=rotF?','+rotF:'';
+ const rotF=rotFilterOf(ed),cropF=cropFilterOf(ed),rotChain=(rotF?','+rotF:'')+(cropF?','+cropF:''); /* V257 (FIX 6): the crop rides the source chain immediately after Rotate/Flip, before the split/scale composition — identity state reproduces the exact pre-crop chain */
  const spdF=spd!==1?',setpts=PTS/'+spd.toFixed(4):'';
  const special=aspectSpecial916(ed);
  /* V233/V234: picY from the ONE shared geometry (subBlockGeom) — the
@@ -2507,6 +2968,12 @@ async function exportOne(ff,ed,seg,idx,total,log,progs){
  await ff.writeFile('in.mp4',fetchFile?await fetchFile(ed.file):new Uint8Array(await ed.file.arrayBuffer()));prepStep('📥 ဖိုင် ပြင်နေပါတယ်…');
  let voiceArr=null,voiceFile='voice.wav';
  if(ed.audioMode==='voice'){if(ed._cachedVoice){log('✅ အသံ အပိုင်းမှာ ထုတ်ထားသော အသံကို ပြန်သုံးပါတယ်');voiceArr=ed._cachedVoice;voiceFile='voice.'+(ed._cachedVoiceExt||'wav')}else{log('အသံ ထုတ်နေပါတယ်…');const gv=await generateVoiceLines(ed,seg.cues.map(c=>c.text),log,(i,n)=>{if(prep)prep(Math.min(1,(prepN+(n?i/n:1))/Math.max(1,prepItems)),'🎙️ အသံ ထုတ်နေပါတယ်… ('+i+'/'+n+')')});voiceArr=gv.bytes;voiceFile='voice.'+gv.ext}await ff.writeFile(voiceFile,ffCopy(voiceArr))}prepStep('🎙️ အသံ ပြင်နေပါတယ်…');
+ /* V257 (FIX 3): measure the voice stem's peak once and derive the
+    loudness-normalisation prefix for the mix graphs below ('' when
+    the stem is already at the ceiling or cannot be measured — the
+    limiter still rides the branch either way) */
+ let vNormPre='';
+ if(ed.audioMode==='voice'&&voiceArr){try{vNormPre=voiceNormPre(voiceNormGainDb(await voicePeakDbOf(voiceArr)))}catch(e){vNormPre=''}}
  const overlays=[]; /* {file,y} */
  /* V249 (M4, safe part): every temp this segment wrote into the wasm
     FS is deleted when the segment finishes OR fails — previously only
@@ -2595,11 +3062,11 @@ async function exportOne(ff,ed,seg,idx,total,log,progs){
     bounded by the OUTPUT duration, and audio fades ride the mix —
     all three reduce to the pre-V253 chain at 1× / no fade */
  const afadeCh=(fw.fi>0||fw.fo>0)?((fw.fi>0?',afade=t=in:st=0:d='+fw.fi.toFixed(2):'')+(fw.fo>0?',afade=t=out:st='+Math.max(0,durOut-fw.fo).toFixed(2)+':d='+fw.fo.toFixed(2):'')):'';
- const fcMix=fc+';[0:a]atrim=start='+seg.start+':end='+seg.end+',asetpts=PTS-STARTPTS'+(spd!==1?','+atempoChain(spd):'')+',volume='+bgmF.toFixed(3)+'[abg];[1:a]volume='+voiceF.toFixed(3)+',apad,atrim=0:'+durOut.toFixed(2)+'[avc];[abg][avc]amix=inputs=2:duration=first:dropout_transition=0'+afadeCh+'[aout]';
+ const fcMix=fc+';[0:a]atrim=start='+seg.start+':end='+seg.end+',asetpts=PTS-STARTPTS'+(spd!==1?','+atempoChain(spd):'')+',volume='+bgmF.toFixed(3)+'[abg];[1:a]'+vNormPre+'volume='+voiceF.toFixed(3)+','+VOICE_LIMIT_CH+',apad,atrim=0:'+durOut.toFixed(2)+'[avc];[abg][avc]amix=inputs=2:duration=first:dropout_transition=0'+afadeCh+'[aout]';
  function buildArgs(mix,copyA){
   const a=['-i','in.mp4'];if(ed.audioMode==='voice')a.push('-i',voiceFile);overlays.forEach(ov=>a.push('-loop','1','-t',durOut.toFixed(2),'-i',ov.file));
   a.push('-filter_complex',mix?fcMix:fc);
-  if(ed.audioMode==='voice'){if(mix)a.push('-map','[vout]','-map','[aout]');else a.push('-map','[vout]','-map','1:a','-af','volume='+voiceF.toFixed(3)+',apad,atrim=0:'+durOut.toFixed(2)+afadeCh)}
+  if(ed.audioMode==='voice'){if(mix)a.push('-map','[vout]','-map','[aout]');else a.push('-map','[vout]','-map','1:a','-af',vNormPre+'volume='+voiceF.toFixed(3)+','+VOICE_LIMIT_CH+',apad,atrim=0:'+durOut.toFixed(2)+afadeCh)}
   else{a.push('-map','[vout]','-map','0:a?');if(!copyA)a.push('-af','atrim=0:'+durOut.toFixed(2)+',asetpts=PTS-STARTPTS'+(spd!==1?','+atempoChain(spd):'')+afadeCh)}
   /* V218 speed plumbing (look + geometry + mix UNCHANGED — the filter
      graph above is byte-identical to before): x264 preset veryfast ->
@@ -2686,7 +3153,7 @@ function hwFramePlan(ed,seg,G){
  /* V255: the plan composes the ROTATED frame — bg/fg rects derive
     from the effective (post-rotation) dims, exactly like exportOne's
     graph, and the draw step applies the rotation itself */
- const vd=effVideoDims(ed);const vw=vd.w,vh=vd.h;
+ const vd=effSrcDims(ed);const vw=vd.w,vh=vd.h; /* V257 (FIX 6): the plan composes the CROPPED frame; the draw step maps the crop back to raw-source pixels (cropSrcRect in the plan) */
  const special=aspectSpecial916(ed);
  /* V233/V234: picY/subY/blockH from the ONE shared geometry
     (subBlockGeom), identical to exportOne and to the stage overlay.
@@ -2713,7 +3180,7 @@ function hwFramePlan(ed,seg,G){
     the compositor's t is media-relative, so an output-second fade
     spans fade×spd media seconds */
  const spdP=segSpeedOf(ed),fwP=fadeWinOf(ed,dur/spdP);
- return{W:W,H:H,S:S,special:special,picY:picY,subY:subY,blockH:SG.blockH,blurPx:blurPx,bg:bg,fg:fg,regions:regions,border:{on:!!ed.borderOn,w:bI,color:String((ed&&ed.borderColor)||'#FFE92E')},dur:dur,adj:adjCssOf(ed),rot:((ed&&ed.rot)||0),flipH:!!(ed&&ed.flipH),fadeInM:fwP.fi*spdP,fadeOutM:fwP.fo*spdP};
+ return{W:W,H:H,S:S,special:special,picY:picY,subY:subY,blockH:SG.blockH,blurPx:blurPx,bg:bg,fg:fg,regions:regions,border:{on:!!ed.borderOn,w:bI,color:String((ed&&ed.borderColor)||'#FFE92E')},dur:dur,adj:adjCssOf(ed),rot:((ed&&ed.rot)||0),flipH:!!(ed&&ed.flipH),crop:cropIsIdentity(ed&&ed.crop)?null:normCrop(ed&&ed.crop),cropSrc:cropSrcRect(ed),fadeInM:fwP.fi*spdP,fadeOutM:fwP.fo*spdP};
 }
 /* V255: draw `src` so its ROTATED+mirrored picture exactly fills the
    rect centred at (cx,cy) sized w×h — the canvas twin of the stage
@@ -2726,6 +3193,23 @@ function hwDrawSrcRot(c,src,cx,cy,w,h,rot,flip){
  c.save();c.translate(cx,cy);c.rotate(rot*Math.PI/180);if(flip)c.scale(-1,1);
  const odd=(rot%180)!==0,dw=odd?h:w,dh=odd?w:h;
  c.drawImage(src,-dw/2,-dh/2,dw,dh);c.restore();
+}
+/* V257 (FIX 6): the crop-aware twin of hwDrawSrcRot — draws only
+   the crop window's RAW-source rect (plan.cropSrc: the rotated-
+   frame crop mapped back through the quarter turn + mirror) into
+   the same transformed destination, so the composed frame matches
+   the ffmpeg crop-after-rotate chain pixel for pixel. The local
+   destination is the same fraction of the full-frame rect, because
+   drawImage's source->dest map is affine. No crop = the exact old
+   draw. */
+function hwDrawSrcCrop(c,src,cx,cy,w,h,plan){
+ if(!plan||!plan.crop){hwDrawSrcRot(c,src,cx,cy,w,h,plan?plan.rot:0,plan?plan.flipH:false);return}
+ const sr=plan.cropSrc,sw=(src&&(src.videoWidth||src.width))||0,sh=(src&&(src.videoHeight||src.height))||0;
+ if(!sw||!sh){hwDrawSrcRot(c,src,cx,cy,w,h,plan.rot,plan.flipH);return}
+ c.save();c.translate(cx,cy);if(plan.rot)c.rotate(plan.rot*Math.PI/180);if(plan.flipH)c.scale(-1,1);
+ const odd=(plan.rot%180)!==0,dw=odd?h:w,dh=odd?w:h;
+ try{c.drawImage(src,sr.x*sw,sr.y*sh,Math.max(1,sr.w*sw),Math.max(1,sr.h*sh),-dw/2+sr.x*dw,-dh/2+sr.y*dh,sr.w*dw,sr.h*dh)}catch(e){}
+ c.restore();
 }
 /* draw ONE composited frame in the ffmpeg graph's z-order: blurred
    cover fill -> main picture -> blur/mosaic regions -> title ->
@@ -2748,13 +3232,13 @@ function hwDrawFrame(ctx,cv,plan,src,layers,t){
   let sm=plan._bgSm||null,sx=null;
   if(!sm){try{sm=document.createElement('canvas');plan._bgSm=sm}catch(err){sm=null}}
   if(sm){const sw=Math.max(2,Math.round(bw/16)),sh=Math.max(2,Math.round(bh/16));if(sm.width!==sw)sm.width=sw;if(sm.height!==sh)sm.height=sh;try{sx=sm.getContext('2d')}catch(err){sx=null}}
-  if(sx){if('filter' in sx)sx.filter='blur('+Math.max(0.5,e/16)+'px) brightness(0.9) saturate(0.85)'+(plan.adj?' '+plan.adj:'');hwDrawSrcRot(sx,src,sm.width/2,sm.height/2,sm.width,sm.height,plan.rot,plan.flipH);ctx.drawImage(sm,b.x-e,b.y-e,bw,bh)}
-  else{ctx.save();if('filter' in ctx)ctx.filter='blur('+e+'px) brightness(0.9) saturate(0.85)'+(plan.adj?' '+plan.adj:'');hwDrawSrcRot(ctx,src,b.x-e+bw/2,b.y-e+bh/2,bw,bh,plan.rot,plan.flipH);ctx.restore()}
+  if(sx){if('filter' in sx)sx.filter='blur('+Math.max(0.5,e/16)+'px) brightness(0.9) saturate(0.85)'+(plan.adj?' '+plan.adj:'');hwDrawSrcCrop(sx,src,sm.width/2,sm.height/2,sm.width,sm.height,plan);ctx.drawImage(sm,b.x-e,b.y-e,bw,bh)}
+  else{ctx.save();if('filter' in ctx)ctx.filter='blur('+e+'px) brightness(0.9) saturate(0.85)'+(plan.adj?' '+plan.adj:'');hwDrawSrcCrop(ctx,src,b.x-e+bw/2,b.y-e+bh/2,bw,bh,plan);ctx.restore()}
  }
  /* V253: Adjust on the main picture — the ctx.filter twin of
     exportOne's eq step (overlays drawn after stay unfiltered) */
- if(plan.adj&&'filter' in ctx){ctx.save();ctx.filter=plan.adj;hwDrawSrcRot(ctx,src,plan.fg.x+plan.fg.w/2,plan.fg.y+plan.fg.h/2,plan.fg.w,plan.fg.h,plan.rot,plan.flipH);ctx.restore()}
- else hwDrawSrcRot(ctx,src,plan.fg.x+plan.fg.w/2,plan.fg.y+plan.fg.h/2,plan.fg.w,plan.fg.h,plan.rot,plan.flipH);
+ if(plan.adj&&'filter' in ctx){ctx.save();ctx.filter=plan.adj;hwDrawSrcCrop(ctx,src,plan.fg.x+plan.fg.w/2,plan.fg.y+plan.fg.h/2,plan.fg.w,plan.fg.h,plan);ctx.restore()}
+ else hwDrawSrcCrop(ctx,src,plan.fg.x+plan.fg.w/2,plan.fg.y+plan.fg.h/2,plan.fg.w,plan.fg.h,plan);
  for(const r of plan.regions){
   if(r.timed&&(t<r.from||t>r.to))continue;
   const tmp=document.createElement('canvas');tmp.width=r.w;tmp.height=r.h;const tx=tmp.getContext('2d');if(!tx)continue;
@@ -3273,9 +3757,14 @@ async function hwMixedAudio(ff,ed,seg,voiceFile,idx,onMix){
  const out='hw_mix'+idx+'.m4a';
  if(ed.audioMode==='voice'){
   const wantMix=bgmF>0;
-  const fcMixA='[0:a]atrim=start='+seg.start+':end='+seg.end+',asetpts=PTS-STARTPTS'+(spd!==1?','+atempoChain(spd):'')+',volume='+bgmF.toFixed(3)+'[abg];[1:a]volume='+voiceF.toFixed(3)+',apad,atrim=0:'+durOut.toFixed(2)+'[avc];[abg][avc]amix=inputs=2:duration=first:dropout_transition=0'+afadeCh+'[aout]';
+  /* V257 (FIX 3): the same loudness normalisation as exportOne —
+     the peak is measured on the very voice file this mix consumes
+     (read back from MEMFS; a failed read just leaves the gain at 0
+     and the limiter still applies) */
+  let vNormPre='';try{const vb=await ff.readFile(voiceFile);if(vb&&vb.length)vNormPre=voiceNormPre(voiceNormGainDb(await voicePeakDbOf(vb)))}catch(e){}
+  const fcMixA='[0:a]atrim=start='+seg.start+':end='+seg.end+',asetpts=PTS-STARTPTS'+(spd!==1?','+atempoChain(spd):'')+',volume='+bgmF.toFixed(3)+'[abg];[1:a]'+vNormPre+'volume='+voiceF.toFixed(3)+','+VOICE_LIMIT_CH+',apad,atrim=0:'+durOut.toFixed(2)+'[avc];[abg][avc]amix=inputs=2:duration=first:dropout_transition=0'+afadeCh+'[aout]';
   const args=mix=>mix?['-i','in.mp4','-i',voiceFile,'-filter_complex',fcMixA,'-map','[aout]','-c:a','aac','-b:a','128k','-t',durOut.toFixed(2),out]
-                     :['-i',voiceFile,'-af','volume='+voiceF.toFixed(3)+',apad,atrim=0:'+durOut.toFixed(2)+afadeCh,'-c:a','aac','-b:a','128k',out];
+                     :['-i',voiceFile,'-af',vNormPre+'volume='+voiceF.toFixed(3)+','+VOICE_LIMIT_CH+',apad,atrim=0:'+durOut.toFixed(2)+afadeCh,'-c:a','aac','-b:a','128k',out];
   let code=await ffExecP(ff,args(wantMix),3600000,durOut,onMix||null);
   if(code!==0&&wantMix){code=await ffExecP(ff,args(false),3600000,durOut,onMix||null)}
   if(code!==0)throw new Error('ffmpeg exit code '+code+' (အသံ ရောရာတွင်)');
@@ -3300,6 +3789,19 @@ async function exportOneHw(ff,ed,seg,idx,total,log,progs){
  const dur=seg.end-seg.start;
  const G=exportGeom(ed);const W=G.W,H=G.H,S=W/720;
  const plan=hwFramePlan(ed,seg,G);
+ /* V256: Auto Hook — when active, the hook window (source segment
+    at seg.start + ed.hookStart, 5 s, ORIGINAL audio) is planned
+    through the SAME frame compositor: base frame + blur regions
+    (rebased to the window) + border + Adjust + Rotate, with NO
+    fades and NO overlay layers. Its frames are encoded FIRST and
+    the mux stamps the combined frame sequence over hook+main
+    durations — that frame-index timing IS the timestamp offset;
+    the main segment's own frame timing is untouched. */
+ const hookOn=hookActiveFor(ed);
+ const hookSeg=hookOn?{start:seg.start+ed.hookStart,end:seg.start+ed.hookStart+HOOK_DUR,cues:[]}:null;
+ const hookLayers={title:null,subs:[],logo:null,text:null,pip:null,texts:[]};
+ let hookPlan=null;
+ if(hookOn){const edH=Object.assign({},ed,{fadeIn:0,fadeOut:0,blurRegions:hookRegionsFor(ed.blurRegions,ed.hookStart)});hookPlan=hwFramePlan(edH,hookSeg,G)}
  const useSub=$('#'+ed.p+'-subTgl').classList.contains('on')&&seg.cues.length;
  const incT=!ed._expOpts||ed._expOpts.incTitle!==false,incL=!ed._expOpts||ed._expOpts.incLogo!==false;
  const useTitle=incT&&$('#'+ed.p+'-titleTgl').classList.contains('on')&&($('#'+ed.p+'-title').value||'').trim();
@@ -3312,7 +3814,7 @@ async function exportOneHw(ff,ed,seg,idx,total,log,progs){
     H.264 stream, mixed audio, output) are deleted when the segment
     finishes OR fails — previously only in.mp4 was removed. voiceFile
     / mixFile are read at call time (both are set by then). */
- const fsCleanHw=async()=>{for(const nm of['in.mp4','out'+idx+'.mp4',voiceFile,'hw_v'+idx+'.h264',mixFile]){if(nm)try{await ff.deleteFile(nm)}catch(e){}}};
+ const fsCleanHw=async()=>{for(const nm of['in.mp4','out'+idx+'.mp4',voiceFile,'hw_v'+idx+'.h264',mixFile,'hw_mix'+idx+'h.m4a','hw_mixfull'+idx+'.m4a','hw_sil'+idx+'.m4a','hw_hlist'+idx+'.txt']){if(nm)try{await ff.deleteFile(nm)}catch(e){}}};
  await ff.writeFile('in.mp4',fetchFile?await fetchFile(ed.file):new Uint8Array(await ed.file.arrayBuffer()));prepStep('📥 ဖိုင် ပြင်နေပါတယ်…');
  let voiceFile='voice.wav';
  if(ed.audioMode==='voice'){let voiceArr;if(ed._cachedVoice){log('✅ အသံ အပိုင်းမှာ ထုတ်ထားသော အသံကို ပြန်သုံးပါတယ်');voiceArr=ed._cachedVoice;voiceFile='voice.'+(ed._cachedVoiceExt||'wav')}else{log('အသံ ထုတ်နေပါတယ်…');const gv=await generateVoiceLines(ed,seg.cues.map(c=>c.text),log,(i,n)=>{if(prep)prep(Math.min(1,(prepN+(n?i/n:1))/Math.max(1,prepItems)),'🎙️ အသံ ထုတ်နေပါတယ်… ('+i+'/'+n+')')});voiceArr=gv.bytes;voiceFile='voice.'+gv.ext}await ff.writeFile(voiceFile,ffCopy(voiceArr))}prepStep('🎙️ အသံ ပြင်နေပါတယ်…');
@@ -3339,6 +3841,18 @@ async function exportOneHw(ff,ed,seg,idx,total,log,progs){
  const mixFile=await hwMixedAudio(ff,ed,seg,voiceFile,idx,f=>{if(prep)prep(Math.min(1,(prepN+f)/Math.max(1,prepItems)),'🎙️ အသံ ရောနေပါတယ်…')});
  expPhaseLog(log,'အသံ ရောချိန်',_tMix);
  if(!mixFile)log('ℹ️ အသံ မပါသော video — အသံ မပါဘဲ ထုတ်ပါတယ်');
+ /* V256: hook audio — the source window with ORIGINAL audio
+    (hwMixedAudio in forced original mode: speed 1, no fades),
+    joined ahead of the main mix with the concat demuxer; a
+    generated silence stands in for whichever side has no audio so
+    the two parts stay aligned with the prepended frames */
+ let finalMix=mixFile;
+ if(hookOn){
+  const edA=Object.assign({},ed,{audioMode:'original',segSpeed:1,fadeIn:0,fadeOut:0});
+  const hookMix=await hwMixedAudio(ff,edA,hookSeg,voiceFile,idx+'h',null);
+  finalMix=await hwHookAudio(ff,idx,hookMix,mixFile,dur/segSpeedOf(ed));
+  log('🎬 Hook အသံ '+(finalMix?'ပြင်ပြီးပါပြီ (မူရင်း အသံ)':'မပါ (အသံ မရှိသော video)'));
+ }
  prepStep('🎙️ အသံ ပြင်နေပါတယ်…');
  log('Video ထုတ်နေပါတယ် ('+(idx+1)+'/'+total+') — '+dur.toFixed(1)+' စက္ကန့် (Hardware)…');
  if(runP)runP(0,'🎬 Hardware နဲ့ ထုတ်နေပါတယ် ('+(idx+1)+'/'+total+')');
@@ -3349,19 +3863,36 @@ async function exportOneHw(ff,ed,seg,idx,total,log,progs){
  const hwPaceRt=!!(ed._expOpts&&ed._expOpts.hwPace==='rt');
  if(hwPaceRt)log('▶️ Real-time နည်းနဲ့ ထုတ်နေပါတယ် (video အရှည် အတိုင်း ကြာပါမည်)');
  const _tEnc=expNow();
- const enc=hwPaceRt?await hwEncodeSegmentRt(ed,seg,plan,layers,runP?(f,info)=>runP(f*0.9,info):null)
-                   :await hwEncodeSegmentFast(ed,seg,plan,layers,runP?(f,info)=>runP(f*0.9,info):null,log);
+ /* V256: with Hook ON the hook's frames are encoded FIRST (same
+    compositor, hookLayers = no overlays), then the main timeline;
+    both pumps emit the same 30 fps grid, so the Annex-B streams
+    concatenate directly and the mux below stamps the COMBINED
+    frame count over hook + main output durations. */
+ const durOutMain=dur/segSpeedOf(ed);
+ const hookShare=hookOn?HOOK_DUR/(HOOK_DUR+durOutMain):0;
+ let hookEnc=null;
+ if(hookOn){
+  log('🎬 Hook (အစပျိုး) ထုတ်နေပါတယ် — ၅ စက္ကန့်…');
+  const hProg=runP?(f,info)=>runP(f*0.9*hookShare,info):null;
+  hookEnc=hwPaceRt?await hwEncodeSegmentRt(ed,hookSeg,hookPlan,hookLayers,hProg)
+                  :await hwEncodeSegmentFast(ed,hookSeg,hookPlan,hookLayers,hProg,log);
+ }
+ const mProg=runP?(f,info)=>runP((hookShare+f*(1-hookShare))*0.9,info):null;
+ const enc=hwPaceRt?await hwEncodeSegmentRt(ed,seg,plan,layers,mProg)
+                   :await hwEncodeSegmentFast(ed,seg,plan,layers,mProg,log);
  expPhaseLog(log,'Encode ချိန်',_tEnc);
- await ff.writeFile('hw_v'+idx+'.h264',enc.stream);
+ await ff.writeFile('hw_v'+idx+'.h264',hookEnc?hwConcat([hookEnc.stream,enc.stream]):enc.stream);
  /* V253: segment speed on this engine = the mux frame rate. The
     pumps composite the media-time grid exactly as before (subtitle /
     blur / fade windows stay media-true inside the frames); stamping
     the stream at frames ÷ OUTPUT duration plays that grid back at
     the segment speed, so the picture retimes without touching a
-    single pump timestamp. At 1× this is the old value exactly. */
- const fpsStr=(enc.frames/Math.max(0.01,dur/segSpeedOf(ed))).toFixed(3);
+    single pump timestamp. At 1× this is the old value exactly.
+    V256: with a hook, the numerator/denominator both grow by the
+    hook's frames / 5 s, so the main part keeps its exact rate. */
+ const fpsStr=(((hookEnc?hookEnc.frames:0)+enc.frames)/Math.max(0.01,(hookOn?HOOK_DUR:0)+durOutMain)).toFixed(3);
  const _tMux=expNow();
- const code=await ffExecP(ff,hwMuxArgs(fpsStr,mixFile,idx),3600000,dur,runP?(f,info)=>runP(0.9+0.1*f,info):null);
+ const code=await ffExecP(ff,hwMuxArgs(fpsStr,finalMix,idx),3600000,dur,runP?(f,info)=>runP(0.9+0.1*f,info):null);
  expPhaseLog(log,'Mux ချိန်',_tMux);
  if(code!==0){await fsCleanHw();throw new Error('ffmpeg exit code '+code+' (mux) — အသေးစိတ်ကို log တွင် ကြည့်ပါ')}
  if(runP)runP(1);
@@ -3391,6 +3922,12 @@ async function exportEditor(ed){
  }
  const dur=end-start;
  if(dur>600)showNotice('⚠️ ဖြတ်ထားသော အပိုင်း 10 မိနစ်ထက် ရှည်နေပါတယ် ('+fmtDur(dur)+') — browser ထဲတွင် အလွန် ကြာနိုင် / memory မလောက်နိုင် ပါတယ်။ ဆက်လုပ်ပါမည်။','info');
+ /* V256: Hook ON without a current analysis never reaches the
+    chooser — the export would otherwise silently lack the hook.
+    The Trim sheet (where the Hook section lives) is opened so the
+    user can run the analysis right there. */
+ if(ed.hookBusy){showNotice('⚠️ Hook ရှာနေဆဲ ဖြစ်ပါတယ် — ပြီးမှ Export လုပ်ပါ','err');return}
+ if(ed.hookOn&&!hookActiveFor(ed)){showNotice('⚠️ '+hookStateFor(ed).msg,'err');if(window.__recapOpenTrimHook)window.__recapOpenTrimHook();return}
  /* record source dims */
  const v=E('video');ed.videoW=v.videoWidth||1280;ed.videoH=v.videoHeight||720;
  /* V221: validation passed — open the Export CHOOSER (engine /
@@ -3403,6 +3940,11 @@ async function exportEditor(ed){
 }
 async function runExport(ed){
  if(ed.busy)return;const p=ed.p,E=id=>$('#'+p+'-'+id);
+ /* V256: Hook ON but no current analysis (or an analysis is still
+    running) blocks HERE too — runExport is also reached without the
+    chooser, and a hook-less export must never slip through */
+ if(ed.hookBusy){showNotice('⚠️ Hook ရှာနေဆဲ ဖြစ်ပါတယ် — ပြီးမှ Export လုပ်ပါ','err');return}
+ if(ed.hookOn&&!hookActiveFor(ed)){showNotice('⚠️ '+hookStateFor(ed).msg,'err');return}
  const start=parseFloat(E('start').value),end=parseFloat(E('end').value);
  const lines=(E('subs').value||'').split('\n').map(s=>s.trim()).filter(Boolean);
  const dur=end-start;
@@ -3437,8 +3979,10 @@ async function runExport(ed){
     V220: the % is now REAL across the WHOLE pipeline, not just the
     ffmpeg runs. Progress is tracked in abstract UNITS with a phase
     plan: ffmpeg load = 2 units (no events exist — creep-covered);
-    export-triggered voice generation = 3 units per line, cap 30 (added
-    when it actually runs, like voiceW below); the voice speed-render
+    export-triggered voice generation = 3 units per line, cap 180 (added
+    when it actually runs, like voiceW below; V257: the old cap of 30
+    weighted a 113-line generation as ~5% of a 353 s export, so the bar
+    sat at 5% for the whole voice stage — user report 2026-11-16); the voice speed-render
     keeps its resulting-seconds weight; each segment = a prep share for
     the PNG/input work (8% of its seconds, clamped to 1..6 units,
     advanced per finished item inside exportOne) + its trim seconds for
@@ -3458,6 +4002,7 @@ async function runExport(ed){
  const LOAD_W=2,FIN_W=1;
  const prepWOf=sg=>Math.max(1,Math.min(6,0.08*Math.max(1,sg.end-sg.start)));
  let expTotal=LOAD_W+FIN_W+segments.reduce((a,sg)=>a+prepWOf(sg)+(sg.end-sg.start),0);
+ if(hookActiveFor(ed))expTotal+=7*segments.length; /* V256: hook render + join weight per segment */
  const expS={pos:0,ceil:0,fracMax:0,lastReal:Date.now(),done:false};
  const expRender=()=>{
   const fr=expS.done?1:Math.min(0.995,expS.pos/Math.max(1,expTotal));
@@ -3514,7 +4059,7 @@ async function runExport(ed){
    let vcRegen=false;
    let pristine,pext;
    if(vc){pristine=vc.bytes;pext=vc.ext;log('✅ အသံ အပိုင်းမှာ ထုတ်ထားသော အသံကို ပြန်သုံးပါတယ်')}
-   else{vcRegen=true;log('အသံ ထုတ်နေပါတယ်…');GEN_W=Math.min(30,3*Math.max(1,canon.length));expTotal+=GEN_W;expCeil(LOAD_W+GEN_W,'🎙️ အသံ ထုတ်နေပါတယ်…');const gv=await generateVoiceLines(ed,canon,log,(i,n)=>expSet(LOAD_W+GEN_W*(n?i/n:1),'🎙️ အသံ ထုတ်နေပါတယ်… ('+i+'/'+n+')'));pristine=gv.bytes;pext=gv.ext;vc={asm:VOICE_ASM,text:lines.join(' '),lines:canon.slice(),linesSig:canon.join('\n'),engine:ed.ttsEngine,voice:vid,bytes:pristine,ext:pext,genSpeed:genSpeedFactor(p),chunkDurs:gv.chunkDurs,pause:gv.pause||0,dur:0};ed.voiceCache=vc}
+   else{vcRegen=true;log('အသံ ထုတ်နေပါတယ်…');GEN_W=Math.min(180,3*Math.max(1,canon.length));expTotal+=GEN_W;expCeil(LOAD_W+GEN_W,'🎙️ အသံ ထုတ်နေပါတယ်…');const gv=await generateVoiceLines(ed,canon,log,(i,n)=>expSet(LOAD_W+GEN_W*(n?i/n:1),'🎙️ အသံ ထုတ်နေပါတယ်… ('+i+'/'+n+')'));pristine=gv.bytes;pext=gv.ext;vc={asm:VOICE_ASM,text:lines.join(' '),lines:canon.slice(),linesSig:canon.join('\n'),engine:ed.ttsEngine,voice:vid,bytes:pristine,ext:pext,genSpeed:genSpeedFactor(p),chunkDurs:gv.chunkDurs,pause:gv.pause||0,dur:0};ed.voiceCache=vc}
    if(!vc.dur)vc.dur=(vc.chunkDurs&&vc.chunkDurs.length)?vc.chunkDurs.reduce((a,b)=>a+b,0)+(vc.pause||0)*Math.max(0,vc.chunkDurs.length-1):await probeAudioDur(pristine,pext);
    if(vcRegen){const fitMsg=await autoFitVoice(ed,dur);if(fitMsg)log(fitMsg)} /* V238: a regenerated voice is fitted like a Voice Create one */
    const eff=effSpeedOf(ed),effDur=vc.dur?vc.dur/eff:0;
@@ -3546,6 +4091,12 @@ async function runExport(ed){
     try{blob=await exportOneHw(ff,ed,segments[i],i,segments.length,log,segProgs)}
     catch(he){if(!(he&&he.cancelled))log('⚠️ Hardware engine မအောင်မြင်ပါ — Export setup မှာ ⚡ Multi-thread / 🎬 ပုံမှန် engine ပြောင်း ကြိုးစားပါ');throw he}
    }else blob=await exportOne(ff,ed,segments[i],i,segments.length,log,segProgs);
+   /* V256: ffmpeg engines prepend the hook as a separate render
+      joined by the concat demuxer; the Hardware engine already
+      contains it (encoded first inside exportOneHw). A join failure
+      throws — the whole export fails instead of delivering a
+      hook-less file. */
+   if(hookActiveFor(ed)&&!(ed._expOpts&&ed._expOpts.engine==='hw'))blob=await joinHookClip(ff,ed,segments[i],i,blob,log,segProgs);
    segBase+=pwI+segDurI;
    const name=baseName+(segments.length>1?'_part'+(i+1):'')+'.mp4';
    const segSrt=segments[i].cues.length?buildSRT(segments[i].cues,segments[i].start,segments[i].end):'';try{await idbAdd({name,date:Date.now(),size:blob.size,blob,srt:segSrt})}catch(e){log('⚠️ နောက်ခံ သိမ်းဆည်းမှု မအောင်မြင်ပါ — ဒေါင်း link မှ ယူပါ')}made.push({name,blob});log('✅ '+name+' — '+fmtSize(blob.size))}
@@ -4781,7 +5332,7 @@ if(undoBtn)undoBtn.onclick=()=>{
    controls; blurOn/blurFull are region-owned views (region objects
    carry their own state) and the expInc* toggles are export-session
    state, so those are not restored as toggles either. */
-const PROJ_ED_FIELDS=['aspect','blur','audioMode','voice','ttsEngine','edgeVoice','bgmVol','voiceVol','bgmMute','voiceMute','syncDelay','subPosY','subPosCustom','subBand','subColor','subColMain','subColHi','subSize','titleX','titleY','titleSize','titleColor','textOn','textStr','textX','textY','textSize','textColor','logoOn','logoX','logoY','logoSize','logoOpacity','logoSrc','logoText','logoImgData','borderOn','borderW','borderColor','blurRegions','adjSpeed','aiMode','recapStyle','modeChosen','cuesManual','adjB','adjC','adjS','segSpeed','fadeIn','fadeOut','rot','flipH','pipOn','pipPos','pipSize','pipOpacity','pipX','pipY','pipImgData','textStart','textEnd','txt2On','txt2Str','txt2Size','txt2Pos','txt2Start','txt2End','txt2Color','txt3On','txt3Str','txt3Size','txt3Pos','txt3Start','txt3End','txt3Color'];
+const PROJ_ED_FIELDS=['aspect','blur','audioMode','voice','ttsEngine','edgeVoice','bgmVol','voiceVol','bgmMute','voiceMute','syncDelay','subPosY','subPosCustom','subBand','subColor','subColMain','subColHi','subSize','titleX','titleY','titleSize','titleColor','textOn','textStr','textX','textY','textSize','textColor','logoOn','logoX','logoY','logoSize','logoOpacity','logoSrc','logoText','logoImgData','borderOn','borderW','borderColor','blurRegions','adjSpeed','aiMode','recapStyle','modeChosen','cuesManual','adjB','adjC','adjS','segSpeed','fadeIn','fadeOut','rot','flipH','pipOn','pipPos','pipSize','pipOpacity','pipX','pipY','pipImgData','textStart','textEnd','txt2On','txt2Str','txt2Size','txt2Pos','txt2Start','txt2End','txt2Color','txt3On','txt3Str','txt3Size','txt3Pos','txt3Start','txt3End','txt3Color','hookOn','hookStart','hookCands','hookIdx','hookSig','crop','cropAsp'];
 const PROJ_SEL_GROUPS=[['aspectOpts','v'],['styleChips','v'],['subColors','v'],['logoSrcs','v'],['borderColors','c']];
 const PROJ_SKIP_TGL={blurOn:1,blurFull:1,expIncTitle:1,expIncLogo:1};
 function projFormCapture(){
@@ -4853,7 +5404,7 @@ function applyProject(proj){
  if(ed.refresh)ed.refresh();
  if(ed.applyStage)ed.applyStage();
  ed._projApplying=false; /* V249 (m6): restore complete — handlers are live again */
- renderCueList();updateCueCount();updateOverlay(true);renderTimeline();checkVoiceStale();refreshVoiceGate();refreshSummaries();
+ renderCueList();updateCueCount();updateOverlay(true);renderTimeline();checkVoiceStale();refreshVoiceGate();refreshSummaries();updateModeUI(); /* V257 (FIX 5): a restored mode must SHOW as selected (the cards' .sel follows ed.aiMode) and must not leave the "pick one" glow running (updateModeUI ends in syncModeAttn) */
 }
 const projSaveBtn=E('projSave');
 if(projSaveBtn)projSaveBtn.onclick=()=>{
@@ -4972,6 +5523,10 @@ window.__recapProject={collect:projCollect,apply:applyProject,sigMatch:projSigMa
   ed.blurRegions=[];ed.blurSel=null;persistBlur();syncBlurLayer();blurListRender();blurCtlSync();
   const osig=waveSigOf(ed.file);if(osig)peaksIdbDelete(osig);
   ed.wavePeaks=null;ed.waveSig='';ed.waveState='idle';
+  /* V256: the hook analysis belongs to the OLD file — clear it with
+     the rest of the per-file state (the ON preference itself is a
+     SETTING and survives, like the other feature toggles) */
+  ed.hookStart=null;ed.hookCands=[];ed.hookIdx=0;ed.hookSig='';ed._hookRms=null;ed._hookRmsSig='';try{persistOvl()}catch(e){}
   const st0=E('start'),en0=E('end'),rs0=E('rstart'),re0=E('rend');
   if(st0)st0.value=0;if(en0)en0.value=0;if(rs0)rs0.value=0;if(re0)re0.value=0;
   try{vidEl.pause()}catch(e){}
@@ -5281,6 +5836,10 @@ window.__recapProject={collect:projCollect,apply:applyProject,sigMatch:projSigMa
   if(!ed.file){showNotice('⚠️ Video ဖိုင် အရင် လိုပါတယ် — အပေါ်မှာ ရွေးပါ','err');goStep(0);return}
   const r=trimRange();
   if(!(r.end>r.start)){showNotice('⚠️ Trim အချိန် (စချိန်/ဆုံးချိန်) အရင် မှန်အောင် ထားပါ — ✂️ Trim Feature မှာ ပြင်ပါ','err');goStep(0);return}
+  /* V256: the Insert render cannot join a hook — with Hook ON it
+     BLOCKS (never a silent hook-less file); Hook ပါသော video ကို
+     🎬 Export (engine သုံးခုလုံး) မှ ထုတ်နိုင်ပါတယ် */
+  if(ed.hookOn){showNotice('⚠️ Hook ဖွင့်ထားပါတယ် — Hook ပါသော video ကို 🎬 Export မှ ထုတ်ပါ (ဒီ "ထည့်မယ်" မှာ Hook မပါပါ)','err');return}
   if(!c.dur)c.dur=await probeAudioDur(c.bytes,c.ext);
   const info=voiceDurInfo();
   if(info&&info.over){updateVoiceWarn();const w=E('voiceWarn');if(w)w.scrollIntoView({behavior:'smooth',block:'center'});showNotice('⚠️ အသံ ('+info.effDur.toFixed(1)+' စက္ကန့်) က video အပိုင်း ('+info.seg.toFixed(1)+' စက္ကန့်) ထက် ရှည်နေပါတယ် — အသံကို ဖြတ်မပစ်ပါ။ အမြန် စုစုပေါင်း '+info.need.toFixed(2)+'× အထိ တင်ပြီးမှ ပြန်ထည့်ပါ','err');return}
@@ -5298,13 +5857,23 @@ window.__recapProject={collect:projCollect,apply:applyProject,sigMatch:projSigMa
       entirely (previous behaviour). If the source has no audio stream the
       mix graph fails — fall back to voice-only with a note. */
    const _mg2=mixGains(ed);const bgmF=_mg2.bgm,voiceF=_mg2.voice;
+   /* V257 (FIX 3): the same loudness normalisation as the export
+      engines — measured on the effective voice bytes this render
+      is about to mix */
+   let vNormPre='';try{vNormPre=voiceNormPre(voiceNormGainDb(await voicePeakDbOf(rv.bytes)))}catch(e){}
    /* V255: Rotate/Flip applies in the Insert render too (it takes the
       chain cleanly: a [vout] hop in the mix graph, -vf otherwise) —
       identity state keeps the exact pre-V255 args */
    const rotVf=rotFilterOf(ed);
+   /* V257 (FIX 6): the crop rides the same [vout] / -vf hop as
+      Rotate/Flip, immediately after it — the Insert graph takes the
+      combined chain cleanly (it has no aspect composition, so the
+      crop is simply the frame crop) */
+   const cropVf=cropFilterOf(ed);
+   const insVf=(rotVf&&cropVf)?rotVf+','+cropVf:(rotVf||cropVf);
    const insArgs=mix=>mix
-    ?['-ss',r.start.toFixed(2),'-i','ins_in.mp4','-i',vf,'-filter_complex',(rotVf?'[0:v]'+rotVf+'[vout];':'')+'[0:a]atrim=0:'+seg+',asetpts=PTS-STARTPTS,volume='+bgmF.toFixed(3)+'[abg];[1:a]volume='+voiceF.toFixed(3)+',apad,atrim=0:'+seg+'[avc];[abg][avc]amix=inputs=2:duration=first:dropout_transition=0[aout]','-t',seg,'-map',(rotVf?'[vout]':'0:v:0'),'-map','[aout]','-c:v','libx264','-preset','veryfast','-crf','23','-pix_fmt','yuv420p','-c:a','aac','-b:a','128k','-movflags','+faststart','ins_out.mp4']
-    :['-ss',r.start.toFixed(2),'-i','ins_in.mp4','-i',vf,...(rotVf?['-vf',rotVf]:[]),'-t',seg,'-map','0:v:0','-map','1:a:0','-af','volume='+voiceF.toFixed(3)+',apad,atrim=0:'+seg,'-c:v','libx264','-preset','veryfast','-crf','23','-pix_fmt','yuv420p','-c:a','aac','-b:a','128k','-movflags','+faststart','ins_out.mp4'];
+    ?['-ss',r.start.toFixed(2),'-i','ins_in.mp4','-i',vf,'-filter_complex',(insVf?'[0:v]'+insVf+'[vout];':'')+'[0:a]atrim=0:'+seg+',asetpts=PTS-STARTPTS,volume='+bgmF.toFixed(3)+'[abg];[1:a]'+vNormPre+'volume='+voiceF.toFixed(3)+','+VOICE_LIMIT_CH+',apad,atrim=0:'+seg+'[avc];[abg][avc]amix=inputs=2:duration=first:dropout_transition=0[aout]','-t',seg,'-map',(insVf?'[vout]':'0:v:0'),'-map','[aout]','-c:v','libx264','-preset','veryfast','-crf','23','-pix_fmt','yuv420p','-c:a','aac','-b:a','128k','-movflags','+faststart','ins_out.mp4']
+    :['-ss',r.start.toFixed(2),'-i','ins_in.mp4','-i',vf,...(insVf?['-vf',insVf]:[]),'-t',seg,'-map','0:v:0','-map','1:a:0','-af',vNormPre+'volume='+voiceF.toFixed(3)+','+VOICE_LIMIT_CH+',apad,atrim=0:'+seg,'-c:v','libx264','-preset','veryfast','-crf','23','-pix_fmt','yuv420p','-c:a','aac','-b:a','128k','-movflags','+faststart','ins_out.mp4'];
    let code=await ff.exec(insArgs(bgmF>0),3600000);
    if(code!==0&&bgmF>0){st.textContent='ℹ️ မူရင်းအသံ ရောမရပါ (အသံ မပါသော video ဖြစ်နိုင်ပါတယ်) — voice သီးသန့် ပြန်ထည့်နေပါတယ်…';code=await ff.exec(insArgs(false),3600000)}
    if(code!==0)throw new Error('ffmpeg exit code '+code);
@@ -5481,6 +6050,16 @@ window.__recapProject={collect:projCollect,apply:applyProject,sigMatch:projSigMa
  ed.adjB=(typeof SETTINGS.adjB==='number')?SETTINGS.adjB:100;ed.adjC=(typeof SETTINGS.adjC==='number')?SETTINGS.adjC:100;ed.adjS=(typeof SETTINGS.adjS==='number')?SETTINGS.adjS:100;
  /* V255: Rotate/Flip state — quarter turns only, mirror a boolean */
  ed.rot=[0,90,180,270].includes(SETTINGS.rot)?SETTINGS.rot:0;ed.flipH=!!SETTINGS.flipH;
+ /* V257 (FIX 6): Crop state — {x,y,w,h} fractions of the ROTATED
+    frame, sanitised on load; the identity state is stored as null */
+ ed.crop=null;try{const _cr=SETTINGS.crop;if(_cr&&typeof _cr.x==='number'&&typeof _cr.y==='number'&&typeof _cr.w==='number'&&typeof _cr.h==='number'&&_cr.w>0&&_cr.h>0&&!cropIsIdentity(_cr))ed.crop=normCrop(_cr)}catch(e){}
+ ed.cropAsp=['free','orig','9:16','16:9','1:1','4:5'].indexOf(SETTINGS.cropAsp)>=0?SETTINGS.cropAsp:'free';
+ /* V256: Auto Hook state seeds from SETTINGS like every other
+    feature (and round-trips through project files via
+    PROJ_ED_FIELDS). hookStart is SEGMENT-relative seconds; hookSig
+    pins the analysis to file + trim, so a stale pick can never be
+    exported after either changes. */
+ ed.hookOn=!!SETTINGS.hookOn;ed.hookStart=(typeof SETTINGS.hookStart==='number')?SETTINGS.hookStart:null;ed.hookCands=Array.isArray(SETTINGS.hookCands)?SETTINGS.hookCands.filter(v=>typeof v==='number'):[];ed.hookIdx=(typeof SETTINGS.hookIdx==='number'&&SETTINGS.hookIdx>=0)?SETTINGS.hookIdx:0;ed.hookSig=(typeof SETTINGS.hookSig==='string')?SETTINGS.hookSig:'';ed.hookBusy=false;
  ed.segSpeed=(typeof SETTINGS.segSpeed==='number'&&SETTINGS.segSpeed>=0.5&&SETTINGS.segSpeed<=2)?SETTINGS.segSpeed:1;
  ed.fadeIn=(typeof SETTINGS.fadeIn==='number')?SETTINGS.fadeIn:0;ed.fadeOut=(typeof SETTINGS.fadeOut==='number')?SETTINGS.fadeOut:0;
  ed.pipOn=!!SETTINGS.pipOn;ed.pipPos=SETTINGS.pipPos||'br';ed.pipSize=SETTINGS.pipSize||30;ed.pipOpacity=(typeof SETTINGS.pipOpacity==='number'?SETTINGS.pipOpacity:90);ed.pipX=(typeof SETTINGS.pipX==='number'?SETTINGS.pipX:null);ed.pipY=(typeof SETTINGS.pipY==='number'?SETTINGS.pipY:null);ed.pipImgData=null;try{ed.pipImgData=localStorage.getItem('recaps_pip_img')||null}catch(e){}
@@ -5489,13 +6068,13 @@ window.__recapProject={collect:projCollect,apply:applyProject,sigMatch:projSigMa
  ed.txt3On=!!SETTINGS.txt3On;ed.txt3Str=SETTINGS.txt3Str||'';ed.txt3Size=SETTINGS.txt3Size||40;ed.txt3Pos=SETTINGS.txt3Pos||'bot';ed.txt3Start=(typeof SETTINGS.txt3Start==='number')?SETTINGS.txt3Start:0;ed.txt3End=(typeof SETTINGS.txt3End==='number')?SETTINGS.txt3End:0;ed.txt3Color=hexOk(SETTINGS.txt3Color)?SETTINGS.txt3Color:'#FFFFFF';
  ed.blurRegions=[];try{const _br=SETTINGS.blurRegions;if(Array.isArray(_br))ed.blurRegions=JSON.parse(JSON.stringify(_br)).filter(r=>r&&typeof r.x==='number'&&typeof r.y==='number')}catch(e){}
  ed.blurSel=ed.blurRegions.length?ed.blurRegions[0].id:null;
- function persistOvl(){SETTINGS.textOn=ed.textOn;SETTINGS.textStr=ed.textStr;SETTINGS.textSize=ed.textSize;SETTINGS.textX=ed.textX;SETTINGS.textY=ed.textY;SETTINGS.logoOn=ed.logoOn;SETTINGS.logoText=ed.logoText;SETTINGS.borderOn=ed.borderOn;SETTINGS.titleSize=ed.titleSize;SETTINGS.titleX=ed.titleX;SETTINGS.titleY=ed.titleY;SETTINGS.logoSrc=ed.logoSrc;SETTINGS.logoSize=ed.logoSize;SETTINGS.logoOpacity=ed.logoOpacity;SETTINGS.logoX=ed.logoX;SETTINGS.logoY=ed.logoY;SETTINGS.borderW=ed.borderW;SETTINGS.borderColor=ed.borderColor;SETTINGS.subColor=ed.subColor;SETTINGS.subBand=ed.subBand;SETTINGS.subSize=ed.subSize;SETTINGS.subColMain=ed.subColMain;SETTINGS.subColHi=ed.subColHi;SETTINGS.titleColor=ed.titleColor;SETTINGS.textColor=ed.textColor;SETTINGS.adjB=ed.adjB;SETTINGS.adjC=ed.adjC;SETTINGS.adjS=ed.adjS;SETTINGS.segSpeed=ed.segSpeed;SETTINGS.fadeIn=ed.fadeIn;SETTINGS.fadeOut=ed.fadeOut;SETTINGS.rot=ed.rot;SETTINGS.flipH=ed.flipH;SETTINGS.pipOn=ed.pipOn;SETTINGS.pipPos=ed.pipPos;SETTINGS.pipSize=ed.pipSize;SETTINGS.pipOpacity=ed.pipOpacity;SETTINGS.pipX=ed.pipX;SETTINGS.pipY=ed.pipY;SETTINGS.textStart=ed.textStart;SETTINGS.textEnd=ed.textEnd;SETTINGS.txt2On=ed.txt2On;SETTINGS.txt2Str=ed.txt2Str;SETTINGS.txt2Size=ed.txt2Size;SETTINGS.txt2Pos=ed.txt2Pos;SETTINGS.txt2Start=ed.txt2Start;SETTINGS.txt2End=ed.txt2End;SETTINGS.txt2Color=ed.txt2Color;SETTINGS.txt3On=ed.txt3On;SETTINGS.txt3Str=ed.txt3Str;SETTINGS.txt3Size=ed.txt3Size;SETTINGS.txt3Pos=ed.txt3Pos;SETTINGS.txt3Start=ed.txt3Start;SETTINGS.txt3End=ed.txt3End;SETTINGS.txt3Color=ed.txt3Color;saveSettings()}
+ function persistOvl(){SETTINGS.textOn=ed.textOn;SETTINGS.textStr=ed.textStr;SETTINGS.textSize=ed.textSize;SETTINGS.textX=ed.textX;SETTINGS.textY=ed.textY;SETTINGS.logoOn=ed.logoOn;SETTINGS.logoText=ed.logoText;SETTINGS.borderOn=ed.borderOn;SETTINGS.titleSize=ed.titleSize;SETTINGS.titleX=ed.titleX;SETTINGS.titleY=ed.titleY;SETTINGS.logoSrc=ed.logoSrc;SETTINGS.logoSize=ed.logoSize;SETTINGS.logoOpacity=ed.logoOpacity;SETTINGS.logoX=ed.logoX;SETTINGS.logoY=ed.logoY;SETTINGS.borderW=ed.borderW;SETTINGS.borderColor=ed.borderColor;SETTINGS.subColor=ed.subColor;SETTINGS.subBand=ed.subBand;SETTINGS.subSize=ed.subSize;SETTINGS.subColMain=ed.subColMain;SETTINGS.subColHi=ed.subColHi;SETTINGS.titleColor=ed.titleColor;SETTINGS.textColor=ed.textColor;SETTINGS.adjB=ed.adjB;SETTINGS.adjC=ed.adjC;SETTINGS.adjS=ed.adjS;SETTINGS.segSpeed=ed.segSpeed;SETTINGS.fadeIn=ed.fadeIn;SETTINGS.fadeOut=ed.fadeOut;SETTINGS.rot=ed.rot;SETTINGS.flipH=ed.flipH;SETTINGS.pipOn=ed.pipOn;SETTINGS.pipPos=ed.pipPos;SETTINGS.pipSize=ed.pipSize;SETTINGS.pipOpacity=ed.pipOpacity;SETTINGS.pipX=ed.pipX;SETTINGS.pipY=ed.pipY;SETTINGS.textStart=ed.textStart;SETTINGS.textEnd=ed.textEnd;SETTINGS.txt2On=ed.txt2On;SETTINGS.txt2Str=ed.txt2Str;SETTINGS.txt2Size=ed.txt2Size;SETTINGS.txt2Pos=ed.txt2Pos;SETTINGS.txt2Start=ed.txt2Start;SETTINGS.txt2End=ed.txt2End;SETTINGS.txt2Color=ed.txt2Color;SETTINGS.txt3On=ed.txt3On;SETTINGS.txt3Str=ed.txt3Str;SETTINGS.txt3Size=ed.txt3Size;SETTINGS.txt3Pos=ed.txt3Pos;SETTINGS.txt3Start=ed.txt3Start;SETTINGS.txt3End=ed.txt3End;SETTINGS.txt3Color=ed.txt3Color;SETTINGS.hookOn=ed.hookOn;SETTINGS.hookStart=ed.hookStart;SETTINGS.hookCands=ed.hookCands;SETTINGS.hookIdx=ed.hookIdx;SETTINGS.hookSig=ed.hookSig;SETTINGS.crop=ed.crop;SETTINGS.cropAsp=ed.cropAsp;saveSettings()}
  function persistBlur(){try{SETTINGS.blurRegions=JSON.parse(JSON.stringify(ed.blurRegions||[]))}catch(e){SETTINGS.blurRegions=ed.blurRegions||[]}saveSettings()}
  /* V244: project-load bridge — after a project file restores ed state
     from the studio closure, re-run THIS closure's sync paths so the
     overlays, the blur layer/list/controls and both SETTINGS
     persistences all match the restored state */
- window.__recapProjectSync=()=>{try{persistOvl()}catch(e){}try{persistBlur()}catch(e){}try{syncTitleOvl()}catch(e){}try{syncTextOvl()}catch(e){}try{syncLogoOvl()}catch(e){}try{syncBorderOvl()}catch(e){}try{syncBlurLayer()}catch(e){}try{blurListRender()}catch(e){}try{blurCtlSync()}catch(e){}try{syncAdjPreview()}catch(e){}try{syncRotPreview()}catch(e){}try{syncRotUI()}catch(e){}try{syncPipOvl()}catch(e){}try{syncTxtOvls()}catch(e){}};
+ window.__recapProjectSync=()=>{try{persistOvl()}catch(e){}try{persistBlur()}catch(e){}try{syncTitleOvl()}catch(e){}try{syncTextOvl()}catch(e){}try{syncLogoOvl()}catch(e){}try{syncBorderOvl()}catch(e){}try{syncBlurLayer()}catch(e){}try{blurListRender()}catch(e){}try{blurCtlSync()}catch(e){}try{syncAdjPreview()}catch(e){}try{syncRotPreview()}catch(e){}try{syncRotUI()}catch(e){}try{syncPipOvl()}catch(e){}try{syncTxtOvls()}catch(e){}try{syncCropPreview()}catch(e){}try{syncCropUI()}catch(e){}};
  /* ================= V253: feature preview syncs =================
     Adjust -> the stage video's CSS filter (the export engines apply
     the eq / ctx.filter twins). Segment speed -> the stage video's
@@ -5503,7 +6082,7 @@ window.__recapProject={collect:projCollect,apply:applyProject,sigMatch:projSigMa
     picture and voice stay on the output timeline). PiP -> the stage
     image overlay. Text items 2/3 -> preset-positioned overlays. The
     per-frame text windows + fade layer tick from updateOverlay. */
- function syncAdjPreview(){try{vidEl.style.filter=adjCssOf(ed)}catch(e){}}
+ function syncAdjPreview(){const f=adjCssOf(ed);try{vidEl.style.filter=f}catch(e){}/* V257 (FIX 1b): the blurred backdrop twin carries the SAME Adjust filter, composed AFTER the blur base applyStage owns (dataset.adjBase) — the export compositor applies adjCssOf to the whole frame, twin included, so the preview now matches; overwriting the twin's filter here would have wiped its blur */const bg=E('videoBg');if(bg)try{const base=bg.dataset.adjBase||'';bg.style.filter=base?(f?base+' '+f:base):f}catch(e){}}
  /* V255: Rotate/Flip preview — the CSS transform goes on the stage
     video AND its blurred backdrop twin (both show the same picture;
     the overlays above them stay upright, exactly as export composes
@@ -5544,6 +6123,20 @@ window.__recapProject={collect:projCollect,apply:applyProject,sigMatch:projSigMa
      and a later URL fetch failed (user report 2026-11-16 17:49).
      Force the layer transparent whenever there is nothing playing. */
   if(!ed.file||!(durM>0)){fl.style.opacity='0';return}
+  /* V257 (FIX 1a): the same trap one state later — WITH a video
+     loaded and a persisted fadeIn > 0 (the sliders were touched in
+     an earlier session; the values persist), the playhead RESTS at
+     the trim start after load/prime, where the curve below reads
+     ~opacity 1 and pins this black layer over a PAUSED stage: the
+     frame is painted (V255's prime works) yet the preview looks
+     black ("မဲမဲကြီး" — user report 2026-11-16 18:28, screenshot
+     shows the faint frame under the layer). A fade is a playback
+     effect: while the stage is paused it must show its frame, so
+     the layer only follows the playhead while playing. The export
+     engines compute their fades from ed.fadeIn/ed.fadeOut via
+     fadeWinOf — never from this DOM layer — so clearing it here
+     cannot change any export. */
+  if(vidEl.paused){fl.style.opacity='0';return}
   const S=segSpeedOf(ed);let op=0;
   if(ed.fadeIn>0){const w=ed.fadeIn*S;if(w>0&&rel<w)op=Math.max(op,1-rel/w)}
   if(ed.fadeOut>0){const w=ed.fadeOut*S,rem=durM-rel;if(w>0&&rem<w)op=Math.max(op,1-rem/w)}
@@ -5559,7 +6152,13 @@ window.__recapProject={collect:projCollect,apply:applyProject,sigMatch:projSigMa
  function showModePill(){const mp=E('modePill');if(!mp)return;mp.classList.remove('hide');if(pillTimer)clearTimeout(pillTimer);pillTimer=setTimeout(()=>{mp.classList.add('hide')},3000)}
  vidEl.addEventListener('play',showModePill);
  vidEl.addEventListener('pause',showModePill);
- function updateModeUI(){const lbl=ed.modeChosen?modeLabel():'🎬 Movie Recap Mode';const mp=E('modePill');if(mp)mp.textContent=lbl;const bo=E('modeOrig'),bn=E('modeNew');if(bo)bo.classList.toggle('sel',!!(ed.modeChosen&&ed.aiMode==='faithful'));if(bn)bn.classList.toggle('sel',!!(ed.modeChosen&&ed.aiMode==='scene'));showModePill()}
+ /* V257 (FIX 5): the mode cards invite a tap ONLY while no mode
+    has been chosen yet — .attn drives the alternating glow (CSS).
+    The moment a mode is chosen the class is gone for good; a
+    project load that restores a chosen mode lands here too (via
+    applyProject's re-sync), so a preselected mode never animates. */
+ function syncModeAttn(){const a=!ed.modeChosen;const bo=E('modeOrig'),bn=E('modeNew');if(bo)bo.classList.toggle('attn',a);if(bn)bn.classList.toggle('attn',a)}
+ function updateModeUI(){const lbl=ed.modeChosen?modeLabel():'🎬 Movie Recap Mode';const mp=E('modePill');if(mp)mp.textContent=lbl;const bo=E('modeOrig'),bn=E('modeNew');if(bo)bo.classList.toggle('sel',!!(ed.modeChosen&&ed.aiMode==='faithful'));if(bn)bn.classList.toggle('sel',!!(ed.modeChosen&&ed.aiMode==='scene'));syncModeAttn();showModePill()}
  function syncTitleOvl(){const o=E('titleOvl');if(!o)return;const on=E('titleTgl').classList.contains('on');const txt=(E('title').value||'').trim();o.textContent=E('title').value||'';o.style.display=(on&&txt)?'block':'none';o.style.fontSize=Math.max(14,Math.round((ed.titleSize||52)*0.5))+'px';o.style.color=ed.titleColor||'#FFE92E';o.style.fontFamily=fontStackCss('title');
   /* V217: draggable — CENTRE fractions with the same measured
      whole-overlay clamp as the free-text overlay */
@@ -5795,7 +6394,7 @@ window.__recapProject={collect:projCollect,apply:applyProject,sigMatch:projSigMa
   const home=E(homeId);if(!home)return;
   openSheetNodes(title,home);
   const ret=sheetOnClose;sheetOnClose=()=>{if(ret)ret();markToolSel(null)};
-  const tid={homeScript:'toolScript',homeSubs:'toolSubs',homeMixer:'toolMixer',homeTrim:'toolTrim',homeAspect:'toolAspect',homeTitle:'toolTitle',homeText:'toolText',homeLogo:'toolLogo',homeBorder:'toolBorder',homeBlur:'toolBlur',homeAdjust:'toolAdjust',homeSpeed:'toolSpeed',homeFade:'toolFade',homePip:'toolPip',homeRotate:'toolRotate'}[homeId];
+  const tid={homeScript:'toolScript',homeSubs:'toolSubs',homeMixer:'toolMixer',homeTrim:'toolTrim',homeAspect:'toolAspect',homeTitle:'toolTitle',homeText:'toolText',homeLogo:'toolLogo',homeBorder:'toolBorder',homeBlur:'toolBlur',homeAdjust:'toolAdjust',homeSpeed:'toolSpeed',homeFade:'toolFade',homePip:'toolPip',homeRotate:'toolRotate',homeCrop:'toolCrop'}[homeId];
   markToolSel(tid||null);
  }
  /* 🎙️ Voice Create pop-up (Burmese Voice app style): the full voice
@@ -5990,7 +6589,231 @@ window.__recapProject={collect:projCollect,apply:applyProject,sigMatch:projSigMa
  const rotRB=E('rotR');if(rotRB)rotRB.onclick=()=>{ed.rot=((ed.rot||0)+90)%360;rotApply()};
  const rotFT=E('rotFlip');if(rotFT)rotFT.onclick=()=>{ed.flipH=!ed.flipH;rotApply()};
  const rotRS=E('rotReset');if(rotRS)rotRS.onclick=()=>{ed.rot=0;ed.flipH=false;rotApply();showNotice('↺ Rotate မူလ (0°) ပြန်ထားပါပြီ','info')};
+ /* ================= V257 (FIX 6): Crop wiring =================
+    While the Crop sheet is open the stage shows the FULL source
+    with the crop window on it (ed._cropEditing); closing the sheet
+    restores the composed (cropped) preview. Drag math runs in
+    ROTATED-frame fractions through picRectFracFor(ed,null), the
+    full-source picture rect; a drag COMMITS on pointerup through
+    applyCropChange, so the blur-region rebase runs once per change,
+    never per pointer move. */
+ function syncCropUI(){
+  $$('#'+p+'-cropAsps .style-chip').forEach(ch=>ch.classList.toggle('sel',ch.dataset.v===(ed.cropAsp||'free')));
+  const st=E('cropState');if(!st)return;
+  if(cropIsIdentity(ed.crop))st.textContent='အပြည့် (Crop မရှိ)';
+  else{const c=normCrop(ed.crop),sd=effSrcDims(ed);st.textContent='X '+Math.round(c.x*100)+'% · Y '+Math.round(c.y*100)+'% · W '+Math.round(c.w*100)+'% · H '+Math.round(c.h*100)+'% — '+Math.round(sd.w)+'×'+Math.round(sd.h)+' px ခန့်'}
+ }
+ function syncCropPreview(){
+  const v=E('video'),bg=E('videoBg');if(!v)return;
+  const layer=E('cropLayer'),rect=E('cropRect');
+  const editing=!!ed._cropEditing;
+  const clearBox=el=>{if(!el)return;['left','top','width','height'].forEach(pr=>{try{el.style.removeProperty(pr)}catch(e){}});try{el.style.clipPath=''}catch(e){}};
+  /* The composed preview: only in the un-rotated, un-mirrored case
+     does element-box + clip-path geometry reproduce the export
+     composition exactly — the box's aspect equals the source's, so
+     object-fit:contain renders it undistorted, the clip shows
+     exactly the crop window, and the box re-fits that window onto
+     the cropped picture rect (the backdrop twin gets the same
+     treatment over its cover rect). With rotation/mirror active
+     the preview keeps the rotated full picture (rotCssOf) and the
+     editing overlay still shows the window — exports stay exact
+     in every engine regardless. */
+  if(!ed.file||editing||cropIsIdentity(ed.crop)||((ed.rot||0)!==0)||ed.flipH){clearBox(v);clearBox(bg)}
+  else{
+   const nc=normCrop(ed.crop);
+   const put=(el,R)=>{if(!el)return;const bw=R.w/nc.w,bh=R.h/nc.h;el.style.left=((R.x-nc.x*bw)*100)+'%';el.style.top=((R.y-nc.y*bh)*100)+'%';el.style.width=(bw*100)+'%';el.style.height=(bh*100)+'%';el.style.clipPath='inset('+(nc.y*100)+'% '+((1-nc.x-nc.w)*100)+'% '+((1-nc.y-nc.h)*100)+'% '+(nc.x*100)+'%)'};
+   put(v,picRectFracFor(ed,ed.crop));
+   put(bg,coverRectFracFor(ed,ed.crop));
+  }
+  if(layer){
+   layer.style.display=(editing&&ed.file)?'block':'none';
+   if(editing&&rect){const pf=picRectFracFor(ed,null),nc=normCrop(ed.crop);
+    rect.style.left=((pf.x+nc.x*pf.w)*100)+'%';rect.style.top=((pf.y+nc.y*pf.h)*100)+'%';rect.style.width=(nc.w*pf.w*100)+'%';rect.style.height=(nc.h*pf.h*100)+'%'}
+  }
+ }
+ ed.syncCropPreview=syncCropPreview;
+ function applyCropChange(nc,asp){
+  const oc=ed.crop;
+  if(JSON.stringify(normCrop(oc))!==JSON.stringify(normCrop(nc))&&(ed.blurRegions||[]).length){
+   /* the regions' covered content moves with the crop — rebase
+      the stored canvas fractions once, here */
+   ed.blurRegions=rebaseRegionsForCrop(ed.blurRegions,ed,oc,nc);
+   persistBlur();syncBlurLayer();
+  }
+  ed.crop=cropIsIdentity(nc)?null:normCrop(nc);
+  if(asp)ed.cropAsp=asp;
+  persistOvl();syncCropUI();syncCropPreview();
+  if(ed.applyStage)ed.applyStage();
+ }
+ function cropLockK(){
+  const r={'9:16':9/16,'16:9':16/9,'1:1':1,'4:5':4/5}[ed.cropAsp||''];
+  if(!r)return 0;
+  const vd=effVideoDims(ed);return r/(vd.w/Math.max(1,vd.h));
+ }
+ function enterCropMode(){ed._cropEditing=true;syncCropPreview();syncCropUI()}
+ function exitCropMode(){ed._cropEditing=false;syncCropPreview()}
+ const cropRectEl=E('cropRect'),cropLayerEl=E('cropLayer');
+ if(cropRectEl&&cropLayerEl){
+  let mode=null,orig=null,pf=null,pend=null,raf=0;
+  function srcPt(e){const rc=cropLayerEl.parentElement.getBoundingClientRect();if(!rc.width||!rc.height||!pf)return null;const wx=(e.clientX-rc.left)/rc.width,wy=(e.clientY-rc.top)/rc.height;return{x:(wx-pf.x)/pf.w,y:(wy-pf.y)/pf.h}}
+  function flush(){
+   raf=0;if(!mode||!orig||!pend)return;
+   const dsx=pend.x-orig._sx,dsy=pend.y-orig._sy;
+   const cand={x:orig.x,y:orig.y,w:orig.w,h:orig.h};
+   if(mode==='move'){cand.x=orig.x+dsx;cand.y=orig.y+dsy}
+   else{
+    if(mode.indexOf('e')>=0)cand.w=orig.w+dsx;
+    if(mode.indexOf('s')>=0)cand.h=orig.h+dsy;
+    if(mode.indexOf('w')>=0){cand.x=orig.x+dsx;cand.w=orig.w-dsx}
+    if(mode.indexOf('n')>=0){cand.y=orig.y+dsy;cand.h=orig.h-dsy}
+    const k=cropLockK();
+    if(k>0){cand.h=cand.w/k;if(mode.indexOf('n')>=0)cand.y=(orig.y+orig.h)-cand.h;if(mode.indexOf('w')>=0)cand.x=(orig.x+orig.w)-cand.w}
+   }
+   const cc=clampCropRect(cand,mode==='move'?0:cropLockK());
+   pend._cand=cc;
+   cropRectEl.style.left=((pf.x+cc.x*pf.w)*100)+'%';cropRectEl.style.top=((pf.y+cc.y*pf.h)*100)+'%';cropRectEl.style.width=(cc.w*pf.w*100)+'%';cropRectEl.style.height=(cc.h*pf.h*100)+'%';
+  }
+  function queue(e){const pt=srcPt(e);if(!pt)return;pend=pt;if(!raf)raf=requestAnimationFrame(flush)}
+  cropRectEl.addEventListener('pointerdown',e=>{
+   if(!ed._cropEditing)return;
+   pf=picRectFracFor(ed,null);
+   const pt=srcPt(e);if(!pt)return;
+   mode=(e.target&&e.target.dataset&&e.target.dataset.h)?e.target.dataset.h:'move';
+   orig=Object.assign(normCrop(ed.crop),{_sx:pt.x,_sy:pt.y});pend=pt;
+   try{cropRectEl.setPointerCapture(e.pointerId)}catch(err){}
+   e.preventDefault();e.stopPropagation();
+  });
+  cropRectEl.addEventListener('pointermove',e=>{if(mode)queue(e)});
+  const up=()=>{if(!mode)return;if(raf){cancelAnimationFrame(raf);raf=0}flush();const cand=pend&&pend._cand;mode=null;orig=null;pend=null;pf=null;if(cand)applyCropChange(cand,null);else syncCropPreview()};
+  cropRectEl.addEventListener('pointerup',up);cropRectEl.addEventListener('pointercancel',up);
+ }
+ const caE=E('cropAsps');if(caE)caE.addEventListener('click',e=>{
+  const b=e.target.closest('.style-chip');if(!b)return;const a=b.dataset.v;
+  if(a==='free'){ed.cropAsp='free';persistOvl();syncCropUI();return}
+  if(a==='orig'){applyCropChange(null,'orig');return}
+  applyCropChange(cropPresetRect(ed,a),a);
+ });
+ const crRS=E('cropReset');if(crRS)crRS.onclick=()=>{applyCropChange(null,'free');showNotice('↺ Crop မူလ (အပြည့်) ပြန်ထားပါပြီ','info')};
+ const tcBtn=E('toolCrop');if(tcBtn)tcBtn.onclick=()=>{openFeatureSheet('homeCrop','⛶ Crop');enterCropMode();const ret=sheetOnClose;sheetOnClose=()=>{if(ret)ret();exitCropMode()}};
  syncRotUI();
+ /* ================= V256: 🎬 Auto Hook wiring =================
+    Lives in the Trim sheet (hookHome). The toggle seeds from
+    SETTINGS via the init above; enabling it with no current
+    analysis auto-runs the finder once. Analysis = phase 1 audio
+    RMS (top-level hookExtractRms) -> phase 2 visual sampling of
+    the top ~10 audio windows only (2 fps thumbnails, mean absolute
+    frame difference + mean luma) -> hookScoreWindows ranks them
+    (audio 0.6 / visual 0.4, dead-air/black openings x0.35). The
+    stage Preview of the main video is untouched; the hook preview
+    seeks the stage video to the window and pauses at its end. */
+ const hookTgl=E('hookTgl'),hookBody=E('hookBody'),hookInfo=E('hookInfo'),hookFindBtn=E('hookFind'),hookPrevBtn=E('hookPrev'),hookNextBtn=E('hookNext'),hookResetBtn=E('hookReset'),hookCancelBtn=E('hookCancel'),hookProg=E('hookProg'),hookProgFill=E('hookProgFill'),hookProgPct=E('hookProgPct'),hookProgLabel=E('hookProgLabel');
+ let hookPvStart=-1,hookPvEnd=-1;
+ function hookSetInfo(t){if(hookInfo)hookInfo.textContent=t}
+ function hookProgSet(f,label){if(!hookProg)return;hookProg.style.display='block';const pc=Math.round(Math.max(0,Math.min(1,f))*100);if(hookProgFill)hookProgFill.style.width=pc+'%';if(hookProgPct)hookProgPct.textContent=pc+'%';if(label&&hookProgLabel)hookProgLabel.textContent=label}
+ function hookProgHide(){if(hookProg)hookProg.style.display='none';if(hookCancelBtn)hookCancelBtn.style.display='none'}
+ function syncHookUI(){
+  if(hookTgl)hookTgl.classList.toggle('on',!!ed.hookOn);
+  if(hookBody)hookBody.style.display=ed.hookOn?'':'none';
+  if(!ed.hookOn)return;
+  const r=trimRange(),segDur=r.end-r.start;
+  if(hookFindBtn)hookFindBtn.disabled=!!ed.hookBusy;
+  if(!ed.file){hookSetInfo('Video တင်ပြီးမှ Hook သုံးနိုင်ပါတယ်');return}
+  if(!(segDur>=HOOK_DUR)){hookSetInfo('⚠️ Trim အပိုင်းက ၅ စက္ကန့်ထက် တိုနေပါတယ် ('+segDur.toFixed(1)+' စက္ကန့်) — Hook အတွက် အနည်းဆုံး ၅ စက္ကန့် လိုပါတယ်');return}
+  const st=hookStateFor(ed);
+  if(st.ok){const a=r.start+ed.hookStart;hookSetInfo('✅ Hook: '+fmtDur(a)+' – '+fmtDur(a+HOOK_DUR)+' (အခန်း '+(ed.hookIdx+1)+'/'+Math.max(1,ed.hookCands.length)+') — Export မှာ အရှေ့ဆုံး ပါမည်')}
+  else if(ed.hookCands&&ed.hookCands.length){hookSetInfo('⚠️ Trim ပြောင်းသွားပါပြီ — "🔍 အကောင်းဆုံး အခန်း ရှာမယ်" နဲ့ ပြန်ရှာပါ')}
+  else hookSetInfo('အကောင်းဆုံး အခန်း မရှာရသေးပါ — "🔍" နှိပ်ပါ (ဖွင့်လိုက်ရင် Auto ရှာပေးပါတယ်)');
+ }
+ function hookInvalidate(){if(ed.hookStart!=null||(ed.hookCands&&ed.hookCands.length)){ed.hookStart=null;ed.hookCands=[];ed.hookIdx=0;ed.hookSig='';persistOvl()}syncHookUI()}
+ ['start','end','rstart','rend'].forEach(id=>{const el=E(id);if(el)el.addEventListener('input',hookInvalidate)});
+ /* visual phase helpers: metadata wait + one thumbnail grab, both
+    timeout-guarded so a video element that cannot seek (or jsdom)
+    degrades to audio-only scoring instead of hanging */
+ function hookWaitMeta(v,ms){return new Promise(res=>{if(v.readyState>=1)return res(true);let done=false;const fin=ok=>{if(done)return;done=true;res(ok)};v.addEventListener('loadedmetadata',()=>fin(true),{once:true});v.addEventListener('error',()=>fin(false),{once:true});setTimeout(()=>fin(v.readyState>=1),ms)})}
+ function hookGrabFrame(v,cx,SW,SH,t,ms){
+  return new Promise(res=>{
+   let done=false;const fin=val=>{if(done)return;done=true;res(val)};
+   const to=setTimeout(()=>fin(null),ms);
+   const onSeek=()=>{clearTimeout(to);try{cx.drawImage(v,0,0,SW,SH);const im=cx.getImageData(0,0,SW,SH);let lum=0,n=0;for(let i=0;i<im.data.length;i+=16){lum+=(im.data[i]+im.data[i+1]+im.data[i+2])/3;n++}fin({d:im.data,luma:n?lum/n:0})}catch(e){fin(null)}};
+   v.addEventListener('seeked',onSeek,{once:true});
+   try{v.currentTime=t}catch(e){clearTimeout(to);fin(null)}
+  });
+ }
+ async function hookSampleVisual(r,top,tok,onProg){
+  const map=new Map();if(!top.length||!ed.url)return map;
+  const v=document.createElement('video');v.muted=true;v.playsInline=true;v.preload='auto';v.src=ed.url;
+  const cv=document.createElement('canvas');const SW=64,SH=36;cv.width=SW;cv.height=SH;const cx=cv.getContext('2d',{willReadFrequently:true});
+  if(!cx||!(await hookWaitMeta(v,1500))){try{v.removeAttribute('src')}catch(e){}return map}
+  let doneN=0;const totalN=top.length*10;
+  for(const w of top){
+   if(tok.hit)throw hookCancelError();
+   let act=0,lumaSum=0,lumaN=0,frames=0,prevF=null,fails=0;
+   for(let k=0;k<10;k++){
+    if(tok.hit)throw hookCancelError();
+    const fr=await hookGrabFrame(v,cx,SW,SH,r.start+w.start+k*0.5,900);
+    doneN++;if(onProg)onProg(doneN/totalN);
+    if(!fr){fails++;if(fails>=3)break;continue}
+    if(k<2){lumaSum+=fr.luma;lumaN++}
+    if(prevF){let dsum=0;for(let i=0;i<fr.d.length;i+=4)dsum+=Math.abs(fr.d[i]-prevF.d[i]);act+=dsum/(fr.d.length/4)}
+    prevF=fr;frames++;
+   }
+   if(frames>=2)map.set(w.i,{act:act/Math.max(1,frames-1),luma:lumaN?lumaSum/lumaN:255});
+   if(w===top[0]&&frames===0)break; /* the element cannot seek at all — stay audio-only */
+  }
+  try{v.removeAttribute('src');v.load()}catch(e){}
+  return map;
+ }
+ let hookJob=0,hookTok=null;
+ async function runHookAnalyse(){
+  if(ed.hookBusy)return;
+  if(!ed.file){showNotice('⚠️ Hook ရှာရန် Video အရင် တင်ပါ','err');return}
+  const r=trimRange(),segDur=r.end-r.start;
+  if(!(segDur>=HOOK_DUR)){syncHookUI();showNotice('⚠️ Trim အပိုင်းက ၅ စက္ကန့်ထက် တိုနေပါတယ် — Hook သုံး၍ မရပါ','err');return}
+  if(ed.busy||ed.aiBusy||ed.voiceBusy){showNotice('⚠️ အခြား အလုပ် လုပ်နေဆဲ ဖြစ်ပါတယ် — ပြီးမှ ပြန်ကြိုးစားပါ','err');return}
+  const job=++hookJob;const tok={hit:false};hookTok=tok;ed.hookBusy=true;
+  if(hookCancelBtn)hookCancelBtn.style.display='';hookProgSet(0.02,'🔍 အကောင်းဆုံး အခန်း ရှာနေပါတယ်…');syncHookUI();
+  try{
+   const rms=await hookExtractRms(ed,r,f=>{if(job===hookJob)hookProgSet(0.02+f*0.53,'🔊 အသံ အား စစ်နေပါတယ်…')},tok);
+   if(job!==hookJob)return;
+   if(tok.hit)throw hookCancelError();
+   const pre=hookScoreWindows(rms,null,segDur);
+   const vis=await hookSampleVisual(r,pre.slice(0,10),tok,f=>{if(job===hookJob)hookProgSet(0.55+f*0.43,'🎞️ ပုံ လှုပ်ရှားမှု စစ်နေပါတယ်…')});
+   if(job!==hookJob)return;
+   const ranked=hookScoreWindows(rms,vis,segDur);
+   const cands=ranked.slice(0,5).map(w=>w.start);
+   if(!cands.length)throw new Error('အခန်း မတွေ့ပါ');
+   ed.hookCands=cands;ed.hookIdx=0;ed.hookStart=cands[0];ed.hookSig=hookSigOf(ed);
+   persistOvl();syncHookUI();
+   const a=r.start+cands[0];
+   hookProgSet(1,'✅ ပြီးပါပြီ');
+   showNotice('✅ အကောင်းဆုံး အခန်း တွေ့ပါပြီ — '+fmtDur(a)+' – '+fmtDur(a+HOOK_DUR),'ok');
+  }catch(e){
+   if(job===hookJob){if(e&&e.cancelled){hookSetInfo('⏹ Hook ရှာတာ ရပ်လိုက်ပါပြီ');showNotice('⏹ Hook ရှာတာ ရပ်လိုက်ပါပြီ','info')}else{console.error(e);showNotice('❌ Hook ရှာ၍ မရပါ: '+humanErr(e),'err')}syncHookUI()}
+  }finally{
+   if(job===hookJob){ed.hookBusy=false;hookTok=null;setTimeout(hookProgHide,600);syncHookUI()}
+  }
+ }
+ if(hookTgl)hookTgl.onclick=()=>{ed.hookOn=!ed.hookOn;persistOvl();syncHookUI();if(ed.hookOn&&ed.file&&!hookActiveFor(ed)&&!ed.hookBusy)runHookAnalyse()};
+ if(hookFindBtn)hookFindBtn.onclick=()=>runHookAnalyse();
+ if(hookCancelBtn)hookCancelBtn.onclick=()=>{if(hookTok)hookTok.hit=true};
+ if(hookNextBtn)hookNextBtn.onclick=()=>{
+  if(!ed.hookCands||ed.hookCands.length<2){showNotice('ℹ️ နောက်ထပ် အခန်း မရှိသေးပါ — အရင် "🔍" နဲ့ ရှာပါ','info');return}
+  ed.hookIdx=((ed.hookIdx||0)+1)%ed.hookCands.length;ed.hookStart=ed.hookCands[ed.hookIdx];ed.hookSig=hookSigOf(ed);persistOvl();syncHookUI();
+  const r=trimRange(),a=r.start+ed.hookStart;showNotice('⏭ Hook အခန်း '+(ed.hookIdx+1)+'/'+ed.hookCands.length+': '+fmtDur(a)+' – '+fmtDur(a+HOOK_DUR),'info');
+ };
+ if(hookPrevBtn)hookPrevBtn.onclick=()=>{
+  const st=hookStateFor(ed);if(!st.ok){showNotice('⚠️ '+(ed.hookOn?st.msg:'အရင် "🔍 အကောင်းဆုံး အခန်း ရှာမယ်" နှိပ်ပြီး အခန်း ရွေးပါ'),'err');return}
+  if(ed.url&&vidEl.src!==ed.url){try{vidEl.src=ed.url}catch(e){}}
+  hookPvStart=st.abs;hookPvEnd=st.abs+HOOK_DUR;
+  try{vidEl.currentTime=st.abs}catch(e){}
+  const pr=vidEl.play();if(pr&&pr.catch)pr.catch(()=>{});
+ };
+ vidEl.addEventListener('timeupdate',()=>{if(hookPvEnd>0&&!vidEl.paused&&(vidEl.currentTime||0)>=hookPvEnd-0.03){try{vidEl.pause()}catch(e){}hookPvEnd=-1}});
+ vidEl.addEventListener('seeked',()=>{if(hookPvEnd>0){const c=vidEl.currentTime||0;if(c<hookPvStart-0.05||c>hookPvEnd+0.05)hookPvEnd=-1}});
+ if(hookResetBtn)hookResetBtn.onclick=()=>{ed.hookOn=false;ed.hookStart=null;ed.hookCands=[];ed.hookIdx=0;ed.hookSig='';ed._hookRms=null;ed._hookRmsSig='';persistOvl();syncHookUI();showNotice('↺ Hook မူလ (ပိတ်) ပြန်ထားပါပြီ','info')};
+ window.__recapOpenTrimHook=()=>openFeatureSheet('homeTrim','✂️ Trim');
+ const _psHook=window.__recapProjectSync;window.__recapProjectSync=()=>{if(_psHook)_psHook();try{syncHookUI()}catch(e){}};
+ syncHookUI();
  const ssEl2=E('segSpeed'),ssLb2=E('segSpeedVal');
  function syncSegSpeedUI(){if(ssEl2)ssEl2.value=ed.segSpeed;if(ssLb2)ssLb2.textContent=segSpeedOf(ed).toFixed(2)+'×'}
  if(ssEl2){syncSegSpeedUI();ssEl2.addEventListener('input',()=>{ed.segSpeed=parseFloat(ssEl2.value)||1;if(ssLb2)ssLb2.textContent=segSpeedOf(ed).toFixed(2)+'×';persistOvl();applyVidRate();updateVoiceWarn();refreshStageVoice()})}

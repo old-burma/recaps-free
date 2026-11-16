@@ -211,7 +211,7 @@ body.locked{overflow:hidden}
    .vid-wrap so it rides the stage at every aspect; z-index 9 keeps
    it above the stage overlays yet far below sheets (100+) and the
    notice (200). Monochrome like the rest of the UI. */
-.vid-wrap .stage-change{position:absolute;top:8px;right:8px;z-index:9;width:38px;height:38px;border-radius:50%;border:1.5px solid rgba(255,255,255,.38);background:rgba(18,18,18,.72);color:#fff;font-size:17px;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;font-family:inherit}
+.vid-wrap .stage-change{position:absolute;top:8px;right:8px;z-index:9;height:38px;border-radius:999px;border:1.5px solid rgba(255,255,255,.38);background:rgba(18,18,18,.72);color:#fff;font-size:13px;font-weight:700;letter-spacing:.02em;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0 14px;font-family:inherit}
 .vid-wrap .stage-change:active{transform:scale(.92)}
 /* V257 (FIX 6): the Crop editing layer — shown only while the Crop
    sheet is open (JS toggles display); the rect dims everything
@@ -335,6 +335,16 @@ body.locked{overflow:hidden}
 .mode-btns .mode-btn.attn:nth-child(2){animation-delay:.9s}
 @keyframes modeAttn{0%,100%{box-shadow:0 0 0 0 rgba(255,255,255,0);border-color:#2C2C2C}50%{box-shadow:0 0 16px 3px rgba(255,255,255,.30);border-color:rgba(255,255,255,.70)}}
 body.locked .mode-btn.attn{animation-play-state:paused}
+/* V258: "ready to export" — when the script exists AND the audio is
+   settled (original-audio mode, or a complete + fresh voiceover),
+   syncExportAttn puts .attn on the quick-row Export pill and it
+   breathes the SAME white glow as the mode cards (shared modeAttn
+   keyframes: box-shadow + border-color only — the pill's box, label
+   and width NEVER change; the V253 blowup lesson). It stops the
+   moment an export starts or readiness is lost. Paused while a
+   sheet is open, like the app's other ambient motion. */
+.qtgl.attn{animation:modeAttn 1.8s ease-in-out infinite}
+body.locked .qtgl.attn{animation-play-state:paused}
 .mode-btn b{display:block;font-size:13.5px;color:#F2F2F2}
 .mode-btn span{display:block;font-size:10.5px;color:#9A9A9A;margin-top:1px;font-weight:600}
 .mode-btn.sel{border-color:#FFFFFF;background:rgba(255,255,255,.14)}
@@ -746,7 +756,7 @@ function editorHTML(p){
    embedded beside it. */
 const transportInner='<div class="transport" id="'+p+'-transport"><div class="tp-row"><button class="tp-play" id="'+p+'-tpPlay" aria-label="Play / Pause">▶</button><button class="tp-skip" id="'+p+'-tpBack" aria-label="5 စက္ကန့် နောက်ပြန်">⏪</button><span class="tp-time" id="'+p+'-tpCur">0:00</span><span class="tp-time tp-right" id="'+p+'-tpDur">0:00</span><button class="tp-skip" id="'+p+'-tpFwd" aria-label="5 စက္ကန့် ရှေ့တိုး">⏩</button></div><input type="range" class="tp-seek" id="'+p+'-tpSeek" min="0" max="1000" value="0"></div>';
 const frameInner='<input type="file" id="'+p+'-file" accept="video/*" style="display:none">'
-+'<div class="vid-wrap"><div class="ph-box" id="'+p+'-ph"><div class="ph-ic">🎬</div><div class="ph-t">Tap to Upload Video</div><div class="ph-s">နှိပ်ပြီး video ဖိုင် ရွေးပါ</div></div><video class="preview-bg" id="'+p+'-videoBg" playsinline muted style="display:none"></video><video class="preview framed" id="'+p+'-video" playsinline style="display:none"></video><div class="mode-pill hide" id="'+p+'-modePill">🎬 Movie Recap Mode</div><div class="title-overlay" id="'+p+'-titleOvl"></div><div class="logo-overlay" id="'+p+'-logoOvl"></div><div class="blur-layer" id="'+p+'-blurLayer"></div><div class="crop-layer" id="'+p+'-cropLayer" style="display:none"><div class="crop-rect" id="'+p+'-cropRect"><span class="cr-handle" data-h="nw"></span><span class="cr-handle" data-h="ne"></span><span class="cr-handle" data-h="sw"></span><span class="cr-handle" data-h="se"></span></div></div><div class="sub-overlay" id="'+p+'-overlay"></div><div class="text-overlay" id="'+p+'-textOvl"></div><div class="text-overlay pos-preset" id="'+p+'-textOvl2"></div><div class="text-overlay pos-preset" id="'+p+'-textOvl3"></div><img class="pip-overlay" id="'+p+'-pipOvl" alt=""><div class="fade-layer" id="'+p+'-fadeLayer"></div><div class="frame-border" id="'+p+'-borderOvl"></div><button type="button" class="stage-change" id="'+p+'-stageChange" title="Video လဲမယ်" aria-label="Video လဲမယ်">🎬</button></div>'+transportInner;
++'<div class="vid-wrap"><div class="ph-box" id="'+p+'-ph"><div class="ph-ic">🎬</div><div class="ph-t">Tap to Upload Video</div><div class="ph-s">နှိပ်ပြီး video ဖိုင် ရွေးပါ</div></div><video class="preview-bg" id="'+p+'-videoBg" playsinline muted style="display:none"></video><video class="preview framed" id="'+p+'-video" playsinline style="display:none"></video><div class="mode-pill hide" id="'+p+'-modePill">🎬 Movie Recap Mode</div><div class="title-overlay" id="'+p+'-titleOvl"></div><div class="logo-overlay" id="'+p+'-logoOvl"></div><div class="blur-layer" id="'+p+'-blurLayer"></div><div class="crop-layer" id="'+p+'-cropLayer" style="display:none"><div class="crop-rect" id="'+p+'-cropRect"><span class="cr-handle" data-h="nw"></span><span class="cr-handle" data-h="ne"></span><span class="cr-handle" data-h="sw"></span><span class="cr-handle" data-h="se"></span></div></div><div class="sub-overlay" id="'+p+'-overlay"></div><div class="text-overlay" id="'+p+'-textOvl"></div><div class="text-overlay pos-preset" id="'+p+'-textOvl2"></div><div class="text-overlay pos-preset" id="'+p+'-textOvl3"></div><img class="pip-overlay" id="'+p+'-pipOvl" alt=""><div class="fade-layer" id="'+p+'-fadeLayer"></div><div class="frame-border" id="'+p+'-borderOvl"></div><button type="button" class="stage-change" id="'+p+'-stageChange" title="Video လဲ (Swap)" aria-label="Video လဲ (Swap)">Swap</button></div>'+transportInner;
 const pickRow='<div class="pick-row"><button class="btn light small" id="'+p+'-pick">📱 Video ရွေးရန်</button><div class="file-info" id="'+p+'-fileinfo">ဖိုင် မရွေးရသေးပါ</div></div>';
 const urlBox='<div class="card" style="margin:12px 0"><h3 style="margin-bottom:8px">🔗 Link မှ Video ယူရန်</h3>'
 +'<div class="field"><label>Video Link</label><input type="url" id="'+p+'-urlInput" placeholder="https://…" autocomplete="off"></div>'
@@ -3966,7 +3976,7 @@ async function runExport(ed){
     WebView's wide-viewport layout expanded the WHOLE page (stage +
     fixed sheet) for exactly the export's duration. Only the disabled
     state (opacity only, no size change) is toggled now. */
- ed.busy=true;const btn=E('qtExport');btn.disabled=true;
+ ed.busy=true;const btn=E('qtExport');btn.disabled=true;if(window.__syncExportAttn)window.__syncExportAttn(); /* V258: busy kills the ready glow the moment the render starts */
  const logBox=E('log');logBox.style.display='none';logBox.textContent='';
  const logTgl=E('logToggle');if(logTgl)logTgl.textContent='📄 Log ပြရန်';
  if(window.__recapShowExport)window.__recapShowExport(); /* V230: the Export view is a bottom-sheet pop-up now */
@@ -4114,7 +4124,7 @@ async function runExport(ed){
   if(err&&err.cancelled){expS.pos=0;expS.ceil=0;expS.fracMax=0;etaRunEnd();expRender();if(expStageEl)expStageEl.textContent='⛔ ရပ်လိုက်ပါပြီ';if(expEtaEl)expEtaEl.textContent='';log('⛔ Export ကို ရပ်လိုက်ပါပြီ');showNotice('⛔ Export ကို ရပ်လိုက်ပါပြီ','info')}
   else{etaRunEnd();console.error(err);log('❌ '+humanErr(err));if(expStageEl)expStageEl.textContent='❌ မအောင်မြင်ပါ';logBox.style.display='block';if(logTgl)logTgl.textContent='📄 Log ဖျောက်ရန်';showNotice('❌ Export မအောင်မြင်ပါ: '+humanErr(err),'err')}
  }
- finally{wlRelease();if(expTimer)clearInterval(expTimer);expCancelRace=null;ed._expCancel=null;etaRunEnd();if(expCancelBtn)expCancelBtn.style.display='none';if(expEtaEl)expEtaEl.textContent='';if(expSetupEl)expSetupEl.style.display='';ed.busy=false;ed._cachedVoice=null;ed._cachedVoiceExt=null;btn.disabled=false;if(window.__refreshFeatureSummaries)window.__refreshFeatureSummaries()}
+ finally{wlRelease();if(expTimer)clearInterval(expTimer);expCancelRace=null;ed._expCancel=null;etaRunEnd();if(expCancelBtn)expCancelBtn.style.display='none';if(expEtaEl)expEtaEl.textContent='';if(expSetupEl)expSetupEl.style.display='';ed.busy=false;ed._cachedVoice=null;ed._cachedVoiceExt=null;btn.disabled=false;if(window.__refreshFeatureSummaries)window.__refreshFeatureSummaries();if(window.__syncExportAttn)window.__syncExportAttn() /* V258: busy cleared — the glow returns if the project is still ready */}
 }
 </script>
 <script>
@@ -5564,6 +5574,7 @@ window.__recapProject={collect:projCollect,apply:applyProject,sigMatch:projSigMa
   if(has&&fresh)doneStep(2);else if(has)undoneStep(2);
   renderTimeline(); /* V216 audit fix: the timeline voice block's stale label now tracks script edits live (it previously only updated on the next unrelated timeline re-render) */
   refreshStageVoice(); /* V229: freshness drives the stage voice too — a fresh voice arms it, a stale/cleared one silences it at once */
+  syncExportAttn(); /* V258: freshness is half of export readiness — every stale/fresh transition (voice gen, cue edit, script clear, voice pick) re-derives the Export pill's glow here */
  }
  function refreshVoiceGate(){if(ed.voiceBusy)return;const b=E('voiceGen');if(b)b.disabled=!scriptText()}
  /* studio default voice = Edge Thiha (audioMode starts 'original', so
@@ -6514,8 +6525,19 @@ window.__recapProject={collect:projCollect,apply:applyProject,sigMatch:projSigMa
      the segment did). What remains of this refresh is the Main quick
      toggles mirror. (The V216 sum* writes were already dead code.) */
   syncMainToggles(); /* V230: the Main quick toggles mirror the real state */
+  syncExportAttn(); /* V258: readiness is re-derived on the same refresh beat (cue count, summaries, project apply, export finish) */
  }
+ /* V258: export readiness for the quick-row Export pill's glow.
+    Ready = a video is loaded, no export is running, the segment has
+    a script (stored cues or script lines — the same sources export
+    resolves from), AND the audio side is settled: original-audio
+    mode needs nothing more; voice mode needs voiceFresh() — the
+    EXISTING freshness machinery (pinned line list + engine/voice
+    match), never a parallel definition. */
+ function exportReadyNow(){if(!ed.file||ed.busy)return false;const hasScript=(ed.cues&&ed.cues.length>0)||scriptLines().length>0;if(!hasScript)return false;return ed.audioMode!=='voice'||voiceFresh()}
+ function syncExportAttn(){const b=E('qtExport');if(b)b.classList.toggle('attn',exportReadyNow())}
  window.__refreshFeatureSummaries=refreshSummaries;
+ window.__syncExportAttn=syncExportAttn; /* V258: runExport (top level) re-derives the glow the moment busy flips, via this bridge like __refreshFeatureSummaries */
  /* V213 toolbar: EVERY tool opens its feature as a bottom pop-up.
     V229: 📝 Script IS in the toolbar now — FIRST, as step 1 of the
     workflow. V231: the status strip (whose Script segment also opened

@@ -879,6 +879,7 @@ const homes='<div id="'+p+'-sheetHomes" style="display:none">'
 +'<div id="'+p+'-homeSubs">'+subsHome+'</div>'
 +'<div id="'+p+'-homeMixer">'+mixerHome+'</div>'
 +'<div id="'+p+'-homeTrim">'+pickRow+trimInner+'</div>'
++'<div id="'+p+'-homeSource"><button class="btn primary" id="'+p+'-srcPick" type="button" style="width:100%">📱 Video ဖိုင် ရွေးရန်</button>'+urlBox+'</div>'
 +'<div id="'+p+'-homeAspect">'+aspectField+'</div>'
 +'<div id="'+p+'-homeTitle">'+titleField+'</div>'
 +'<div id="'+p+'-homeText">'+textHome+'</div>'
@@ -912,7 +913,6 @@ const homes='<div id="'+p+'-sheetHomes" style="display:none">'
    (Main row). ---- */
 return ''
 +'<div class="vid-sticky" id="'+p+'-framePin">'+frameInner+'</div>'
-+urlBox /* V251: the 🔗 URL box lives in the MAIN page flow, directly under the stage and above the script-mode cards — it used to park inside #homeTrim, so it only appeared after opening the Trim sheet and users never found it */
 +mainRowInner
 +timelineInner
 +spacerInner
@@ -932,7 +932,20 @@ function makeEditor(p){
  const E=id=>$('#'+p+'-'+id);
  function refreshLabels(){$$('#'+p+'-aspectOpts .opt').forEach(o=>o.classList.toggle('sel',o.dataset.v===ed.aspect));E('blurVal').textContent=ed.blur;E('blur').value=ed.blur;const vfl=E('voiceFieldLabel');if(vfl)vfl.textContent=voiceFieldLabelOf(ed);const s=parseFloat(E('start').value)||0,en=parseFloat(E('end').value)||0;E('durinfo').textContent=ed.duration?fmtDur(Math.max(0,en-s))+' (မူရင်း '+fmtDur(ed.duration)+')':'—';if(window.__refreshFeatureSummaries)window.__refreshFeatureSummaries()}
  ed.refresh=refreshLabels;
- E('pick').onclick=()=>{ed._changeWipe=false;E('file').click()};const phB=E('ph');if(phB)phB.onclick=()=>{ed._changeWipe=false;E('file').click()};
+ E('pick').onclick=()=>{ed._changeWipe=false;E('file').click()};
+ /* V252: tapping the stage placeholder ("Tap to Upload Video") opens
+    the SOURCE-CHOICE sheet (#homeSource, parked in #sheetHomes like
+    every other sheet home): 📱 file pick OR the 🔗 URL box — the
+    user's order of 2026-11-16, replacing V251's main-flow urlBox
+    card (and the placeholder's old straight-to-picker jump). */
+ function openSourceSheet(){const hs=E('homeSource');if(!hs)return;openSheetNodes('🎬 Video ယူရန်',hs)}
+ ed.openSourceSheet=openSourceSheet;
+ const phB=E('ph');if(phB)phB.onclick=()=>{openSourceSheet()};
+ /* the sheet's own 📱 file button: close the sheet first (the parked
+    home returns to #sheetHomes), then run the EXACT pick flow the
+    placeholder used before — same _changeWipe=false semantics, same
+    #file input, same change handler */
+ const srcPickBtn=E('srcPick');if(srcPickBtn)srcPickBtn.onclick=()=>{closeSheet();ed._changeWipe=false;E('file').click()};
  /* V236: 🎬 Video လဲ (Main quick row) — the SAME picker as the
     initial load, but the selection it produces is a deliberate
     CHANGE: the old project is fully wiped first (wipeForChange,
@@ -947,8 +960,11 @@ function makeEditor(p){
  function acceptVideoFile(f,wasChange){if(wasChange&&ed.file&&window.__recapWipeForChange)window.__recapWipeForChange();ed.file=f;if(ed.url)URL.revokeObjectURL(ed.url);ed.url=URL.createObjectURL(f);const v=E('video');v.src=ed.url;v.style.display='block';const ph0=E('ph');if(ph0)ph0.style.display='none';E('fileinfo').textContent=f.name+' · '+fmtSize(f.size);if(f.size>200*1048576)showNotice('⚠️ ဖိုင် 200 MB ထက် ကြီးနေပါတယ် ('+fmtSize(f.size)+') — browser ထဲတွင် Export ကြာနိုင် / မအောင်မြင်နိုင်ပါတယ်။ ဖိုင် သေးတာ သုံးရန် အကြံပြုပါတယ်။','info');v.onloadedmetadata=()=>{if(ed.url&&v.src!==ed.url)return; /* an inserted-voice preview is loaded, not a new source file */ ed.duration=v.duration;ed.videoW=v.videoWidth||0;ed.videoH=v.videoHeight||0;E('start').value=0;E('end').value=Math.floor(v.duration*10)/10;E('rstart').max=v.duration;E('rend').max=v.duration;E('rstart').value=0;E('rend').value=v.duration;refreshLabels();if(window.__recapNavRefresh)window.__recapNavRefresh();showNotice(wasChange?'🎬 Video လဲပြီးပါပြီ — အရင် project အကုန် ရှင်းပြီးပါပြီ':'✅ Video တင်ပြီးပါပြီ — ကြာချိန် '+fmtDur(v.duration),'ok');if(ed.pendingCreate&&ed.modeChosen){ed.pendingCreate=false;if(window.__recapPendingCreate)window.__recapPendingCreate()}}}
  E('file').addEventListener('change',()=>{const f=E('file').files[0];if(!f)return;const wasChange=!!ed._changeWipe;ed._changeWipe=false;acceptVideoFile(f,wasChange)});
  /* ================= V250: 🔗 URL video box =================
-    One input + one fetch button on the Trim home, beside the video
-    pick control. Routing:
+    One input + one fetch button. Placement history: V250 parked it
+    in the Trim home (invisible to users) -> V251 moved it into the
+    main page flow -> V252 (user's order): it lives in the
+    SOURCE-CHOICE sheet (#homeSource) that the stage placeholder
+    opens, beside that sheet's 📱 file-pick button. Routing:
       (a) direct media URL (.mp4/.webm/.mov/.m4v) -> browser fetch
           with progress; on CORS/network failure -> the server route
           (which is ONLY ever used for direct media URLs);
@@ -1133,6 +1149,12 @@ function makeEditor(p){
    const safeName=String(got.name||'url-video').replace(/[\\/:*?"<>|]/g,'_').slice(0,120)||'url-video';
    const f=new File([got.blob],safeName,{type:got.blob.type||'video/mp4'});
    acceptVideoFile(f,true);
+   /* V252: the URL box lives in the source-choice sheet now — on
+      success close the sheet so the loaded video is right there in
+      the editor. On error / cancel the sheet stays open: those paths
+      never reach this line, and the guard only fires while the
+      source home is actually mounted in the sheet */
+   const hsDone=E('homeSource');if(hsDone&&hsDone.parentElement&&hsDone.parentElement.id==='sheetBody')closeSheet();
    setUrlProg(100,'✅ ပြီးပါပြီ');setTimeout(hideUrlProg,700);
    setUrlStatus('✅ ရပါပြီ — '+safeName);
    if(typeof recapsStat==='function')recapsStat('urlfetch');

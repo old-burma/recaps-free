@@ -69,9 +69,14 @@ input[type=checkbox]{width:19px;height:19px;accent-color:#FFFFFF;cursor:pointer}
 .pick-btn{flex:1;padding:12px;border-radius:14px;border:1.5px solid #2C2C2C;background:#1E1E1E;cursor:pointer;font-family:inherit;text-align:left}
 .pick-btn b{display:block;font-size:13.5px;color:#F2F2F2}.pick-btn span{font-size:12px;color:#9A9A9A}
 .switch-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0}
-.tgl{width:50px;height:28px;border-radius:999px;background:#3A3A3A;position:relative;cursor:pointer;flex:0 0 50px}
-.tgl::after{content:'';position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:all .18s}
-.tgl.on{background:#FFFFFF}.tgl.on::after{left:25px}
+/* V254: the knob MUST contrast with the track in BOTH states — the
+   V253 monochrome pass left ON as a white knob on a white track (the
+   switch read as one solid white pill, ON/OFF indistinguishable).
+   OFF = dark gray track + visible outline + light-gray knob;
+   ON  = white track + BLACK knob. Still strictly black & white. */
+.tgl{width:50px;height:28px;border-radius:999px;background:#3A3A3A;position:relative;cursor:pointer;flex:0 0 50px;box-shadow:inset 0 0 0 1.5px #6E6E6E}
+.tgl::after{content:'';position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#BDBDBD;transition:all .18s}
+.tgl.on{background:#FFFFFF;box-shadow:inset 0 0 0 1.5px #FFFFFF}.tgl.on::after{left:25px;background:#111111}
 video.preview{width:100%;border-radius:12px;background:#000}
 video.preview.framed{max-height:40vh;max-height:40dvh;object-fit:contain}
 .file-info{font-size:12.5px;color:#9A9A9A;margin-top:6px;word-break:break-all}
@@ -193,7 +198,12 @@ body.locked{overflow:hidden}
 .frame-border{position:absolute;inset:0;border:3px solid #FFE92E;border-radius:14px;pointer-events:none;display:none;z-index:7}
 /* ===== V253: fade preview layer + PiP overlay + extra text overlays ===== */
 .fade-layer{position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;z-index:4}
-.pip-overlay{position:absolute;z-index:6;pointer-events:none;border-radius:8px;display:none}
+/* V254: draggable like the logo (pointer-events auto + grab cursor +
+   touch-action none), and hard bounds so the preview can never become
+   an oversized slab: height auto (natural aspect), max-height 94% of
+   the stage with object-fit contain as the last-resort fit */
+.pip-overlay{position:absolute;z-index:6;pointer-events:auto;cursor:grab;touch-action:none;border-radius:8px;display:none;height:auto;max-width:60%;max-height:94%;object-fit:contain}
+.pip-overlay:active{cursor:grabbing}
 .text-overlay.pos-preset{cursor:default;pointer-events:none}
 /* ===== V217 Blur tool + colour swatches =====
    .blur-layer sits over the video (z 3, below the app's own overlays)
@@ -807,7 +817,7 @@ const speedHome='<div class="field vs-field"><div class="vs-head"><label>⏩ Vid
 const fadeHome='<div class="field vs-field"><div class="vs-head"><label>🌅 Fade In (အစ မှိန်ဝင်)</label><span class="vs-val" id="'+p+'-fadeInVal">0s</span></div><input type="range" class="vs-range" id="'+p+'-fadeIn" min="0" max="3" step="0.5" value="0"></div>'
 +'<div class="field vs-field"><div class="vs-head"><label>🌇 Fade Out (အဆုံး မှိန်ထွက်)</label><span class="vs-val" id="'+p+'-fadeOutVal">0s</span></div><input type="range" class="vs-range" id="'+p+'-fadeOut" min="0" max="3" step="0.5" value="0"><p class="hint">Video + အသံ နှစ်ခုလုံး မှိန်ဝင်/မှိန်ထွက် ဖြစ်ပါမယ် — 0s = ပိတ်။ Preview မှာ အကြမ်းဖျင်း မြင်ရပြီး Export မှာ အတိအကျ ပါပါတယ်</p></div>'
 +'<button class="btn light" id="'+p+'-fadeReset" style="width:100%;margin-top:6px">↺ Fade မူလ (ပိတ်) ပြန်ထား</button>';
-const pipHome='<div class="switch-row"><div><b style="font-size:14px">ပုံ ထပ်ပြရန် (PiP)</b><div style="font-size:12px;color:#9A9A9A">Video ပေါ်မှာ ပုံ တစ်ပုံ ထပ်ပြမည် — Export တွင်လည်း ပါမည်</div></div><div class="tgl" id="'+p+'-pipTgl"></div></div>'
+const pipHome='<div class="switch-row"><div><b style="font-size:14px">ပုံ ထပ်ပြရန် (PiP)</b><div style="font-size:12px;color:#9A9A9A">Video ပေါ်တွင် ပြပြီး လက်ဖြင့် ရွှေ့နိုင်သည် — Export တွင်လည်း ပါမည်</div></div><div class="tgl" id="'+p+'-pipTgl"></div></div>'
 +'<div class="field"><label>ပုံ ရွေးရန်</label><div class="picker-row"><button type="button" class="btn light small" id="'+p+'-pipPick">📁 ပုံ တင်</button><span class="file-info" id="'+p+'-pipInfo" style="margin-top:0">ပုံ မရွေးရသေးပါ</span></div><input type="file" id="'+p+'-pipFile" accept="image/*" style="display:none"></div>'
 +'<div class="field"><label>နေရာ</label><div class="style-row" id="'+p+'-pipPos"><button class="style-chip" data-v="tl">↖ အပေါ်-ဘယ်</button><button class="style-chip" data-v="tr">↗ အပေါ်-ညာ</button><button class="style-chip" data-v="bl">↙ အောက်-ဘယ်</button><button class="style-chip" data-v="br">↘ အောက်-ညာ</button><button class="style-chip" data-v="c">⬜ အလယ်</button></div></div>'
 +'<div class="field vs-field"><div class="vs-head"><label>ပုံ အရွယ်</label><span class="vs-val" id="'+p+'-pipSizeVal">30%</span></div><input type="range" class="vs-range" id="'+p+'-pipSize" min="10" max="60" step="1" value="30"></div>'
@@ -1610,20 +1620,35 @@ function fadeWinOf(ed,durOut){
  return{fi:Math.min(fi,durOut/2),fo:Math.min(fo,durOut/2)};
 }
 /* PiP: the overlay PNG — the uploaded image drawn at size% of the
-   canvas width with the opacity baked in (same recipe as the logo) */
-async function buildPipPNG(ed,W){
+   canvas width with the opacity baked in (same recipe as the logo).
+   V254: the height is capped at 94% of the frame height (the width
+   shrinks to match) — the stage preview's fit in syncPipOvl applies
+   the same cap, so preview and export can never disagree and a tall
+   image can never spill out of the frame. */
+async function buildPipPNG(ed,W,H){
  if(!ed||!ed.pipOn||!ed.pipImgData)return null;
  const img=await loadImg(ed.pipImgData);if(!img)return null;
- const tw=Math.max(16,Math.round(((ed.pipSize||30)/100)*W));
- const nw=img.naturalWidth||img.width||220,nh=img.naturalHeight||img.height||220,th=Math.max(8,Math.round(tw*nh/nw));
+ let tw=Math.max(16,Math.round(((ed.pipSize||30)/100)*W));
+ const nw=img.naturalWidth||img.width||220,nh=img.naturalHeight||img.height||220;
+ let th=Math.max(8,Math.round(tw*nh/nw));
+ const maxH=(typeof H==='number'&&H>0)?Math.round(0.94*H):0;
+ if(maxH&&th>maxH){th=maxH;tw=Math.max(16,Math.round(th*nw/nh))}
  const c=document.createElement('canvas');c.width=tw;c.height=th;const x=c.getContext('2d');if(!x)return null;
  x.globalAlpha=Math.max(0.05,Math.min(1,((ed.pipOpacity==null?90:ed.pipOpacity))/100));x.drawImage(img,0,0,tw,th);
  const bytes=await new Promise(res=>c.toBlob(b=>{if(!b){res(null);return}b.arrayBuffer().then(ab=>res(new Uint8Array(ab))),'image/png'}));
  return bytes?{bytes,w:tw,h:th}:null;
 }
-/* PiP top-left corner for a preset (3% frame margin; centre = centred) */
+/* PiP top-left corner: a preset (3% frame margin; centre = centred)
+   or, V254, the dragged position — pipX/pipY are CENTRE fractions
+   exactly like the logo's, mapped to a top-left and clamped so the
+   whole image stays inside the frame (the stage preview clamps the
+   centre the same way, so preview and export agree) */
 function pipXY(ed,W,H,w,h){
  const m=Math.round(0.03*Math.min(W,H)),pos=ed.pipPos||'br';
+ if(pos==='free'&&typeof ed.pipX==='number'&&typeof ed.pipY==='number'){
+  return{x:Math.max(0,Math.min(Math.max(0,W-w),Math.round(ed.pipX*W-w/2))),
+         y:Math.max(0,Math.min(Math.max(0,H-h),Math.round(ed.pipY*H-h/2)))};
+ }
  if(pos==='tl')return{x:m,y:m};
  if(pos==='tr')return{x:W-w-m,y:m};
  if(pos==='bl')return{x:m,y:H-h-m};
@@ -2369,7 +2394,7 @@ async function exportOne(ff,ed,seg,idx,total,log,progs){
  if(ed.textOn&&(ed.textStr||'').trim()){const bh=Math.round(170*S);const ty=Math.max(0,Math.min(H-bh,Math.round((ed.textY||0.16)*H-bh/2)));await ff.writeFile('freetext.png',await textPNG(ed.textStr.trim(),W,bh,{size:Math.round((ed.textSize||44)*S),color:(ed.textColor||'#FFFFFF'),cx:(ed.textX==null?0.5:ed.textX),font:fontFamFor('text')}));prepStep('🖼️ စာသား ပုံ ပြင်နေပါတယ်…');const tFrom=(ed.textStart||0)/spd,tTo=(((ed.textEnd||0)>(ed.textStart||0))?ed.textEnd:dur)/spd;overlays.push({file:'freetext.png',y:ty,from:tFrom,to:tTo})}
  /* V253: PiP image overlay + timed text items 2/3 — same PNG-overlay
     machinery as the logo / free text above */
- if(ed.pipOn&&ed.pipImgData){const pp=await buildPipPNG(ed,W);if(pp){await ff.writeFile('pip.png',pp.bytes);const xy=pipXY(ed,W,H,pp.w,pp.h);prepStep('🖼️ PiP ပုံ ပြင်နေပါတယ်…');overlays.push({file:'pip.png',x:xy.x,y:xy.y,from:0,to:durOut})}}
+ if(ed.pipOn&&ed.pipImgData){const pp=await buildPipPNG(ed,W,H);if(pp){await ff.writeFile('pip.png',pp.bytes);const xy=pipXY(ed,W,H,pp.w,pp.h);prepStep('🖼️ PiP ပုံ ပြင်နေပါတယ်…');overlays.push({file:'pip.png',x:xy.x,y:xy.y,from:0,to:durOut})}}
  for(const tk of['2','3']){const tOn=ed['txt'+tk+'On'],tStr=(ed['txt'+tk+'Str']||'').trim();if(tOn&&tStr){const bh2=Math.round(170*S);const ty2=txtStripY(ed['txt'+tk+'Pos'],H,bh2);const fn2='freetext'+tk+'.png';await ff.writeFile(fn2,await textPNG(tStr,W,bh2,{size:Math.round((ed['txt'+tk+'Size']||40)*S),color:(ed['txt'+tk+'Color']||'#FFFFFF'),cx:0.5,font:fontFamFor('text')}));prepStep('🖼️ စာသား ပုံ ပြင်နေပါတယ်…');const s2=(ed['txt'+tk+'Start']||0),e2=(ed['txt'+tk+'End']||0);overlays.push({file:fn2,y:ty2,from:s2/spd,to:(e2>s2?e2:dur)/spd})}}
  /* build filter graph */
  const blur=Math.max(2,Math.round(ed.blur/2*S));
@@ -3149,7 +3174,7 @@ async function exportOneHw(ff,ed,seg,idx,total,log,progs){
  if(useText){const bh=Math.round(170*S);const ty=Math.max(0,Math.min(H-bh,Math.round((ed.textY||0.16)*H-bh/2)));const img=await hwImgFromBytes(await textPNG(ed.textStr.trim(),W,bh,{size:Math.round((ed.textSize||44)*S),color:(ed.textColor||'#FFFFFF'),cx:(ed.textX==null?0.5:ed.textX),font:fontFamFor('text')}));if(!img)throw new Error('စာသား ပုံ ဖွင့် မရပါ');const tFrom=ed.textStart||0,tTo=((ed.textEnd||0)>(ed.textStart||0))?ed.textEnd:dur;layers.text={img:img,x:0,y:ty,from:tFrom,to:tTo};prepStep('🖼️ စာသား ပုံ ပြင်နေပါတယ်…')}
  /* V253: PiP image + timed text items 2/3 — the same images
     exportOne overlays, composited by hwDrawFrame instead */
- if(ed.pipOn&&ed.pipImgData){const pp=await buildPipPNG(ed,W);if(pp){const img=await hwImgFromBytes(pp.bytes);if(!img)throw new Error('PiP ပုံ ဖွင့် မရပါ');const xy=pipXY(ed,W,H,pp.w,pp.h);layers.pip={img:img,x:xy.x,y:xy.y};prepStep('🖼️ PiP ပုံ ပြင်နေပါတယ်…')}}
+ if(ed.pipOn&&ed.pipImgData){const pp=await buildPipPNG(ed,W,H);if(pp){const img=await hwImgFromBytes(pp.bytes);if(!img)throw new Error('PiP ပုံ ဖွင့် မရပါ');const xy=pipXY(ed,W,H,pp.w,pp.h);layers.pip={img:img,x:xy.x,y:xy.y};prepStep('🖼️ PiP ပုံ ပြင်နေပါတယ်…')}}
  for(const tk of['2','3']){const tOn=ed['txt'+tk+'On'],tStr=(ed['txt'+tk+'Str']||'').trim();if(tOn&&tStr){const bh2=Math.round(170*S);const ty2=txtStripY(ed['txt'+tk+'Pos'],H,bh2);const img=await hwImgFromBytes(await textPNG(tStr,W,bh2,{size:Math.round((ed['txt'+tk+'Size']||40)*S),color:(ed['txt'+tk+'Color']||'#FFFFFF'),cx:0.5,font:fontFamFor('text')}));if(!img)throw new Error('စာသား ပုံ ဖွင့် မရပါ');const s2=(ed['txt'+tk+'Start']||0),e2=(ed['txt'+tk+'End']||0);layers.texts.push({img:img,x:0,y:ty2,from:s2,to:(e2>s2?e2:dur)});prepStep('🖼️ စာသား ပုံ ပြင်နေပါတယ်…')}}
  const _tMix=expNow();
  const mixFile=await hwMixedAudio(ff,ed,seg,voiceFile,idx,f=>{if(prep)prep(Math.min(1,(prepN+f)/Math.max(1,prepItems)),'🎙️ အသံ ရောနေပါတယ်…')});
@@ -4597,7 +4622,7 @@ if(undoBtn)undoBtn.onclick=()=>{
    controls; blurOn/blurFull are region-owned views (region objects
    carry their own state) and the expInc* toggles are export-session
    state, so those are not restored as toggles either. */
-const PROJ_ED_FIELDS=['aspect','blur','audioMode','voice','ttsEngine','edgeVoice','bgmVol','voiceVol','bgmMute','voiceMute','syncDelay','subPosY','subPosCustom','subBand','subColor','subColMain','subColHi','subSize','titleX','titleY','titleSize','titleColor','textOn','textStr','textX','textY','textSize','textColor','logoOn','logoX','logoY','logoSize','logoOpacity','logoSrc','logoText','logoImgData','borderOn','borderW','borderColor','blurRegions','adjSpeed','aiMode','recapStyle','modeChosen','cuesManual','adjB','adjC','adjS','segSpeed','fadeIn','fadeOut','pipOn','pipPos','pipSize','pipOpacity','pipImgData','textStart','textEnd','txt2On','txt2Str','txt2Size','txt2Pos','txt2Start','txt2End','txt2Color','txt3On','txt3Str','txt3Size','txt3Pos','txt3Start','txt3End','txt3Color'];
+const PROJ_ED_FIELDS=['aspect','blur','audioMode','voice','ttsEngine','edgeVoice','bgmVol','voiceVol','bgmMute','voiceMute','syncDelay','subPosY','subPosCustom','subBand','subColor','subColMain','subColHi','subSize','titleX','titleY','titleSize','titleColor','textOn','textStr','textX','textY','textSize','textColor','logoOn','logoX','logoY','logoSize','logoOpacity','logoSrc','logoText','logoImgData','borderOn','borderW','borderColor','blurRegions','adjSpeed','aiMode','recapStyle','modeChosen','cuesManual','adjB','adjC','adjS','segSpeed','fadeIn','fadeOut','pipOn','pipPos','pipSize','pipOpacity','pipX','pipY','pipImgData','textStart','textEnd','txt2On','txt2Str','txt2Size','txt2Pos','txt2Start','txt2End','txt2Color','txt3On','txt3Str','txt3Size','txt3Pos','txt3Start','txt3End','txt3Color'];
 const PROJ_SEL_GROUPS=[['aspectOpts','v'],['styleChips','v'],['subColors','v'],['logoSrcs','v'],['borderColors','c']];
 const PROJ_SKIP_TGL={blurOn:1,blurFull:1,expIncTitle:1,expIncLogo:1};
 function projFormCapture(){
@@ -5293,13 +5318,13 @@ window.__recapProject={collect:projCollect,apply:applyProject,sigMatch:projSigMa
  ed.adjB=(typeof SETTINGS.adjB==='number')?SETTINGS.adjB:100;ed.adjC=(typeof SETTINGS.adjC==='number')?SETTINGS.adjC:100;ed.adjS=(typeof SETTINGS.adjS==='number')?SETTINGS.adjS:100;
  ed.segSpeed=(typeof SETTINGS.segSpeed==='number'&&SETTINGS.segSpeed>=0.5&&SETTINGS.segSpeed<=2)?SETTINGS.segSpeed:1;
  ed.fadeIn=(typeof SETTINGS.fadeIn==='number')?SETTINGS.fadeIn:0;ed.fadeOut=(typeof SETTINGS.fadeOut==='number')?SETTINGS.fadeOut:0;
- ed.pipOn=!!SETTINGS.pipOn;ed.pipPos=SETTINGS.pipPos||'br';ed.pipSize=SETTINGS.pipSize||30;ed.pipOpacity=(typeof SETTINGS.pipOpacity==='number'?SETTINGS.pipOpacity:90);ed.pipImgData=null;try{ed.pipImgData=localStorage.getItem('recaps_pip_img')||null}catch(e){}
+ ed.pipOn=!!SETTINGS.pipOn;ed.pipPos=SETTINGS.pipPos||'br';ed.pipSize=SETTINGS.pipSize||30;ed.pipOpacity=(typeof SETTINGS.pipOpacity==='number'?SETTINGS.pipOpacity:90);ed.pipX=(typeof SETTINGS.pipX==='number'?SETTINGS.pipX:null);ed.pipY=(typeof SETTINGS.pipY==='number'?SETTINGS.pipY:null);ed.pipImgData=null;try{ed.pipImgData=localStorage.getItem('recaps_pip_img')||null}catch(e){}
  ed.textStart=(typeof SETTINGS.textStart==='number')?SETTINGS.textStart:0;ed.textEnd=(typeof SETTINGS.textEnd==='number')?SETTINGS.textEnd:0;
  ed.txt2On=!!SETTINGS.txt2On;ed.txt2Str=SETTINGS.txt2Str||'';ed.txt2Size=SETTINGS.txt2Size||40;ed.txt2Pos=SETTINGS.txt2Pos||'top';ed.txt2Start=(typeof SETTINGS.txt2Start==='number')?SETTINGS.txt2Start:0;ed.txt2End=(typeof SETTINGS.txt2End==='number')?SETTINGS.txt2End:0;ed.txt2Color=hexOk(SETTINGS.txt2Color)?SETTINGS.txt2Color:'#FFFFFF';
  ed.txt3On=!!SETTINGS.txt3On;ed.txt3Str=SETTINGS.txt3Str||'';ed.txt3Size=SETTINGS.txt3Size||40;ed.txt3Pos=SETTINGS.txt3Pos||'bot';ed.txt3Start=(typeof SETTINGS.txt3Start==='number')?SETTINGS.txt3Start:0;ed.txt3End=(typeof SETTINGS.txt3End==='number')?SETTINGS.txt3End:0;ed.txt3Color=hexOk(SETTINGS.txt3Color)?SETTINGS.txt3Color:'#FFFFFF';
  ed.blurRegions=[];try{const _br=SETTINGS.blurRegions;if(Array.isArray(_br))ed.blurRegions=JSON.parse(JSON.stringify(_br)).filter(r=>r&&typeof r.x==='number'&&typeof r.y==='number')}catch(e){}
  ed.blurSel=ed.blurRegions.length?ed.blurRegions[0].id:null;
- function persistOvl(){SETTINGS.textOn=ed.textOn;SETTINGS.textStr=ed.textStr;SETTINGS.textSize=ed.textSize;SETTINGS.textX=ed.textX;SETTINGS.textY=ed.textY;SETTINGS.logoOn=ed.logoOn;SETTINGS.logoText=ed.logoText;SETTINGS.borderOn=ed.borderOn;SETTINGS.titleSize=ed.titleSize;SETTINGS.titleX=ed.titleX;SETTINGS.titleY=ed.titleY;SETTINGS.logoSrc=ed.logoSrc;SETTINGS.logoSize=ed.logoSize;SETTINGS.logoOpacity=ed.logoOpacity;SETTINGS.logoX=ed.logoX;SETTINGS.logoY=ed.logoY;SETTINGS.borderW=ed.borderW;SETTINGS.borderColor=ed.borderColor;SETTINGS.subColor=ed.subColor;SETTINGS.subBand=ed.subBand;SETTINGS.subSize=ed.subSize;SETTINGS.subColMain=ed.subColMain;SETTINGS.subColHi=ed.subColHi;SETTINGS.titleColor=ed.titleColor;SETTINGS.textColor=ed.textColor;SETTINGS.adjB=ed.adjB;SETTINGS.adjC=ed.adjC;SETTINGS.adjS=ed.adjS;SETTINGS.segSpeed=ed.segSpeed;SETTINGS.fadeIn=ed.fadeIn;SETTINGS.fadeOut=ed.fadeOut;SETTINGS.pipOn=ed.pipOn;SETTINGS.pipPos=ed.pipPos;SETTINGS.pipSize=ed.pipSize;SETTINGS.pipOpacity=ed.pipOpacity;SETTINGS.textStart=ed.textStart;SETTINGS.textEnd=ed.textEnd;SETTINGS.txt2On=ed.txt2On;SETTINGS.txt2Str=ed.txt2Str;SETTINGS.txt2Size=ed.txt2Size;SETTINGS.txt2Pos=ed.txt2Pos;SETTINGS.txt2Start=ed.txt2Start;SETTINGS.txt2End=ed.txt2End;SETTINGS.txt2Color=ed.txt2Color;SETTINGS.txt3On=ed.txt3On;SETTINGS.txt3Str=ed.txt3Str;SETTINGS.txt3Size=ed.txt3Size;SETTINGS.txt3Pos=ed.txt3Pos;SETTINGS.txt3Start=ed.txt3Start;SETTINGS.txt3End=ed.txt3End;SETTINGS.txt3Color=ed.txt3Color;saveSettings()}
+ function persistOvl(){SETTINGS.textOn=ed.textOn;SETTINGS.textStr=ed.textStr;SETTINGS.textSize=ed.textSize;SETTINGS.textX=ed.textX;SETTINGS.textY=ed.textY;SETTINGS.logoOn=ed.logoOn;SETTINGS.logoText=ed.logoText;SETTINGS.borderOn=ed.borderOn;SETTINGS.titleSize=ed.titleSize;SETTINGS.titleX=ed.titleX;SETTINGS.titleY=ed.titleY;SETTINGS.logoSrc=ed.logoSrc;SETTINGS.logoSize=ed.logoSize;SETTINGS.logoOpacity=ed.logoOpacity;SETTINGS.logoX=ed.logoX;SETTINGS.logoY=ed.logoY;SETTINGS.borderW=ed.borderW;SETTINGS.borderColor=ed.borderColor;SETTINGS.subColor=ed.subColor;SETTINGS.subBand=ed.subBand;SETTINGS.subSize=ed.subSize;SETTINGS.subColMain=ed.subColMain;SETTINGS.subColHi=ed.subColHi;SETTINGS.titleColor=ed.titleColor;SETTINGS.textColor=ed.textColor;SETTINGS.adjB=ed.adjB;SETTINGS.adjC=ed.adjC;SETTINGS.adjS=ed.adjS;SETTINGS.segSpeed=ed.segSpeed;SETTINGS.fadeIn=ed.fadeIn;SETTINGS.fadeOut=ed.fadeOut;SETTINGS.pipOn=ed.pipOn;SETTINGS.pipPos=ed.pipPos;SETTINGS.pipSize=ed.pipSize;SETTINGS.pipOpacity=ed.pipOpacity;SETTINGS.pipX=ed.pipX;SETTINGS.pipY=ed.pipY;SETTINGS.textStart=ed.textStart;SETTINGS.textEnd=ed.textEnd;SETTINGS.txt2On=ed.txt2On;SETTINGS.txt2Str=ed.txt2Str;SETTINGS.txt2Size=ed.txt2Size;SETTINGS.txt2Pos=ed.txt2Pos;SETTINGS.txt2Start=ed.txt2Start;SETTINGS.txt2End=ed.txt2End;SETTINGS.txt2Color=ed.txt2Color;SETTINGS.txt3On=ed.txt3On;SETTINGS.txt3Str=ed.txt3Str;SETTINGS.txt3Size=ed.txt3Size;SETTINGS.txt3Pos=ed.txt3Pos;SETTINGS.txt3Start=ed.txt3Start;SETTINGS.txt3End=ed.txt3End;SETTINGS.txt3Color=ed.txt3Color;saveSettings()}
  function persistBlur(){try{SETTINGS.blurRegions=JSON.parse(JSON.stringify(ed.blurRegions||[]))}catch(e){SETTINGS.blurRegions=ed.blurRegions||[]}saveSettings()}
  /* V244: project-load bridge — after a project file restores ed state
     from the studio closure, re-run THIS closure's sync paths so the
@@ -5315,7 +5340,24 @@ window.__recapProject={collect:projCollect,apply:applyProject,sigMatch:projSigMa
     per-frame text windows + fade layer tick from updateOverlay. */
  function syncAdjPreview(){try{vidEl.style.filter=adjCssOf(ed)}catch(e){}}
  function applyVidRate(){try{vidEl.playbackRate=segSpeedOf(ed)}catch(e){}}
- function syncPipOvl(){const o=E('pipOvl');if(!o)return;const show=!!(ed.pipOn&&ed.pipImgData);if(show&&o.getAttribute('src')!==ed.pipImgData)o.src=ed.pipImgData;o.style.display=show?'block':'none';if(!show)return;o.style.width=(ed.pipSize||30)+'%';o.style.opacity=String(Math.max(0.05,Math.min(1,(ed.pipOpacity==null?90:ed.pipOpacity)/100)));const pos=ed.pipPos||'br',m='3%';o.style.left='auto';o.style.right='auto';o.style.top='auto';o.style.bottom='auto';o.style.transform='';if(pos==='tl'){o.style.left=m;o.style.top=m}else if(pos==='tr'){o.style.right=m;o.style.top=m}else if(pos==='bl'){o.style.left=m;o.style.bottom=m}else if(pos==='c'){o.style.left='50%';o.style.top='50%';o.style.transform='translate(-50%,-50%)'}else{o.style.right=m;o.style.bottom=m}}
+ function syncPipOvl(){const o=E('pipOvl');if(!o)return;const show=!!(ed.pipOn&&ed.pipImgData);if(show&&o.getAttribute('src')!==ed.pipImgData)o.src=ed.pipImgData;if(!o._syncHook){o._syncHook=1;o.onload=()=>{try{syncPipOvl()}catch(e){}}}o.style.display=show?'block':'none';if(!show)return;o.style.opacity=String(Math.max(0.05,Math.min(1,(ed.pipOpacity==null?90:ed.pipOpacity)/100)));
+ /* V254 size fit: the width is pipSize% of the stage width, but the
+    rendered height may not pass 94% of the stage height — when the
+    image's natural aspect would overflow (a tall phone photo on a
+    wide stage, the user's "huge slab" recording), the width shrinks
+    until the WHOLE image fits inside the stage. Aspect is never
+    cropped or stretched; buildPipPNG caps the export identically. */
+ let wPct=ed.pipSize||30;const wrap=o.parentElement;
+ if(wrap&&o.naturalWidth>0&&o.naturalHeight>0){const r=wrap.getBoundingClientRect();if(r.width>0&&r.height>0){const hFrac=(wPct/100)*(r.width/r.height)*(o.naturalHeight/o.naturalWidth);if(hFrac>0.94)wPct=Math.max(4,Math.round(wPct*(0.94/hFrac)*10)/10)}}
+ o.style.width=wPct+'%';o.style.height='auto';
+ const pos=ed.pipPos||'br',m='3%';o.style.left='auto';o.style.right='auto';o.style.top='auto';o.style.bottom='auto';o.style.transform='';
+ if(pos==='free'&&typeof ed.pipX==='number'&&typeof ed.pipY==='number'){
+  /* V254 dragged position: CENTRE fractions like the logo, with the
+     same measured whole-overlay clamp, so the image stays fully
+     inside the frame at every dragged position (pipXY mirrors it) */
+  if(wrap&&o.offsetWidth&&o.offsetHeight){const r=wrap.getBoundingClientRect();if(r.width>0&&r.height>0){const hw=o.offsetWidth/2/r.width,hh=o.offsetHeight/2/r.height;let cx=ed.pipX,cy=ed.pipY;if(hw<0.5)cx=Math.max(hw,Math.min(1-hw,cx));if(hh<0.5)cy=Math.max(hh,Math.min(1-hh,cy));ed.pipX=cx;ed.pipY=cy}}
+  o.style.left=(ed.pipX*100)+'%';o.style.top=(ed.pipY*100)+'%';o.style.transform='translate(-50%,-50%)'}
+ else if(pos==='tl'){o.style.left=m;o.style.top=m}else if(pos==='tr'){o.style.right=m;o.style.top=m}else if(pos==='bl'){o.style.left=m;o.style.bottom=m}else if(pos==='c'){o.style.left='50%';o.style.top='50%';o.style.transform='translate(-50%,-50%)'}else{o.style.right=m;o.style.bottom=m}}
  function syncTxtOvls(){for(const tk of['2','3']){const o=E('textOvl'+tk);if(!o)continue;const on=ed['txt'+tk+'On'],str=ed['txt'+tk+'Str']||'';o.textContent=str;o.style.fontSize=Math.max(13,Math.round((ed['txt'+tk+'Size']||40)*0.5))+'px';o.style.color=ed['txt'+tk+'Color']||'#FFFFFF';o.style.fontFamily=fontStackCss('text');const pos=ed['txt'+tk+'Pos']||'top';o.style.left='50%';o.style.top=pos==='top'?'10%':pos==='mid'?'50%':'88%';o.style.display=(on&&str.trim())?'block':'none'}}
  function textWindowOpen(start,end,rel,durM){const s=start||0,e=(end||0)>s?end:durM;return rel>=s&&rel<e}
  function fadeTick(rel,durM){
@@ -5515,6 +5557,21 @@ window.__recapProject={collect:projCollect,apply:applyProject,sigMatch:projSigMa
   function move(e){if(!drag)return;const r=wrap.getBoundingClientRect();if(!r.width||!r.height)return;ed.logoX=Math.max(-0.5,Math.min(1.5,drag.fx+(e.clientX-drag.x)/r.width));ed.logoY=Math.max(-0.5,Math.min(1.5,drag.fy+(e.clientY-drag.y)/r.height));syncLogoOvl()}
   function end(){if(!drag)return;drag=null;persistOvl()}
   lO.addEventListener('pointerdown',start);lO.addEventListener('pointermove',move);lO.addEventListener('pointerup',end);lO.addEventListener('pointercancel',end);
+ })();
+ /* V254: PiP drag — the SAME pattern as the logo drag above (the user
+    asked for "logo လို"): pointer capture in try/catch, DELTA from the
+    drag-start centre, pointerup AND pointercancel both end + persist.
+    The start centre is read from the overlay's RENDERED rect when it
+    is measurable, so grabbing a preset-anchored image switches it to
+    centre fractions ('free') without a jump — the V233 lesson. A drag
+    sets ed.pipPos='free' and stores centre fractions in ed.pipX/Y;
+    the preset chips in the PiP sheet snap it back to a preset. */
+ (function(){
+  const pO=E('pipOvl');if(!pO)return;const wrap=pO.parentElement;if(!wrap)return;let drag=null;
+  function start(e){if(pO.style.display==='none')return;let fx=(typeof ed.pipX==='number')?ed.pipX:null,fy=(typeof ed.pipY==='number')?ed.pipY:null;const wr=wrap.getBoundingClientRect(),orr=pO.getBoundingClientRect();if(wr.width>0&&wr.height>0&&orr.width>0){fx=(orr.left+orr.width/2-wr.left)/wr.width;fy=(orr.top+orr.height/2-wr.top)/wr.height}else if(fx==null||fy==null){fx=0.5;fy=0.5}drag={x:e.clientX,y:e.clientY,fx:fx,fy:fy};try{pO.setPointerCapture(e.pointerId)}catch(err){}e.preventDefault();e.stopPropagation()}
+  function move(e){if(!drag)return;const r=wrap.getBoundingClientRect();if(!r.width||!r.height)return;ed.pipX=Math.max(-0.5,Math.min(1.5,drag.fx+(e.clientX-drag.x)/r.width));ed.pipY=Math.max(-0.5,Math.min(1.5,drag.fy+(e.clientY-drag.y)/r.height));if(ed.pipPos!=='free'){ed.pipPos='free';syncPipChips()}syncPipOvl()}
+  function end(){if(!drag)return;drag=null;persistOvl()}
+  pO.addEventListener('pointerdown',start);pO.addEventListener('pointermove',move);pO.addEventListener('pointerup',end);pO.addEventListener('pointercancel',end);
  })();
  /* script edits drive the cue count, the stale warning and the voice gate */
  E('subs').addEventListener('input',()=>{updateCueCount();checkVoiceStale();refreshVoiceGate();renderSteps()});
@@ -5758,7 +5815,7 @@ window.__recapProject={collect:projCollect,apply:applyProject,sigMatch:projSigMa
  const pipSizeI=E('pipSize'),pipOpI=E('pipOpacity');
  if(pipSizeI){pipSizeI.value=ed.pipSize||30;const lb=E('pipSizeVal');if(lb)lb.textContent=(ed.pipSize||30)+'%';pipSizeI.addEventListener('input',()=>{ed.pipSize=parseInt(pipSizeI.value,10)||30;const l2=E('pipSizeVal');if(l2)l2.textContent=ed.pipSize+'%';persistOvl();syncPipOvl()})}
  if(pipOpI){pipOpI.value=(ed.pipOpacity==null?90:ed.pipOpacity);const lb=E('pipOpacityVal');if(lb)lb.textContent=(ed.pipOpacity==null?90:ed.pipOpacity)+'%';pipOpI.addEventListener('input',()=>{ed.pipOpacity=parseInt(pipOpI.value,10);const l2=E('pipOpacityVal');if(l2)l2.textContent=ed.pipOpacity+'%';persistOvl();syncPipOvl()})}
- const pipR=E('pipReset');if(pipR)pipR.onclick=()=>{ed.pipOn=false;ed.pipPos='br';ed.pipSize=30;ed.pipOpacity=90;if(pipTgl)pipTgl.classList.remove('on');if(pipSizeI){pipSizeI.value=30;const lb=E('pipSizeVal');if(lb)lb.textContent='30%'}if(pipOpI){pipOpI.value=90;const lb=E('pipOpacityVal');if(lb)lb.textContent='90%'}syncPipChips();persistOvl();syncPipOvl();showNotice('↺ PiP Setting မူလ ပြန်ထားပါပြီ','info')};
+ const pipR=E('pipReset');if(pipR)pipR.onclick=()=>{ed.pipOn=false;ed.pipPos='br';ed.pipX=null;ed.pipY=null;ed.pipSize=30;ed.pipOpacity=90;if(pipTgl)pipTgl.classList.remove('on');if(pipSizeI){pipSizeI.value=30;const lb=E('pipSizeVal');if(lb)lb.textContent='30%'}if(pipOpI){pipOpI.value=90;const lb=E('pipOpacityVal');if(lb)lb.textContent='90%'}syncPipChips();persistOvl();syncPipOvl();showNotice('↺ PiP Setting မူလ ပြန်ထားပါပြီ','info')};
  syncPipInfo();syncPipOvl();
  /* text item 1 timing + items 2/3 (controls live in the Text sheet) */
  const txStartI=E('textStart'),txEndI=E('textEnd');

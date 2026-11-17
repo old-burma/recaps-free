@@ -5175,6 +5175,30 @@ function resolveCues(ed,notify){
     — never inside a cluster. Hand-edited lists keep the V265
     extension + single-cue split, with the same grapheme
     fallback and the same parent-rewriting split apply. */
+ /* V267: the last resort (user, 2026-11-17 11:26: "နောက်ဆုံး
+    အဆင်မပြေရင် Str line ကို cut/delect လုပ်လို့ရတယ်"). On the
+    user's phone the cap-hit cues were SLIVERS (0.5 s, 0.3 s,
+    0.2 s windows whose chunks need far more time): redistribution
+    had nothing to give them and a re-split of a sub-second window
+    only makes sub-sliver halves that cannot hold speech either.
+    So both planners gain a FINAL step for a chunk that is STILL
+    capped after redistribution / re-split / extension and was
+    NOT split in this run (a split chunk's truth is still its
+    post-regeneration measurement — V266 doctrine; a later press
+    can cut it with real durations): (1) CUT the text to the
+    longest prefix whose estimated speech fits the window at the
+    cap (cutPrefixFor — the kept text is an exact prefix, cut on
+    a grapheme boundary, preferring a nearby space); the line
+    keeps its window, only its text shortens, and the subtitle
+    shortens identically because the cue text IS the line; or
+    (2) DELETE the line outright when not even a 3-grapheme
+    remnant fits — its window stays as silence in the fitted
+    render and no other cue's window or text changes. A chunk
+    whose window is a sliver (< CUEFIT_SLIVER) is never re-split
+    in the first place: it goes straight to this last resort.
+    Cuts and deletes write through the same script-rewriting
+    paths as a split, so the regeneration speaks exactly the
+    surviving texts (a deleted line is not re-spoken at all). */
  /* The fit describes THIS cue list only when the rows are the fit's
     own lines: voice mode, same count, same texts, in order. Anything
     else (no voice, stale voice, a desynced cue list) => no red rows,
@@ -5241,6 +5265,44 @@ function resolveCues(ed,notify){
   if(!A||!B||A.trim()!==A||B.trim()!==B)return null;
   return{A,B,gA:bk,gB:gs.length-bk};
  }
+ /* V267: a cue window shorter than this is a SLIVER — splitting
+    it could only produce sub-sliver halves, so sliver chunks are
+    never re-split; they go straight to the cut/delete last
+    resort (the user's real slivers were 0.2–0.5 s). */
+ const CUEFIT_SLIVER=0.6;
+ /* V267: the cut half of the last resort. Given a chunk's
+    measured duration, its text and the fit target for its window
+    (the computeCueFit target: window minus the pause reserve),
+    find the longest PREFIX of the text whose estimated speech
+    fits the window at the cap: rate = dur / grapheme count, and
+    the kept grapheme count is the largest whose estimate stays
+    under CAP * target * 0.98 (the 0.98 is the same hair of
+    safety the planners aim at with CAP*0.999). The cut lands on
+    a grapheme-cluster boundary (graphemeList — never inside a
+    cluster); a SPACE at or near the boundary (within ~20 %)
+    wins, so whole words survive where possible — the space is
+    the separator and is dropped, exactly like a split. The
+    kept text must be trim-stable (canonical texts are trimmed).
+    Returns {text, g, dur} for a cut, null when not even a
+    3-grapheme remnant fits (the caller then DELETES the line),
+    or {full:true} when the whole text already fits the budget
+    (defensive: a genuinely capped chunk cannot produce it,
+    since capped means dur > CAP * target > the budget). */
+ function cutPrefixFor(dur,text,target){
+  const gs=graphemeList(text);
+  if(!gs.length||!(dur>0)||!(target>0))return null;
+  if(dur<=CUEFIT_CAP*target)return{full:true};
+  const rate=dur/gs.length;
+  const maxG=Math.floor(CUEFIT_CAP*target*0.98/rate);
+  if(maxG<3)return null;
+  let cut=Math.min(maxG,gs.length),spCut=-1;
+  for(let k=cut;k>=Math.max(3,Math.ceil(cut*0.8));k--){if(gs[k]===' '){spCut=k;break}}
+  if(spCut>=3)cut=spCut;
+  let kept=gs.slice(0,cut).join('');
+  while(cut>0&&kept&&kept.trim()!==kept){cut--;kept=gs.slice(0,cut).join('')}
+  if(cut<3||!kept||kept.trim()!==kept)return null;
+  return{text:kept,g:cut,dur:rate*cut};
+ }
  /* Plan the Auto Fix on a WORKING COPY of the fit (chunk
     durations + windows in OUTPUT seconds — the fit's own
     timeline). Two planners, one per cue-list provenance:
@@ -5272,7 +5334,7 @@ function resolveCues(ed,notify){
   const ss=segSpeedOf(ed),trim=trimRange(),P=fit.pause||0;
   const org=[],lines=[],durs=[],wins=[];
   fit.lines.forEach((t,i)=>{org.push(i);lines.push(t);durs.push(fit.durs[i]);wins.push({start:(ed.cues[i].start-trim.start)/ss,end:(ed.cues[i].end-trim.start)/ss})});
-  const ops=[],extOrg=new Set(),splitOrg=new Set();
+  const ops=[],extOrg=new Set(),splitOrg=new Set(),cutOrg=new Set(),delOrg=new Set();
   const cappedAt=idx=>{const f=computeCueFit(durs,P,wins);return f?!!f.capped[idx]:false};
   const reds=[];fit.capped.forEach((c,i)=>{if(c)reds.push(i)});
   for(let r=reds.length-1;r>=0;r--){
@@ -5288,9 +5350,11 @@ function resolveCues(ed,notify){
     if(newEnd>wins[i].end){wins[i].end=newEnd;extApplied=true}
    }
    if(extApplied&&!cappedAt(i)){ops.push({type:'ext',i0:o,endSrc:trim.start+wins[i].end*ss});extOrg.add(o);continue}
-   /* (2) split at a word or grapheme boundary */
+   /* (2) split at a word or grapheme boundary — V267: never on
+      a SLIVER window (its halves could never hold speech); a
+      sliver goes straight to the cut/delete last resort below */
    let didSplit=false;
-   const sp=splitPointFor(lines[i]);
+   const sp=(wins[i].end-wins[i].start<CUEFIT_SLIVER)?null:splitPointFor(lines[i]);
    if(sp){
     const s=wins[i].start,e=wins[i].end,gA=sp.gA,gB=sp.gB;
     const mid=s+(e-s)*(gA/(gA+gB));
@@ -5300,14 +5364,28 @@ function resolveCues(ed,notify){
     ops.push({type:'split',i0:o,A:sp.A,B:sp.B,midSrc:trim.start+mid*ss,endSrc:trim.start+e*ss,origText:fit.lines[o]});
     splitOrg.add(o);didSplit=true;
    }
-   if(!didSplit&&extApplied)ops.push({type:'ext',i0:o,endSrc:trim.start+wins[i].end*ss}); /* partial extension: applied (a later split starts from the longer window) but NOT counted as fixed */
+   if(!didSplit&&cappedAt(i)){
+    /* (3) V267 last resort: CUT the text to the longest prefix
+       that fits this window at the cap, or DELETE the line when
+       not even a 3-grapheme remnant fits. A partial extension is
+       pushed FIRST — the cut was sized against the extended
+       window, and the applier runs the ops in plan order. */
+    if(extApplied)ops.push({type:'ext',i0:o,endSrc:trim.start+wins[i].end*ss});
+    const wlen=wins[i].end-wins[i].start;
+    const target=Math.max(0.05,wlen-((i<wins.length-1&&wlen>P)?P:0));
+    const cut=cutPrefixFor(durs[i],lines[i],target);
+    if(cut&&!cut.full){ops.push({type:'cut',i0:o,newText:cut.text,origText:fit.lines[o]});lines[i]=cut.text;durs[i]=cut.dur;cutOrg.add(o)}
+    else if(!cut){ops.push({type:'del',i0:o,origText:fit.lines[o]});org.splice(i,1);lines.splice(i,1);durs.splice(i,1);wins.splice(i,1);delOrg.add(o)}
+   }
+   else if(!didSplit&&extApplied)ops.push({type:'ext',i0:o,endSrc:trim.start+wins[i].end*ss}); /* partial extension: applied (a later split starts from the longer window) but NOT counted as fixed */
   }
   const fEnd=computeCueFit(durs,P,wins),remainingOrgs=new Set();
   if(fEnd)fEnd.capped.forEach((c,j)=>{if(c)remainingOrgs.add(org[j])});
-  let nExt=0,nSplit=0;
+  let nExt=0,nSplit=0,nCut=0;
   extOrg.forEach(o=>{if(!remainingOrgs.has(o))nExt++});
   splitOrg.forEach(o=>{if(!remainingOrgs.has(o))nSplit++});
-  return{ops,nExt,nRedist:0,nSplit,nRemainingPlanned:remainingOrgs.size};
+  cutOrg.forEach(o=>{if(!remainingOrgs.has(o))nCut++});
+  return{ops,nExt,nRedist:0,nSplit,nCut,nDel:delOrg.size,nRemainingPlanned:remainingOrgs.size};
  }
  /* V266 planner for script-derived cue lists: work on the
     PARENT script line. A parent owns the span from its first
@@ -5344,7 +5422,7 @@ function resolveCues(ed,notify){
    if(!gidOf.has(r)){gidOf.set(r,gcount++);rawOf.push(r)}
    grp.push(gidOf.get(r));
   });
-  const ops=[];let nRedist=0,nSplit=0;const remainingOrgs=new Set();
+  const ops=[];let nRedist=0,nSplit=0,nCut=0,nDel=0;const remainingOrgs=new Set();
   const cappedAt=idx=>{const f=computeCueFit(durs,P,wins);return f?!!f.capped[idx]:false};
   const gpos=g=>{const out=[];for(let j=0;j<lines.length;j++)if(grp[j]===g)out.push(j);return out};
   const redist=g=>{
@@ -5375,6 +5453,7 @@ function resolveCues(ed,notify){
   for(const go of gorder){
    const g=go.g,raw=rawOf[g];
    let G=gpos(g);
+   const gFirstOrg=org[G[0]]; /* V267: captured before any splice — a group whose parts are ALL deleted still needs its first original index for the op */
    const cappedOrgs=[...new Set(G.filter(j=>fit.capped[org[j]]).map(j=>org[j]))];
    if(!cappedOrgs.length)continue;
    const expect=G.map(j=>lines[j]);
@@ -5386,25 +5465,53 @@ function resolveCues(ed,notify){
      let pos=-1;const GG=gpos(g);
      for(const j of GG)if(org[j]===o){pos=j;break}
      if(pos<0||!cappedAt(pos))continue;
+     if(wins[pos].end-wins[pos].start<CUEFIT_SLIVER)continue; /* V267: a sliver window is never re-split — it falls to the cut/delete last resort below */
      if(splitAt(pos))splitOrgs.add(o);
     }
     if(splitOrgs.size)redist(g);
    }
+   /* V267 final step: a part that is STILL capped and was NOT
+      split in this run is CUT to the longest prefix whose
+      estimated speech fits its window at the cap, or DELETED
+      when not even a 3-grapheme remnant fits (its window then
+      stays as silence in the fitted render; no other cue
+      moves). A split part is exempt — its truth is the
+      post-regeneration measurement (V266 doctrine), and a
+      later press can cut it with real durations if it still
+      caps. Only originally-red parts are candidates: a sibling
+      that merely tightened during redistribution was never
+      flagged and is never cut. Text changes ride the parent
+      op's script rewrite, so this needs the aligned path.
+      Candidates run in DESCENDING position order so a delete
+      never shifts a pending candidate. */
+   const cutOrgs=new Set(),delOrgs=new Set(),cappedSet=new Set(cappedOrgs);
+   if(aligned&&raw>=0){
+    const cand=gpos(g).filter(j=>cappedAt(j)&&cappedSet.has(org[j])&&!splitOrgs.has(org[j])).sort((a,b)=>b-a);
+    for(const j of cand){
+     const o=org[j],wlen=wins[j].end-wins[j].start;
+     const target=Math.max(0.05,wlen-((j<wins.length-1&&wlen>P)?P:0));
+     const cut=cutPrefixFor(durs[j],lines[j],target);
+     if(cut&&!cut.full){lines[j]=cut.text;durs[j]=cut.dur;cutOrgs.add(o)}
+     else if(!cut){org.splice(j,1);grp.splice(j,1);lines.splice(j,1);durs.splice(j,1);wins.splice(j,1);delOrgs.add(o)}
+    }
+   }
    G=gpos(g);
    const stillCapped=new Set(G.filter(j=>cappedAt(j)).map(j=>org[j]));
-   let changed=splitOrgs.size>0;
+   let changed=splitOrgs.size>0||cutOrgs.size>0||delOrgs.size>0;
    if(!changed){for(let k=0;k<G.length;k++)if(Math.abs(wins[G[k]].start-before[k].start)>0.0005||Math.abs(wins[G[k]].end-before[k].end)>0.0005){changed=true;break}}
    cappedOrgs.forEach(o=>{
-    if(splitOrgs.has(o))nSplit++;
+    if(delOrgs.has(o))nDel++;
+    else if(cutOrgs.has(o))nCut++;
+    else if(splitOrgs.has(o))nSplit++;
     else if(!stillCapped.has(o))nRedist++;
     else remainingOrgs.add(o);
    });
    if(!changed)continue;
-   ops.push({type:'parent',i0:org[G[0]],raw,expect,
+   ops.push({type:'parent',i0:gFirstOrg,raw,expect,
     parts:G.map(j=>({text:lines[j],startSrc:trim.start+wins[j].start*ss,endSrc:trim.start+wins[j].end*ss})),
-    split:splitOrgs.size>0});
+    split:splitOrgs.size>0,rewrite:(splitOrgs.size>0||cutOrgs.size>0||delOrgs.size>0)});
   }
-  return{ops,nExt:0,nRedist,nSplit,nRemainingPlanned:remainingOrgs.size};
+  return{ops,nExt:0,nRedist,nSplit,nCut,nDel,nRemainingPlanned:remainingOrgs.size};
  }
  /* Apply a plan to the real cue state, in plan order (descending
     original index — a splice at i0 never shifts the position of
@@ -5443,6 +5550,33 @@ function resolveCues(ed,notify){
     if(!rewriteRawLine(pt.raw,repl))continue;
     const nc1={text:op.A,start:c.start,end:op.midSrc},nc2={text:op.B,start:op.midSrc,end:op.endSrc};
     ed.cues.splice(op.i0,1,nc1,nc2);ed.cuesManual=true;fixedObjs.push(nc1);
+   }else if(op.type==='cut'){
+    /* V267: shorten ONE cue's text to the planned prefix. The
+       parent script line is rewritten exactly like a split (one
+       raw line per part, this part carrying the cut text), so
+       the regeneration speaks the cut text; the cue keeps its
+       window — only its text shortens. */
+    const parts=canonicalSplit(ed);const pt=parts[op.i0];
+    if(!pt||pt.text!==op.origText)continue;
+    const c=ed.cues[op.i0];if(!c)continue;
+    const sibs=parts.filter(q=>q.raw===pt.raw),repl=[];
+    sibs.forEach(q=>{repl.push(q===pt?op.newText:q.text)});
+    if(!rewriteRawLine(pt.raw,repl))continue;
+    c.text=op.newText;ed.cuesManual=true;fixedObjs.push(c);
+   }else if(op.type==='del'){
+    /* V267: remove ONE cue entirely. Its text leaves the parent
+       script line too (an emptied raw line is removed), so the
+       regeneration never re-speaks it; every other cue keeps
+       its exact window and text, and the deleted window stays
+       as silence in the fitted render. */
+    const parts=canonicalSplit(ed);const pt=parts[op.i0];
+    if(!pt||pt.text!==op.origText)continue;
+    if(!ed.cues[op.i0])continue;
+    const sibs=parts.filter(q=>q.raw===pt.raw),repl=[];
+    sibs.forEach(q=>{if(q!==pt)repl.push(q.text)});
+    if(!rewriteRawLine(pt.raw,repl))continue;
+    ed.cues.splice(op.i0,1);ed.cuesManual=true;
+    if(ed.cues[op.i0])fixedObjs.push(ed.cues[op.i0]); /* focus the cue that took its place */
    }else if(op.type==='parent'){
     const partsNow=canonicalSplit(ed);
     const cur=partsNow.filter(q=>q.raw===op.raw);
@@ -5450,9 +5584,9 @@ function resolveCues(ed,notify){
     let okc=true;
     for(let k=0;k<op.expect.length;k++){const c=ed.cues[op.i0+k];if(!c||c.text!==op.expect[k]){okc=false;break}}
     if(!okc)continue;
-    if(op.split&&!rewriteRawLine(op.raw,op.parts.map(pt=>pt.text)))continue;
+    if((op.split||op.rewrite)&&!rewriteRawLine(op.raw,op.parts.map(pt=>pt.text)))continue; /* V267: a cut or delete inside the parent also rewrites the raw line (the surviving parts' texts); a full-group delete passes an empty list and removes the raw line */
     const newCues=op.parts.map(pt=>({text:pt.text,start:pt.startSrc,end:pt.endSrc}));
-    ed.cues.splice(op.i0,op.expect.length,...newCues);ed.cuesManual=true;fixedObjs.push(newCues[0]);
+    ed.cues.splice(op.i0,op.expect.length,...newCues);ed.cuesManual=true;if(newCues.length)fixedObjs.push(newCues[0]);
    }
   }
   if(scriptTouched){ed.cuesSig=cueSigNow();updateCueCount();checkVoiceStale();refreshVoiceGate()}
@@ -5528,9 +5662,9 @@ function resolveCues(ed,notify){
    const fixedIdxs=applied.fixedObjs.map(o=>ed.cues.indexOf(o)).filter(x=>x>=0);
    const firstIdx=fixedIdxs.length?Math.min.apply(null,fixedIdxs):-1; /* the FIRST fixed row in list order (fixes are applied descending) */
    if(regenErr){
-    showNotice('⚠️ Cue များ ပြင်ပြီးပါပြီ (အချိန် ရှည်ပေးပြီး ပြင်: '+plan.nExt+' ကြောင်း · အချိန် ပြန်ခွဲပြီး ပြင်: '+(plan.nRedist||0)+' ကြောင်း · စာကြောင်း ခွဲပြီး ပြင်: '+plan.nSplit+' ကြောင်း) — ဒါပေမယ့် အသံ ပြန်ထုတ် မအောင်မြင်ပါ: '+(regenErr.message||String(regenErr))+' — 🎙️ Voice Create ကို ပြန်နှိပ်ပြီး အသံ ပြန်ထုတ်ပါ','err');
+    showNotice('⚠️ Cue များ ပြင်ပြီးပါပြီ (အချိန် ရှည်ပေးပြီး ပြင်: '+plan.nExt+' ကြောင်း · အချိန် ပြန်ခွဲပြီး ပြင်: '+(plan.nRedist||0)+' ကြောင်း · စာကြောင်း ခွဲပြီး ပြင်: '+plan.nSplit+' ကြောင်း · စာတို ဖြတ်ပြီး ပြင်: '+(plan.nCut||0)+' ကြောင်း · ဖျက်လိုက်ရ: '+(plan.nDel||0)+' ကြောင်း) — ဒါပေမယ့် အသံ ပြန်ထုတ် မအောင်မြင်ပါ: '+(regenErr.message||String(regenErr))+' — 🎙️ Voice Create ကို ပြန်နှိပ်ပြီး အသံ ပြန်ထုတ်ပါ','err');
    }else{
-    let msg='✅ Auto Fix ပြီးပါပြီ — အချိန် ရှည်ပေးပြီး ပြင်: '+plan.nExt+' ကြောင်း · အချိန် ပြန်ခွဲပြီး ပြင်: '+(plan.nRedist||0)+' ကြောင်း · စာကြောင်း ခွဲပြီး ပြင်: '+plan.nSplit+' ကြောင်း · အသစ် ပြန်ထုတ်သော အသံ စာကြောင်း: '+synthCount+' ကြောင်း';
+    let msg='✅ Auto Fix ပြီးပါပြီ — အချိန် ရှည်ပေးပြီး ပြင်: '+plan.nExt+' ကြောင်း · အချိန် ပြန်ခွဲပြီး ပြင်: '+(plan.nRedist||0)+' ကြောင်း · စာကြောင်း ခွဲပြီး ပြင်: '+plan.nSplit+' ကြောင်း · စာတို ဖြတ်ပြီး ပြင်: '+(plan.nCut||0)+' ကြောင်း · ဖျက်လိုက်ရ: '+(plan.nDel||0)+' ကြောင်း · အသစ် ပြန်ထုတ်သော အသံ စာကြောင်း: '+synthCount+' ကြောင်း';
     if(remaining>0)msg+=' · ⚠️ '+remaining+' ကြောင်း ကျန်နေသေးတယ် — အနီရောင် အတိုင်း ထားထားပါတယ်';
     showNotice(msg,remaining>0?'err':'ok');
    }

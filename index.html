@@ -306,6 +306,20 @@ body.locked{overflow:hidden}
 .cue-txt{display:block;font-size:13px;line-height:1.5;color:#F2F2F2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cue-when{display:block;font-size:11px;color:#9A9A9A;margin-top:1px}
 .cue-ic{width:32px;height:32px;flex:0 0 32px;border-radius:9px;border:none;background:rgba(255,255,255,.16);color:#FFFFFF;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center}
+/* V265: cap-hit (over-long) cue rows — the ONE sanctioned red state in
+   the monochrome UI (user request 2026-11-17): the line's voice chunk
+   cannot fit its cue window even at the 3.0x per-cue fit cap */
+.cue-row.cap{border-color:#E5484D;background:rgba(229,72,77,.14)}
+.cue-row.cap .cue-txt{color:#FF9A9E}
+.cue-row.cap .cue-when{color:#FF9A9E}
+.cue-cap-tag{display:inline-block;margin-top:3px;padding:1px 8px;border-radius:999px;background:#E5484D;color:#FFFFFF;font-size:11px;font-weight:700;line-height:1.5}
+/* V265: post-save / post-Auto-Fix row highlight — a ~1.2 s pulse that
+   fully clears (the class is removed on a timer; nothing persists).
+   A red-flagged row pulses its red state instead of the white one */
+@keyframes cueFlash{0%{background:rgba(255,255,255,.38)}100%{background:#1B1B1B}}
+@keyframes cueFlashRed{0%{background:rgba(229,72,77,.6)}100%{background:rgba(229,72,77,.14)}}
+.cue-row.cue-flash{animation:cueFlash 1.2s ease-out}
+.cue-row.cap.cue-flash{animation:cueFlashRed 1.2s ease-out}
 .cue-pop textarea{min-height:64px}
 .warnbox{margin-top:10px;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.12);color:#FFFFFF;font-size:13px;font-weight:600;line-height:1.55}
 /* voice mini player */
@@ -837,6 +851,7 @@ const subsHome=subToggleRow
 +'<div class="switch-row"><div><b style="font-size:14px">နောက်ခံ Band</b><div style="font-size:12px;color:#9A9A9A">စာတန်း နောက်တွင် အမည်း ပြား ခံပေးမည် — ဖတ်ရ ပိုလွယ်သည်</div></div><div class="tgl" id="'+p+'-subBandTgl"></div></div>'
 +'<div class="picker-row" style="margin-bottom:10px;align-items:center"><button class="btn light small" id="'+p+'-subPosReset">↺ အလယ် ပြန်ထား</button><button class="btn light small" id="'+p+'-cueRebuild">↻ Script မှ အချိန် ပြန်ခွဲ</button><button class="btn light small" id="'+p+'-cueAdd">➕ Cue ထည့်</button></div>'
 +'<div class="file-info" id="'+p+'-cueCount" style="margin-bottom:10px">စာတန်း ၀ ကြောင်း</div><div id="'+p+'-cueList"></div><div class="warnbox" id="'+p+'-cueWarn" style="display:none"></div>'
++'<button class="btn primary" id="'+p+'-cueFix" style="width:100%;margin-top:10px;display:none"><span class="btn-label">🔧 Auto Fix — ရှည်နေသော စာကြောင်း ပြင်မယ်</span></button>'
 +'<div style="margin-top:10px">'+srtRow+'</div>'
 +fontBlock('sub')
 +'<button class="btn light" id="'+p+'-subReset" style="width:100%;margin-top:14px">↺ စာတန်း Setting မူလ ပြန်ထား</button>';
@@ -5111,14 +5126,258 @@ function resolveCues(ed,notify){
  function escapeHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
  function renderCueList(){
   const box=E('cueList');if(!box)return;box.innerHTML='';
+  const capFit=capFitAligned(); /* V265: rows map 1:1 onto the fit's lines only while this holds */
   ed.cues.forEach((cue,i)=>{
    const row=document.createElement('div');row.className='cue-row';
+   const capped=!!(capFit&&capFit.capped[i]);
+   if(capped)row.classList.add('cap');
    row.innerHTML='<button class="cue-ic seek" title="ဒီ cue နေရာသို့ သွားမယ်">▶</button>'
-    +'<div class="cue-main"><span class="cue-txt">'+escapeHtml(cue.text||'')+'</span><span class="cue-when">'+cue.start.toFixed(1)+'s – '+cue.end.toFixed(1)+'s · ပြင်ရန် နှိပ်ပါ</span></div>';
+    +'<div class="cue-main"><span class="cue-txt">'+escapeHtml(cue.text||'')+'</span><span class="cue-when">'+cue.start.toFixed(1)+'s – '+cue.end.toFixed(1)+'s · ပြင်ရန် နှိပ်ပါ</span>'+(capped?'<span class="cue-cap-tag">အရမ်း ရှည်နေတယ်</span>':'')+'</div>';
    row.querySelector('.seek').onclick=ev=>{ev.stopPropagation();try{vidEl.currentTime=cue.start;vidEl.play().catch(()=>{})}catch(e){}updateOverlay(true)};
    row.querySelector('.cue-main').onclick=()=>openCuePop(i,true);
    box.appendChild(row);
   });
+  syncCapUI(capFit);
+ }
+ /* ================= V265: red cap-hit rows + Auto Fix + save focus =================
+    User requests 2026-11-17, on top of the V264 per-cue fit:
+    (1) a line whose chunk still overflows its cue window at the 3.0x
+    cap shows RED in the cue list (the fit's capped[] flags, rendered
+    by renderCueList above) so he can see exactly WHICH lines to fix;
+    (2) a 🔧 Auto Fix button (visible only while red lines exist)
+    fixes them for him — extend the cue's end toward the next cue's
+    start first, split the line at a word boundary when extension
+    cannot suffice — through the SAME cue-state writes as a manual
+    pop-up save (cue fields + ed.cuesManual; a split also rewrites
+    the script line, like syncCueTextToScript), then REGENERATES the
+    voice through the (engine+voice+text) line cache (only the new /
+    changed texts are re-spoken) and re-renders the fitted voice
+    through the effectiveVoiceBytes funnel, so one tap completes
+    everything; (3) after a cue-edit Save (and after Auto Fix) the
+    list scrolls to the touched row and pulses it briefly. */
+ /* The fit describes THIS cue list only when the rows are the fit's
+    own lines: voice mode, same count, same texts, in order. Anything
+    else (no voice, stale voice, a desynced cue list) => no red rows,
+    no Auto Fix button — never mark rows the fit does not govern. */
+ function capFitAligned(){
+  if(ed.audioMode!=='voice')return null;
+  const fit=cueFitFor(ed);if(!fit||!fit.lines||!fit.capped)return null;
+  if(!ed.cues||ed.cues.length!==fit.factors.length)return null;
+  for(let i=0;i<fit.lines.length;i++)if(ed.cues[i].text!==fit.lines[i])return null;
+  return fit;
+ }
+ /* The Auto Fix button lives under the cue warning in the စာတန်း
+    sheet; it is shown exactly while red (cap-hit) rows exist. Called
+    from renderCueList and updateVoiceWarn — the two renders that
+    bracket every state change touching the fit or the list. */
+ function syncCapUI(fit){
+  const b=E('cueFix');if(!b)return;
+  if(fit===undefined)fit=capFitAligned();
+  b.style.display=(fit&&fit.cappedCount>0)?'block':'none';
+ }
+ /* Scroll one cue row into view inside the sheet and pulse it. The
+    row is looked up FRESH at fire time (the list may have re-rendered
+    since the save), the scroll lands in the sheet's own scroll
+    container (scrollIntoView scrolls the nearest scrollable
+    ancestor — the page behind stays put), and the highlight class
+    removes itself after the ~1.2 s animation, leaving no styling. */
+ function focusCueRow(i){
+  if(i==null||i<0)return;
+  setTimeout(()=>{
+   const box=E('cueList');if(!box)return;const row=box.children[i];if(!row)return;
+   try{row.scrollIntoView({behavior:'smooth',block:'center'})}catch(e){}
+   row.classList.add('cue-flash');
+   setTimeout(()=>{try{row.classList.remove('cue-flash')}catch(e){}},1350);
+  },90);
+ }
+ /* Plan the Auto Fix on a WORKING COPY of the fit (chunk durations +
+    windows in OUTPUT seconds — the fit's own timeline). Red lines
+    are processed in DESCENDING index order so a splice never shifts
+    a pending index; every entry carries its origin (the pre-fix line
+    index) so outcomes stay attributable after splices. Per red line:
+    (1) EXTEND the window end toward the next start — always keeping
+    the 0.12 s cue gap, the last line may run to the trim end —
+    aiming at factor CUEFIT_CAP*0.999 (a hair under the cap, so a
+    window built to land exactly on 3.0x cannot re-trip the strict
+    > cap test on floating point); (2) if still capped, SPLIT at the
+    space nearest the middle by grapheme count (splitLongCues'
+    25%–75% preference), dividing the (extended) window and the
+    estimated duration proportionally to the two texts — text is
+    preserved exactly (A + ' ' + B === the original). A split is
+    planned only when the line is the SOLE canonical part of its
+    script line: the script write then swaps exactly one raw line
+    for two, so neighbour lines' canonical texts cannot shift.
+    Outcomes are measured on the working model with computeCueFit
+    itself as the ground truth. */
+ function planAutoFixCues(fit){
+  const ss=segSpeedOf(ed),trim=trimRange(),P=fit.pause||0;
+  const parts=canonicalSplit(ed);
+  const partsAligned=parts.length===fit.lines.length&&parts.every((pt,j)=>pt.text===fit.lines[j]);
+  const sole=fit.lines.map((_,i)=>!!(partsAligned&&parts[i]&&parts.filter(q=>q.raw===parts[i].raw).length===1));
+  const org=[],lines=[],durs=[],wins=[];
+  fit.lines.forEach((t,i)=>{org.push(i);lines.push(t);durs.push(fit.durs[i]);wins.push({start:(ed.cues[i].start-trim.start)/ss,end:(ed.cues[i].end-trim.start)/ss})});
+  const ops=[],extOrg=new Set(),splitOrg=new Set();
+  const cappedAt=idx=>{const f=computeCueFit(durs,P,wins);return f?!!f.capped[idx]:false};
+  const reds=[];fit.capped.forEach((c,i)=>{if(c)reds.push(i)});
+  for(let r=reds.length-1;r>=0;r--){
+   const i=org.indexOf(reds[r]);if(i<0)continue;
+   if(!cappedAt(i))continue;
+   const o=org[i];
+   /* (1) extension */
+   let extApplied=false;
+   const maxEnd=(i<wins.length-1)?(wins[i+1].start-0.12/ss):((trim.end-trim.start)/ss);
+   if(maxEnd>wins[i].end+0.001){
+    const reqEnd=wins[i].start+durs[i]/(CUEFIT_CAP*0.999)+(i<wins.length-1?P:0);
+    const newEnd=Math.min(reqEnd,maxEnd);
+    if(newEnd>wins[i].end){wins[i].end=newEnd;extApplied=true}
+   }
+   if(extApplied&&!cappedAt(i)){ops.push({type:'ext',i0:o,endSrc:trim.start+wins[i].end*ss});extOrg.add(o);continue}
+   /* (2) split at a word boundary */
+   let didSplit=false;
+   if(sole[o]){
+    const gs=graphemeList(lines[i]);
+    let best=-1,bestScore=1e18;
+    for(let k=1;k<gs.length-1;k++){
+     if(gs[k]!==' '||gs[k-1]===' '||gs[k+1]===' ')continue;
+     const score=Math.abs(k-(gs.length-1-k))+((k>=gs.length*0.25&&k<=gs.length*0.75)?0:1e6);
+     if(score<bestScore){bestScore=score;best=k}
+    }
+    if(best>0){
+     const A=gs.slice(0,best).join(''),B=gs.slice(best+1).join('');
+     if(A&&B){
+      const s=wins[i].start,e=wins[i].end,gA=best,gB=gs.length-best-1;
+      const mid=s+(e-s)*(gA/(gA+gB));
+      org.splice(i,1,o,o);lines.splice(i,1,A,B);
+      durs.splice(i,1,durs[i]*(gA/(gA+gB)),durs[i]*(gB/(gA+gB)));
+      wins.splice(i,1,{start:s,end:mid},{start:mid,end:e});
+      ops.push({type:'split',i0:o,A,B,midSrc:trim.start+mid*ss,endSrc:trim.start+e*ss,origText:fit.lines[o]});
+      splitOrg.add(o);didSplit=true;
+     }
+    }
+   }
+   if(!didSplit&&extApplied)ops.push({type:'ext',i0:o,endSrc:trim.start+wins[i].end*ss}); /* partial extension: applied (a later split starts from the longer window) but NOT counted as fixed */
+  }
+  const fEnd=computeCueFit(durs,P,wins),remainingOrgs=new Set();
+  if(fEnd)fEnd.capped.forEach((c,j)=>{if(c)remainingOrgs.add(org[j])});
+  let nExt=0,nSplit=0;
+  extOrg.forEach(o=>{if(!remainingOrgs.has(o))nExt++});
+  splitOrg.forEach(o=>{if(!remainingOrgs.has(o))nSplit++});
+  return{ops,nExt,nSplit,nRemainingPlanned:remainingOrgs.size};
+ }
+ /* Apply a plan to the real cue state, in plan order (descending
+    original index — a splice at i0 never shifts the position of a
+    pending op at a lower index, in either ed.cues or the canonical
+    parts). Writes mirror the manual pop-up save exactly: cue fields
+    + ed.cuesManual for time fixes; for a split, the parent script
+    line is replaced by the two new lines (the syncCueTextToScript
+    precedent: cuesSig re-synced, staleness + gate refreshed) and the
+    cue is spliced into two cues over the divided window. One
+    pushCueUndo snapshots the whole fix, like one Save. Non-red
+    lines are never touched. */
+ function applyAutoFixCues(plan){
+  const fixedObjs=[];
+  if(plan.ops.length)pushCueUndo();
+  let scriptTouched=false;
+  for(const op of plan.ops){
+   if(op.type==='ext'){
+    const c=ed.cues[op.i0];if(!c)continue;
+    c.end=op.endSrc;ed.cuesManual=true;fixedObjs.push(c);
+   }else if(op.type==='split'){
+    const parts=canonicalSplit(ed);const pt=parts[op.i0];
+    if(!pt||pt.text!==op.origText||parts.filter(q=>q.raw===pt.raw).length!==1)continue;
+    const c=ed.cues[op.i0];if(!c)continue;
+    const rawLines=(E('subs').value||'').split('\n');let seen=-1,ti=-1;
+    for(let k=0;k<rawLines.length;k++){if(rawLines[k].trim()){seen++;if(seen===pt.raw){ti=k;break}}}
+    if(ti<0)continue;
+    const lead=(rawLines[ti].match(/^\s*/)||[''])[0];
+    rawLines[ti]=lead+op.A;rawLines.splice(ti+1,0,op.B);
+    E('subs').value=rawLines.join('\n');scriptTouched=true;
+    const nc1={text:op.A,start:c.start,end:op.midSrc},nc2={text:op.B,start:op.midSrc,end:op.endSrc};
+    ed.cues.splice(op.i0,1,nc1,nc2);ed.cuesManual=true;fixedObjs.push(nc1);
+   }
+  }
+  if(scriptTouched){ed.cuesSig=cueSigNow();updateCueCount();checkVoiceStale();refreshVoiceGate()}
+  return{fixedObjs};
+ }
+ /* Regenerate the voice after the cue fixes and re-render the
+    fitted voice — the runVoiceGen core, minus its pop-ups: the line
+    list is re-derived from the (possibly re-lined) script and spoken
+    through generateVoiceLines, whose (engine+voice+text) cache
+    serves every unchanged line without a network call; the fresh
+    assembly replaces voiceCache the same way, and the fitted render
+    is then produced ONCE through effectiveVoiceBytes (the funnel
+    the stage preview and every export already consume), so the
+    preview picks the new combined voice up with no further taps.
+    Returns how many DISTINCT line texts actually had to be
+    synthesized (cache misses, counted before the run). */
+ async function autoFixRegenerate(){
+  if(ed.ttsEngine==='gemini'&&!getApiKey())throw new Error('Gemini TTS အတွက် Gemini API Key လိုပါတယ် — အောက်ခြေ toolbar က 🔑 Key မှာ သင့် key အရင် ထည့်ပါ');
+  const lines=canonicalLines(ed);
+  const miss=new Set();
+  lines.forEach(t=>{const k=ttsLineKey(ed,t);if(!ttsLineCache.has(k)&&!ttsInflight.has(k))miss.add(k)});
+  const gv=await generateVoiceLines(ed,lines,m=>setVoiceStatus(m));
+  ed.voiceCache={asm:VOICE_ASM,text:scriptText(),lines:lines.slice(),linesSig:lines.join('\n'),engine:ed.ttsEngine,voice:effVoice(),bytes:gv.bytes,ext:gv.ext,genSpeed:genSpeedFactor(p),chunkDurs:gv.chunkDurs,pause:gv.pause||0,peakDb:(gv.peakDb!=null?gv.peakDb:null),dur:0};
+  ed._effVoice=null;ed.renderUrl=null;
+  if(ed.voiceUrl)URL.revokeObjectURL(ed.voiceUrl);
+  ed.voiceUrl=URL.createObjectURL(new Blob([gv.bytes],{type:gv.ext==='mp3'?'audio/mpeg':'audio/wav'}));
+  const au=E('vpAudio');if(au){au.src=ed.voiceUrl;au.playbackRate=effSpeedOf(ed)}
+  const vp=E('voicePlayer');if(vp)vp.style.display='block';
+  ed.voiceCache.dur=(gv.chunkDurs&&gv.chunkDurs.length)?gv.chunkDurs.reduce((a,b)=>a+b,0)+(gv.pause||0)*Math.max(0,gv.chunkDurs.length-1):await probeAudioDur(gv.bytes,gv.ext);
+  const rv=await effectiveVoiceBytes(ed,ed.voiceCache.bytes,ed.voiceCache.ext,()=>{});
+  if(ed.renderUrl)URL.revokeObjectURL(ed.renderUrl);
+  ed.renderUrl=URL.createObjectURL(new Blob([rv.bytes],{type:'audio/wav'}));
+  syncVoicePlayer();refreshStageVoice();renderTimeline();updateVoiceWarn();checkVoiceStale();
+  return{synthCount:miss.size};
+ }
+ /* The 🔧 Auto Fix button's handler. Refuses outright while an
+    export is running (ed.busy) or a voice generation is in flight —
+    never queues, never interferes. With no generated voice there is
+    no fit and nothing measurable to fix: it completes with the
+    no-voice notice and zero synthesis. Otherwise: plan -> apply ->
+    (voice existed) regenerate + re-render -> recount the red lines
+    from the NEW fit (the planning estimate is only the fallback for
+    when regeneration failed and the old voice no longer matches) ->
+    one result notice naming extension fixes / split fixes /
+    re-synthesized lines / lines still red -> focus the first fixed
+    row. A regeneration failure keeps the cue fixes and surfaces the
+    TRUE error. */
+ async function runAutoFix(){
+  if(ed._autoFixBusy)return;
+  if(ed.busy){showNotice('⚠️ Export လုပ်နေပါတယ် — Export ပြီးမှ Auto Fix ကို ပြန်နှိပ်ပါ','err');return}
+  if(ed.voiceBusy){showNotice('⚠️ အသံ ထုတ်နေပါတယ် — ပြီးမှ Auto Fix ကို ပြန်နှိပ်ပါ','err');return}
+  const hadVoice=!!(ed.voiceCache&&ed.voiceCache.chunkDurs&&ed.voiceCache.chunkDurs.length);
+  const fit=capFitAligned();
+  if(!fit||!fit.cappedCount){
+   if(!hadVoice)showNotice('ℹ️ အသံ မရှိသေးပါ — ရှည်နေသော စာကြောင်းများ စစ်ပြီး ပြင်နိုင်ရန် အရင် 🎙️ Voice Create မှာ အသံ ထုတ်ပါ (အသံ ရရင် ရှည်နေသော စာကြောင်းများ အနီရောင် ပေါ်လာပါမယ်)','info');
+   return;
+  }
+  ed._autoFixBusy=true;const btn=E('cueFix');if(btn)busyBtn(btn,true,'ပြင်နေပါတယ်…');
+  showNotice('▶️ Auto Fix စတင်ပါပြီ','info');
+  try{
+   const plan=planAutoFixCues(fit);
+   const applied=applyAutoFixCues(plan);
+   renderCueList();updateCueCount();updateOverlay(true);renderTimeline();refreshSummaries();
+   let synthCount=0,regenErr=null;
+   if(hadVoice){
+    ed.voiceBusy=true;
+    try{const r=await autoFixRegenerate();synthCount=r.synthCount}catch(e){regenErr=e}
+    finally{ed.voiceBusy=false;refreshVoiceGate()}
+   }
+   let remaining=plan.nRemainingPlanned;
+   const fit2=capFitAligned();if(fit2)remaining=fit2.cappedCount;
+   renderCueList();updateVoiceWarn();
+   const fixedIdxs=applied.fixedObjs.map(o=>ed.cues.indexOf(o)).filter(x=>x>=0);
+   const firstIdx=fixedIdxs.length?Math.min.apply(null,fixedIdxs):-1; /* the FIRST fixed row in list order (fixes are applied descending) */
+   if(regenErr){
+    showNotice('⚠️ Cue များ ပြင်ပြီးပါပြီ (အချိန် ရှည်ပေးပြီး ပြင်: '+plan.nExt+' ကြောင်း · စာကြောင်း ခွဲပြီး ပြင်: '+plan.nSplit+' ကြောင်း) — ဒါပေမယ့် အသံ ပြန်ထုတ် မအောင်မြင်ပါ: '+(regenErr.message||String(regenErr))+' — 🎙️ Voice Create ကို ပြန်နှိပ်ပြီး အသံ ပြန်ထုတ်ပါ','err');
+   }else{
+    let msg='✅ Auto Fix ပြီးပါပြီ — အချိန် ရှည်ပေးပြီး ပြင်: '+plan.nExt+' ကြောင်း · စာကြောင်း ခွဲပြီး ပြင်: '+plan.nSplit+' ကြောင်း · အသစ် ပြန်ထုတ်သော အသံ စာကြောင်း: '+synthCount+' ကြောင်း';
+    if(remaining>0)msg+=' · ⚠️ '+remaining+' ကြောင်း ကျန်နေသေးတယ် — အနီရောင် အတိုင်း ထားထားပါတယ်';
+    showNotice(msg,remaining>0?'err':'ok');
+   }
+   if(firstIdx>=0)focusCueRow(firstIdx);
+  }catch(e){showNotice('⚠️ Auto Fix မအောင်မြင်ပါ — '+humanErr(e),'err')}
+  finally{ed._autoFixBusy=false;if(btn)busyBtn(btn,false,'🔧 Auto Fix — ရှည်နေသော စာကြောင်း ပြင်မယ်');syncCapUI()}
  }
  /* ================= V213 per-cue edit pop-up =================
     One bottom pop-up per cue — opened from a timeline cue block or a
@@ -5256,6 +5515,7 @@ function resolveCues(ed,notify){
      else{c.start=ns;c.end=ne;c.text=nt;ed.cuesManual=true;checkVoiceStale();refreshVoiceGate()}
     }else{c.start=ns;c.end=ne;ed.cuesManual=true}
     renderCueList();updateCueCount();updateOverlay(true);renderTimeline();refreshSummaries();
+    focusCueRow(cuePopIdx); /* V265: land back on the just-saved row (scroll + brief pulse) once the စာတန်း sheet re-opens */
     if(timeWarn)showNotice('⚠️ အချိန် ဖတ်မရလို့ မူရင်း အချိန် ပြန်သုံးထားပါတယ် — ကျန်တာ သိမ်းပြီးပါပြီ','err');
     else showNotice('✅ Cue ပြင်ပြီးပါပြီ','ok');
    }catch(e){showNotice('⚠️ Cue သိမ်းမရပါ — '+humanErr(e),'err')}
@@ -5282,6 +5542,7 @@ function resolveCues(ed,notify){
   ed.cues.push({text:'',start:s,end:e});ed.cuesManual=true;renderCueList();updateCueCount();renderTimeline();
   openCuePop(ed.cues.length-1,true);
  };
+ E('cueFix').onclick=()=>{runAutoFix()}; /* V265: 🔧 Auto Fix (red cap-hit lines) — visibility is driven by syncCapUI */
  /* --- live subtitle overlay on the video frame (SRT section + combined preview) --- */
  function overlayActive(){const t=E('subTgl');return !t||t.classList.contains('on')} /* live cue shows on the pinned frame while the စာတန်း switch (③ / 🎨 chip — one shared state) is on */
  function cueAt(t){for(let i=0;i<ed.cues.length;i++){if(t>=ed.cues[i].start&&t<ed.cues[i].end)return i}return -1}
@@ -6409,6 +6670,7 @@ window.__recapProject={collect:projCollect,apply:applyProject,sigMatch:projSigMa
   ['voiceWarn','cueWarn'].forEach(id=>{const w=E(id);if(w){w.style.display=txt?'block':'none';w.textContent=txt}});
   const ei=E('effInfo');
   if(ei){if(info){const d=info.seg-info.effDur;const diff=Math.abs(d)<1?' — အံကိုက် ✓':(d>0?(' — video ထက် '+Math.round(d)+'s တို'):(' — video ထက် '+Math.round(-d)+'s ရှည်'));ei.textContent='အသံ ကြာချိန် ~'+fmtDur(info.effDur)+' (စုစုပေါင်း အမြန် '+fmtSpeed(info.eff)+') · video အပိုင်း '+fmtDur(info.seg)+diff}else ei.textContent=''}
+  syncCapUI(); /* V265: the Auto Fix button follows the same cap state as this warning */
  }
  function syncVoicePlayer(){
   const a=E('vpAudio');if(!a)return;

@@ -2834,11 +2834,199 @@ async function autoFitVoice(ed,targetSec){
   return '🎯 အသံ '+natural.toFixed(1)+' စက္ကန့် → Video '+target.toFixed(1)+' စက္ကန့် နဲ့ ကွက်တိ ('+fs+')';
  }catch(e){return null}
 }
-function effVoiceKey(ed){const c=ed.voiceCache;if(!c)return'';return[c.text,c.engine,c.voice,effSpeedOf(ed).toFixed(3)].join('|')}
+/* ================= V264: PER-CUE AUTO-FIT =================
+   User report 2026-11-17 10:01: "Auto အသံချိန်ငြိတာက တော်တော်လေး
+   အားနည်းနေတယ် — Srt timer အတိုင်း အသံက မထွက်ပေးနိုင်ဘူး". Both
+   halves confirmed in the V263 code: (1) the V238 fit above writes
+   ONE global factor clamped to [0.77, 1.30] — his case needed
+   2.28x total (an 88.5s voice at +30% over a 50.5s trim), so the
+   fit gave up and the length block fired; (2) cue timings were
+   VOICE-led (voiceCueTimings), so the SRT followed the voice
+   instead of the voice following the SRT. With the 🎯 toggle ON
+   and a per-line voice (chunkDurs), the fit is now PER CUE: every
+   line's chunk is atempo'd into ITS OWN cue window — the windows
+   the SRT shows (hand-edited cues win; otherwise the char-weighted
+   spread over the trim) — by factor = chunk duration / window
+   (the 0.12s inter-line pause reserved where the window allows),
+   clamped to [CUEFIT_MIN, CUEFIT_CAP]. A line needing more than
+   the cap is clamped, overruns into its pause/neighbour, and is
+   COUNTED: the count surfaces in the Voice-sheet warning, the
+   Insert flow and the export log — never a silent misfit, and
+   never a hard block merely because the total voice is longer
+   than the trim. renderCueFitVoice lays the fitted chunks on the
+   SRT timeline, so the export mix, the part slicer and the
+   rendered preview all consume exactly that timeline; the
+   pristine preview mirrors it per chunk (playbackRate = the
+   current chunk's factor, position via the piecewise fitFilePos).
+   Toggle OFF, an imported file voice, or a chunkless cache keep
+   V263 behaviour exactly — the global fit above still serves the
+   imported-file path through applyAutoFit's fall-through. */
+const CUEFIT_CAP=3.0,CUEFIT_MIN=0.5;
+function autoFitOn(){return !(typeof SETTINGS!=='undefined'&&SETTINGS&&SETTINGS.autoFitVoice===false)}
+/* Pure per-cue fit. durs = natural chunk durations (the assembly's
+   own scale), pause = the assembly's inter-chunk pause, wins =
+   [{start,end}] cue windows in OUTPUT seconds relative to the
+   segment start (the SRT cue times mapped through segment speed).
+   Returns per-chunk factors, the placed timeline (chunk i starts
+   exactly at wins[i].start), the pristine-file chunk offsets, and
+   which lines hit the cap. Windows must be ordered (each start >=
+   the previous start); anything degenerate returns null and the
+   callers fall back to the legacy paths. */
+function computeCueFit(durs,pause,wins){
+ if(!durs||!wins||durs.length!==wins.length||!durs.length)return null;
+ const P=pause||0,n=durs.length,factors=[],placed=[],offs=[],capped=[];
+ let off=0,cappedCount=0;
+ for(let i=0;i<n;i++){
+  const w=wins[i];if(!w||!(w.end>=w.start))return null;
+  if(i>0&&w.start<wins[i-1].start-0.001)return null;
+  const wlen=w.end-w.start;
+  const reserve=(i<n-1&&wlen>P)?P:0;
+  const target=Math.max(0.05,wlen-reserve);
+  let f=(durs[i]>0)?durs[i]/target:1,cap=false;
+  if(f>CUEFIT_CAP){f=CUEFIT_CAP;cap=true;cappedCount++}
+  if(f<CUEFIT_MIN)f=CUEFIT_MIN;
+  factors.push(f);capped.push(cap);offs.push(off);
+  placed.push({start:w.start,end:w.start+(durs[i]>0?durs[i]/f:0)});
+  off+=durs[i]+(i<n-1?P:0);
+ }
+ const totD=durs.reduce((a,b)=>a+b,0),totF=placed.reduce((a,pl,i)=>a+(durs[i]>0?durs[i]/factors[i]:0),0);
+ return{factors,placed,offs,capped,cappedCount,pause:P,durs:durs.slice(),
+  totalOut:n?placed[n-1].end:0,avgF:totF>0?totD/totF:1};
+}
+/* The pinned line list a per-line voice actually spoke — the exact
+   identity rule unifiedCues has always used (V249 M3), shared now
+   with the fit so both judge the same voice the same way. Null
+   when the cache does not match the current script/engine/voice. */
+function voicePinnedLines(ed){
+ const vc=ed.voiceCache;if(!vc||!vc.chunkDurs)return null;
+ if(vc.engine!==ed.ttsEngine||vc.voice!==(ed.ttsEngine==='edge'?ed.edgeVoice:ed.voice))return null;
+ const lines=canonicalLines(ed);
+ if(vc.lines&&vc.lines.length&&vc.chunkDurs.length===vc.lines.length&&vc.linesSig===vc.lines.join('\n')){
+  const rawTxt=($('#'+ed.p+'-subs').value||'').split('\n').map(s=>s.trim()).filter(Boolean).join(' ');
+  if(vc.text===rawTxt)return vc.lines;
+ }
+ if(vc.chunkDurs.length===lines.length&&vc.linesSig===lines.join('\n'))return lines;
+ return null;
+}
+/* The SRT windows the fit targets, in SOURCE seconds: hand-edited
+   cues win when they are exactly the spoken lines; otherwise the
+   char-weighted spread over the trim — the same windows the SRT
+   shows for a fresh script. */
+function cueFitWindowsFor(ed,lines){
+ const p=ed.p,start=parseFloat($('#'+p+'-start').value),end=parseFloat($('#'+p+'-end').value);
+ if(isNaN(start)||isNaN(end)||end<=start)return null;
+ if(ed.cuesManual&&ed.cues&&ed.cues.length===lines.length&&ed.cues.map(c=>c.text).join('\n')===lines.join('\n'))
+  return ed.cues.map(c=>({start:c.start,end:c.end}));
+ return spreadCuesWeighted(lines,start,end).map(c=>({start:c.start,end:c.end}));
+}
+/* The active per-cue fit for an editor, or null (toggle OFF, no
+   per-line voice, voice stale, degenerate windows). Computed on
+   demand from (chunkDurs, pause, current windows) — pure math, so
+   a cue-time edit re-fits with no re-synthesis; a small memo keyed
+   on every input keeps the preview's per-tick calls cheap.
+   fit.winsS keeps the SOURCE-second windows (the cue times
+   themselves); fit.placed / fit.factors live on the OUTPUT
+   timeline (segment-relative, segment speed applied). */
+function cueFitFor(ed){
+ if(!autoFitOn())return null;
+ const vc=ed.voiceCache;if(!vc||vc.asm!==VOICE_ASM||!vc.chunkDurs||!vc.chunkDurs.length)return null;
+ const p=ed.p;
+ const sEl=$('#'+p+'-start'),eEl=$('#'+p+'-end'),uEl=$('#'+p+'-subs');
+ const subsV=uEl?uEl.value:'';
+ let sh=0;for(let i=0;i<subsV.length;i++)sh=(sh*31+subsV.charCodeAt(i))|0;
+ const mk=[vc.chunkDurs.join(','),vc.pause||0,vc.linesSig||'',ed.ttsEngine,ed.ttsEngine==='edge'?ed.edgeVoice:ed.voice,sEl?sEl.value:'',eEl?eEl.value:'',segSpeedOf(ed),sh,ed.aspect||'',ed.subSize||'',ed.videoW||0,ed.videoH||0,ed.cuesManual?'M':'S',ed.cuesManual&&ed.cues?ed.cues.map(c=>(+c.start).toFixed(2)+'-'+(+c.end).toFixed(2)).join(','):''].join('|');
+ if(ed._fitMemo&&ed._fitMemo.k===mk)return ed._fitMemo.fit;
+ let fit=null;
+ const lines=voicePinnedLines(ed);
+ if(lines&&lines.length===vc.chunkDurs.length){
+  const winsS=cueFitWindowsFor(ed,lines);
+  if(winsS&&winsS.length===lines.length){
+   const start=parseFloat(sEl?sEl.value:NaN),ss=segSpeedOf(ed);
+   const wins=winsS.map(w=>({start:(w.start-start)/ss,end:(w.end-start)/ss}));
+   fit=computeCueFit(vc.chunkDurs,vc.pause||0,wins);
+   if(fit){fit.winsS=winsS;fit.lines=lines;fit.hash=fit.factors.map(f=>f.toFixed(2)).join(',')+'@'+wins.map(w=>w.start.toFixed(2)).join(',')}
+  }
+ }
+ ed._fitMemo={k:mk,fit};
+ return fit;
+}
+/* The one notice for cap-hit lines — WHAT is wrong, WHERE, and
+   what to do (instructive-error rule); shared by the Voice sheet,
+   the Insert flow and the export log. */
+function fitCapNotice(fit){
+ return '⚠️ စာကြောင်း '+fit.cappedCount+' ကြောင်း က အမြန် အများဆုံး '+CUEFIT_CAP.toFixed(2)+'× နဲ့တောင် သူ့ cue အချိန်ထဲ မဆံ့ပါ — အဲဒီ စာကြောင်းတွေ အချိန် အနည်းငယ် ကျော်ပါမယ်။ စာကြောင်း စာသား တိုအောင် ပြင်ပါ၊ သို့မဟုတ် အဲဒီ cue ရဲ့ ဆုံးချိန်ကို နောက်ဆုတ်ပေးပါ။';
+}
+/* Preview mirror (pure): the pristine file's position + rate for
+   an OUTPUT-timeline time t under a fit. Inside a chunk's fitted
+   span the rate is that chunk's factor; in the silence tail of a
+   window (chunk shorter than its window) or between windows, the
+   position pins to the previous chunk's end and gap=true so the
+   preview pauses the element instead of leaking the next chunk. */
+function fitFilePos(fit,t){
+ const n=fit.factors.length;if(!n)return{pos:0,rate:1,gap:false};
+ for(let i=0;i<n;i++){
+  const pl=fit.placed[i];
+  if(t<pl.start){
+   if(i===0)return{pos:fit.offs[0],rate:fit.factors[0],gap:true};
+   return{pos:fit.offs[i-1]+fit.durs[i-1],rate:fit.factors[i-1],gap:true};
+  }
+  if(t<=pl.end)return{pos:fit.offs[i]+(t-pl.start)*fit.factors[i],rate:fit.factors[i],gap:false};
+ }
+ const l=n-1;return{pos:fit.offs[l]+fit.durs[l],rate:fit.factors[l],gap:true};
+}
+/* Inverse map (pristine file position -> OUTPUT time), for the
+   preview clock when the video has ended and the voice drives. */
+function fitOutPos(fit,filePos){
+ const n=fit.factors.length;if(!n)return 0;
+ for(let i=0;i<n;i++){
+  const o=fit.offs[i],d=fit.durs[i];
+  if(filePos<=o+d)return fit.placed[i].start+Math.max(0,filePos-o)/fit.factors[i];
+ }
+ return fit.placed[n-1].end;
+}
+/* Render the per-cue fitted voice from the PRISTINE assembly: each
+   chunk is cut at its known assembly offset, atempo'd by its fit
+   factor (atempoChain chains past 2x), delayed to its cue-window
+   start and mixed — ONE ffmpeg pass producing a WAV that lives ON
+   the SRT/output timeline, so every downstream consumer (export
+   mix, part slicing, Insert, the rendered preview) treats it
+   exactly like the old global-speed render. */
+async function renderCueFitVoice(ed,pristine,ext,fit,logFn,progFn){
+ const ff=await getFFmpeg(logFn||(()=>{}));
+ const inName='fit_in.'+ext,outName='fit_out.wav';
+ await ff.writeFile(inName,ffCopy(pristine));
+ try{
+  const n=fit.factors.length;
+  let fc='[0:a]asplit='+n+fit.factors.map((_,i)=>'[fs'+i+']').join('')+';';
+  for(let i=0;i<n;i++){
+   const o=fit.offs[i],d=Math.max(0.02,fit.durs[i]);
+   const dl=Math.max(0,Math.round(fit.placed[i].start*1000));
+   fc+='[fs'+i+']atrim=start='+o.toFixed(3)+':end='+(o+d).toFixed(3)+',asetpts=PTS-STARTPTS,'+atempoChain(fit.factors[i])+',adelay='+dl+'|'+dl+'[fc'+i+'];';
+  }
+  fc+=fit.factors.map((_,i)=>'[fc'+i+']').join('')+'amix=inputs='+n+':duration=longest:normalize=0[aout]';
+  const code=await ffExecP(ff,['-i',inName,'-filter_complex',fc,'-map','[aout]','-vn','-c:a','pcm_s16le',outName],600000,0,progFn);
+  if(code!==0)throw new Error('အသံ cue-fit ပြင်ရာတွင် ffmpeg exit code '+code);
+  return{bytes:await ffReadU8(ff,outName),ext:'wav'};
+ }finally{try{await ff.deleteFile(inName)}catch(e){}try{await ff.deleteFile(outName)}catch(e){}}
+}
+/* The one auto-fit entry for the generation paths: per-cue fit
+   when a per-line voice exists and the toggle is ON; the legacy
+   global fit otherwise (imported files / chunkless caches). */
+async function applyAutoFit(ed,targetSec){
+ const vc=ed.voiceCache;
+ if(vc&&vc.chunkDurs&&vc.chunkDurs.length&&autoFitOn()){
+  const fit=cueFitFor(ed);if(!fit)return null;
+  let msg='🎯 အသံကို SRT အချိန်အတိုင်း စာကြောင်းလိုက် ညှိထားပါတယ် (ပျမ်းမျှ '+(Math.round(fit.avgF*100)/100).toFixed(2)+'×)';
+  if(fit.cappedCount)msg+=' '+fitCapNotice(fit);
+  return msg;
+ }
+ return autoFitVoice(ed,targetSec);
+}
+function effVoiceKey(ed){const c=ed.voiceCache;if(!c)return'';let k=[c.text,c.engine,c.voice,effSpeedOf(ed).toFixed(3)].join('|');const fit=cueFitFor(ed);if(fit)k+='|F'+fit.hash;return k}
 async function effectiveVoiceBytes(ed,pristine,ext,logFn,progFn){
- const eff=effSpeedOf(ed),key=effVoiceKey(ed);
+ const eff=effSpeedOf(ed),key=effVoiceKey(ed),fit=cueFitFor(ed);
  if(ed._effVoice&&ed._effVoice.key===key)return ed._effVoice;
- const r=await renderVoiceSpeed(pristine,ext,eff,logFn,progFn);
+ const r=fit?await renderCueFitVoice(ed,pristine,ext,fit,logFn,progFn):await renderVoiceSpeed(pristine,ext,eff,logFn,progFn);
  /* V259: the effective stem's loudness peak is measured ONCE, here,
     and stored with the render — every mix site (exportOne,
     hwMixedAudio, Insert) reads it instead of re-measuring. WAV
@@ -2846,7 +3034,7 @@ async function effectiveVoiceBytes(ed,pristine,ext,logFn,progFn){
     the assembly-time peak; a full decode remains only for a
     non-WAV stem passing through at speed 1. */
  let pk=wavPeakDb(r.bytes);
- if(pk==null){const c=ed.voiceCache;if(c&&c.peakDb!=null&&Math.abs(eff-1)<0.001&&pristine===c.bytes)pk=c.peakDb}
+ if(pk==null){const c=ed.voiceCache;if(c&&c.peakDb!=null&&!fit&&Math.abs(eff-1)<0.001&&pristine===c.bytes)pk=c.peakDb}
  if(pk==null){try{pk=await voicePeakDbOf(r.bytes)}catch(e){pk=null}}
  ed._effVoice={key,bytes:r.bytes,ext:r.ext,peakDb:pk};
  return ed._effVoice;
@@ -4385,20 +4573,28 @@ async function runExport(ed){
    if(vc){pristine=vc.bytes;pext=vc.ext;log('✅ အသံ အပိုင်းမှာ ထုတ်ထားသော အသံကို ပြန်သုံးပါတယ်')}
    else{vcRegen=true;log('အသံ ထုတ်နေပါတယ်…');GEN_W=Math.min(180,3*Math.max(1,canon.length));expTotal+=GEN_W;expCeil(LOAD_W+GEN_W,'🎙️ အသံ ထုတ်နေပါတယ်…');const gv=await generateVoiceLines(ed,canon,log,(i,n)=>expSet(LOAD_W+GEN_W*(n?i/n:1),'🎙️ အသံ ထုတ်နေပါတယ်… ('+i+'/'+n+')'));pristine=gv.bytes;pext=gv.ext;vc={asm:VOICE_ASM,text:lines.join(' '),lines:canon.slice(),linesSig:canon.join('\n'),engine:ed.ttsEngine,voice:vid,bytes:pristine,ext:pext,genSpeed:genSpeedFactor(p),chunkDurs:gv.chunkDurs,pause:gv.pause||0,peakDb:(gv.peakDb!=null?gv.peakDb:null),dur:0};ed.voiceCache=vc}
    if(!vc.dur)vc.dur=(vc.chunkDurs&&vc.chunkDurs.length)?vc.chunkDurs.reduce((a,b)=>a+b,0)+(vc.pause||0)*Math.max(0,vc.chunkDurs.length-1):await probeAudioDur(pristine,pext);
-   if(vcRegen){const fitMsg=await autoFitVoice(ed,dur);if(fitMsg)log(fitMsg)} /* V238: a regenerated voice is fitted like a Voice Create one */
-   const eff=effSpeedOf(ed),effDur=vc.dur?vc.dur/eff:0;
+   if(vcRegen){const fitMsg=await applyAutoFit(ed,dur);if(fitMsg)log(fitMsg)} /* V238: a regenerated voice is fitted like a Voice Create one — V264: per-cue when the toggle is ON */
+   const eff=effSpeedOf(ed);
+   /* V264: with a per-cue fit, the duration that matters is the
+      FITTED total (the chunks laid on the SRT timeline) */
+   const fitX=cueFitFor(ed);
+   const effDur=fitX?fitX.totalOut:(vc.dur?vc.dur/eff:0);
    /* V253: the comparison is against the OUTPUT duration (segment
       speed applied) — the same number auto-fit targets */
    const durOut=dur/segSpeedOf(ed);
-   if(vc.dur&&effDur>durOut+0.05){
+   if(vc.dur&&!fitX&&effDur>durOut+0.05){
     const msg='အသံ ကြာချိန် ('+effDur.toFixed(1)+' စက္ကန့်) က video အပိုင်း ('+durOut.toFixed(1)+' စက္ကန့်) ထက် ရှည်နေပါတယ် — အသံကို ဖြတ်မပစ်ပါ။ 🎙️ Voice Create မှာ အသံ အမြန်ကို စုစုပေါင်း '+(vc.dur/durOut).toFixed(2)+'× အထိ တင်ပါ၊ သို့မဟုတ် ✂️ Trim pop-up မှာ Trim အပိုင်းကို ပိုရှည်အောင် ပြန်ဖြတ်ပါ။';
     log('⚠️ '+msg);showNotice('⚠️ '+msg,'err');return;
    }
-   voiceW=(Math.abs(eff-1)>=0.001&&effDur>0)?Math.max(1,effDur):0;
+   /* V264: a fitted voice is never blocked for length — cap-hit
+      lines overrun their pause/neighbour, are NAMED here, and the
+      export proceeds */
+   if(fitX&&fitX.cappedCount){const cm=fitCapNotice(fitX);log(cm);showNotice(cm,'err')}
+   voiceW=(fitX||(Math.abs(eff-1)>=0.001&&effDur>0))?Math.max(1,effDur):0;
    if(voiceW)expTotal+=voiceW;
-   const rv=await effectiveVoiceBytes(ed,pristine,pext,log,voiceW?mkRun(LOAD_W+GEN_W,voiceW,'🎙️ အသံ အမြန် ပြင်နေပါတယ်…',effDur):undefined);
+   const rv=await effectiveVoiceBytes(ed,pristine,pext,log,voiceW?mkRun(LOAD_W+GEN_W,voiceW,fitX?'🎙️ အသံကို SRT အချိန်အတိုင်း ညှိနေပါတယ်…':'🎙️ အသံ အမြန် ပြင်နေပါတယ်…',effDur):undefined);
    ed._cachedVoice=rv.bytes;ed._cachedVoiceExt=rv.ext;
-   if(effDur)log('🎙️ အသံ အမြန် '+eff.toFixed(2)+'× — အသံ '+effDur.toFixed(1)+' စက္ကန့် / video '+dur.toFixed(1)+' စက္ကန့်');
+   if(effDur)log(fitX?('🎙️ အသံကို SRT အချိန်အတိုင်း ညှိပြီး — အသံ '+effDur.toFixed(1)+' စက္ကန့် / video '+durOut.toFixed(1)+' စက္ကန့်'):('🎙️ အသံ အမြန် '+eff.toFixed(2)+'× — အသံ '+effDur.toFixed(1)+' စက္ကန့် / video '+dur.toFixed(1)+' စက္ကန့်'));
    expPhaseLog(log,'အသံ ပြင်ဆင်မှု',_tVoice);
   }
   /* V219: the voice is fresh now (reused or just regenerated) — when the
@@ -4804,15 +5000,14 @@ function unifiedCues(ed){
     timings ride on the pinned lines even after an Aspect / subtitle-
     size change re-splits the DISPLAY lines. Only a cache without a
     pinned snapshot falls back to the old geometry-dependent match. */
- let vLines=null;
- if(vc&&vc.chunkDurs&&vc.engine===ed.ttsEngine&&vc.voice===(ed.ttsEngine==='edge'?ed.edgeVoice:ed.voice)){
-  if(vc.lines&&vc.lines.length&&vc.chunkDurs.length===vc.lines.length&&vc.linesSig===vc.lines.join('\n')){
-   const rawTxt=($('#'+p+'-subs').value||'').split('\n').map(s=>s.trim()).filter(Boolean).join(' ');
-   if(vc.text===rawTxt)vLines=vc.lines;
-  }
-  if(!vLines&&vc.chunkDurs.length===lines.length&&vc.linesSig===lines.join('\n'))vLines=lines;
- }
+ const vLines=(vc&&vc.chunkDurs)?voicePinnedLines(ed):null; /* V264: the pinned-lines rule itself moved to voicePinnedLines (shared with the per-cue fit) — same judgements, one home */
  if(ed.audioMode==='voice'&&vc&&vc.asm===VOICE_ASM&&vLines){
+  /* V264: with 🎯 Auto-fit ON the SRT leads and the voice follows —
+     the cues ARE the fit windows (hand-edited or spread), and the
+     fitted render places each chunk inside its window. Without a
+     fit, the V219 voice-led timings below stand unchanged. */
+  const fit=cueFitFor(ed);
+  if(fit){ed._cueSrc='voice';return vLines.map((text,i)=>({text,start:fit.winsS[i].start,end:fit.winsS[i].end}))}
   const ts=voiceCueTimings(vc.chunkDurs,vc.pause||0,start,effSpeedOf(ed),end);
   ed._cueSrc='voice';
   return vLines.map((text,i)=>({text,start:ts[i].start,end:ts[i].end}));
@@ -4831,7 +5026,7 @@ function cueSigFor(ed){
  const start=parseFloat($('#'+p+'-start').value),end=parseFloat($('#'+p+'-end').value);
  let sig=raw.join('\n')+'|'+start+'|'+end;
  const vc=ed.voiceCache;
- if(ed.audioMode==='voice'&&vc&&vc.chunkDurs)sig+='|V'+effSpeedOf(ed).toFixed(3)+'|'+(vc.linesSig||'');
+ if(ed.audioMode==='voice'&&vc&&vc.chunkDurs){const fit=cueFitFor(ed);sig+='|V'+(fit?('F'+fit.hash):effSpeedOf(ed).toFixed(3))+'|'+(vc.linesSig||'')} /* V264: with a per-cue fit, the FIT (windows + factors) is what times the cues — the signature follows it, not the global speed */
  return sig;
 }
 /* V249 (M1): ONE cue resolver for the SRT editor, the SRT download AND
@@ -5344,7 +5539,19 @@ function resolveCues(ed,notify){
     on its last frame while the voice + its cues keep going on the voice clock. */
  function pvUseRendered(){return !!(ed._effVoice&&ed.renderUrl&&ed._effVoice.key===effVoiceKey(ed))}
  function pvFactor(){return pvUseRendered()?1:Math.max(0.05,effSpeedOf(ed))}
- function previewTime(){const r=trimRange();if(vidEl.ended&&pvAudio)return r.start+(pvAudio.currentTime||0)/pvFactor();return vidEl.currentTime}
+ /* V264: when a per-cue fit is active and the PRISTINE voice is
+    playing (no fitted render yet), the preview mirrors the fit
+    per chunk — playbackRate is the current chunk's factor and the
+    position map is the piecewise fitFilePos, the same numbers the
+    export render bakes in. A fitted render (renderUrl) keeps the
+    identity map at rate 1, exactly like a speed render. Without a
+    fit these reduce to the V253 formulas unchanged. */
+ function pvFit(){return pvUseRendered()?null:cueFitFor(ed)}
+ function pvOutT(){const r=trimRange();return Math.max(0,(vidEl.currentTime-r.start)/segSpeedOf(ed))}
+ function pvVoicePos(){const fit=pvFit();if(fit)return fitFilePos(fit,pvOutT()).pos;return pvOutT()*pvFactor()}
+ function pvVoiceRate(){const fit=pvFit();if(fit)return fitFilePos(fit,pvOutT()).rate;return pvFactor()}
+ function pvVoiceGap(){const fit=pvFit();return fit?fitFilePos(fit,pvOutT()).gap:false}
+ function previewTime(){const r=trimRange();if(vidEl.ended&&pvAudio){const fit=pvFit();return r.start+(fit?fitOutPos(fit,pvAudio.currentTime||0):(pvAudio.currentTime||0)/pvFactor())}return vidEl.currentTime}
  function setPreviewBtns(){const t=previewMode?'⏹ Preview ပိတ်':'▶ စစ်ကြည့်မယ်';const b1=E('previewBtn');if(b1)b1.textContent=t;}
  function enterPreview(){
   if(!ed.voiceCache||!ed.voiceUrl){showNotice('⚠️ စစ်ကြည့်ရန် အသံ အရင် လိုပါတယ် — 🎙️ Voice Create မှာ အသံ အရင် ထုတ်ပါ','err');goStep(2);return}
@@ -5364,7 +5571,7 @@ function resolveCues(ed,notify){
   ensureCues();
   if(ed.url&&vidEl.src!==ed.url)vidEl.src=ed.url; /* preview always uses the original video */
   pvAudio.src=pvUseRendered()?ed.renderUrl:ed.voiceUrl;
-  pvAudio.playbackRate=pvFactor();
+  pvAudio.playbackRate=pvVoiceRate(); /* V264: per-chunk rate when a fit is active */
   /* mixer approximation for preview only: voice element at Voice% (element
      volume caps at 100%), original audio unmuted at BGM% when BGM > 0 */
   pvAudio.volume=ed.voiceMute?0:Math.min(100,(ed.voiceVol==null?100:ed.voiceVol))/100;
@@ -5372,7 +5579,7 @@ function resolveCues(ed,notify){
   if((ed.bgmVol||0)>0&&!ed.bgmMute){vidEl.muted=false;vidEl.volume=(ed.bgmVol||0)/100}else{vidEl.muted=true;vidEl.volume=1}
   const r=trimRange();
   if(vidEl.currentTime<r.start||vidEl.currentTime>=r.end)vidEl.currentTime=r.start;
-  pvAudio.currentTime=Math.max(0,(vidEl.currentTime-r.start)/segSpeedOf(ed)*pvFactor()); /* V253: output-time mapping, as on the stage */
+  pvAudio.currentTime=pvVoicePos(); /* V253: output-time mapping, as on the stage — V264: per-chunk fit map when a fit is active */
   vidEl.play().catch(()=>{});pvAudio.play().catch(()=>{});
   updateVoiceWarn();
   if(previewTimer)clearInterval(previewTimer);
@@ -5388,16 +5595,24 @@ function resolveCues(ed,notify){
  }
  function previewTick(){
   if(!previewMode)return;
-  const r=trimRange(),f=pvFactor();
+  const fit=pvFit();
   if(vidEl.ended){
    if(pvAudio.ended){exitPreview(true);showNotice('✅ Preview ပြီးပါပြီ','ok');return}
+   /* V264: on the voice clock the per-chunk rate still applies
+      (via the inverse map); gap-pausing is impossible here — the
+      element itself is the only clock — so it plays through */
+   if(fit)pvAudio.playbackRate=fitFilePos(fit,fitOutPos(fit,pvAudio.currentTime||0)).rate;
    if(pvAudio.paused)pvAudio.play().catch(()=>{});
   }else{
-   const desired=Math.max(0,(vidEl.currentTime-r.start)/segSpeedOf(ed)*f);
+   const desired=pvVoicePos();
    if(vidEl.paused){if(!pvAudio.paused)pvAudio.pause()}
    else{
-    if(pvAudio.paused&&!pvAudio.ended)pvAudio.play().catch(()=>{});
-    if(Math.abs(pvAudio.currentTime-desired)>0.15)pvAudio.currentTime=desired;
+    pvAudio.playbackRate=pvVoiceRate(); /* V264: the rate follows the chunk under the playhead */
+    if(pvVoiceGap()){if(!pvAudio.paused)pvAudio.pause()} /* V264: a window's silence tail — hold the chunk end until the next window */
+    else{
+     if(pvAudio.paused&&!pvAudio.ended)pvAudio.play().catch(()=>{});
+     if(Math.abs(pvAudio.currentTime-desired)>0.15)pvAudio.currentTime=desired;
+    }
    }
   }
   updateOverlay();
@@ -5436,7 +5651,7 @@ function resolveCues(ed,notify){
   if(ed.insertUrl&&vidEl.src===ed.insertUrl)return false;
   return voiceFresh();
  }
- function stageVoicePos(){const r=trimRange();return Math.max(0,(vidEl.currentTime-r.start)/segSpeedOf(ed)*pvFactor())} /* V253: media time -> OUTPUT time (÷ segment speed) -> voice time */
+ function stageVoicePos(){return pvVoicePos()} /* V253: media time -> OUTPUT time (÷ segment speed) -> voice time — V264: the per-chunk fit map when a fit is active */
  function applyStageMix(){
   const g=mixGains(ed);
   if(g.bgm>0){vidEl.muted=false;vidEl.volume=g.bgm}else{vidEl.muted=true;vidEl.volume=1}
@@ -5452,11 +5667,14 @@ function resolveCues(ed,notify){
   }
   const want=pvUseRendered()?ed.renderUrl:ed.voiceUrl;
   if(want&&pvAudio.src!==want)pvAudio.src=want;
-  pvAudio.playbackRate=pvFactor();
+  pvAudio.playbackRate=pvVoiceRate(); /* V264: per-chunk rate when a fit is active */
   applyStageMix();
   const pos=stageVoicePos();
   if(Math.abs((pvAudio.currentTime||0)-pos)>0.25)pvAudio.currentTime=pos;
-  if(!vidEl.paused&&!vidEl.ended){if(pvAudio.paused&&!pvAudio.ended)pvAudio.play().catch(()=>{})}
+  if(!vidEl.paused&&!vidEl.ended){
+   if(pvVoiceGap()){if(!pvAudio.paused)try{pvAudio.pause()}catch(e){}} /* V264: silence tail of a fitted window — the next chunk must not leak in early */
+   else if(pvAudio.paused&&!pvAudio.ended)pvAudio.play().catch(()=>{});
+  }
   else if(!pvAudio.paused)try{pvAudio.pause()}catch(e){}
  }
  function refreshStageVoice(){if(previewMode)return;stageVoiceSync()}
@@ -6063,7 +6281,7 @@ window.__recapProject={collect:projCollect,apply:applyProject,sigMatch:projSigMa
    const au=E('vpAudio');if(au){au.src=ed.voiceUrl;au.playbackRate=1}
    const pl=E('voicePlayer');if(pl)pl.style.display='block';
    const adl=E('audioDl');if(adl){adl.classList.remove('off');adl.removeAttribute('aria-disabled')}
-   const fitMsg=await autoFitVoice(ed);
+   const fitMsg=await applyAutoFit(ed); /* V264: chunkless import — falls through to the legacy global fit inside applyAutoFit */
    if(fitMsg&&au)au.playbackRate=effSpeedOf(ed);
    const fi=E('voiceFileInfo');if(fi){fi.style.display='block';fi.textContent='📁 '+(f.name||'audio')+' · '+dur.toFixed(1)+' စက္ကန့် — ဒီ file ကို Voice အဖြစ် သုံးနေပါတယ်'}
    updateVoiceWarn();renderTimeline();checkVoiceStale();if(ed.refresh)ed.refresh();refreshSummaries();
@@ -6144,7 +6362,7 @@ window.__recapProject={collect:projCollect,apply:applyProject,sigMatch:projSigMa
    ed.voiceCache.dur=(gv.chunkDurs&&gv.chunkDurs.length)?gv.chunkDurs.reduce((a,b)=>a+b,0)+(gv.pause||0)*Math.max(0,gv.chunkDurs.length-1):await probeAudioDur(gv.bytes,gv.ext);
    /* V238: AUTO-FIT — fit the fresh voice to the video time, then
       re-sync the player rate before the cues re-derive from it */
-   const fitMsg=await autoFitVoice(ed);
+   const fitMsg=await applyAutoFit(ed); /* V264: per-cue fit when the toggle is ON (the message names any cap-hit lines) */
    if(fitMsg)au.playbackRate=effSpeedOf(ed);
    /* V219: cues snap to the voice's own chunk timeline — V249 (C1):
       hand-edited cues are NEVER wiped by a Voice Create re-run (every
@@ -6179,11 +6397,15 @@ window.__recapProject={collect:projCollect,apply:applyProject,sigMatch:projSigMa
  function voiceDurInfo(){
   const c=ed.voiceCache;if(!c||!c.dur)return null;
   const eff=effSpeedOf(ed),r=trimRange(),seg=Math.max(0,r.end-r.start)/segSpeedOf(ed); /* V253: seg = OUTPUT duration */
+  /* V264: with a per-cue fit the heard duration is the FITTED
+     total and length alone never warns — only cap-hit lines do */
+  const fit=cueFitFor(ed);
+  if(fit)return{eff:fit.avgF,effDur:fit.totalOut,seg:seg,over:false,need:0,fitCaps:fit.cappedCount,fit:fit};
   return{eff:eff,effDur:c.dur/eff,seg:seg,over:seg>0&&(c.dur/eff)>seg+0.05,need:seg>0?c.dur/seg:0};
  }
  function updateVoiceWarn(){
   const info=voiceDurInfo();
-  const txt=(info&&info.over)?('⚠️ အသံ ('+info.effDur.toFixed(1)+' စက္ကန့်) က video အပိုင်း ('+info.seg.toFixed(1)+' စက္ကန့်) ထက် ရှည်နေပါတယ် — အသံ အမြန် စုစုပေါင်း '+info.need.toFixed(2)+'× အထိ တင်ပါ၊ သို့မဟုတ် ✂️ Trim Feature မှာ Trim အပိုင်းကို ရှည်ပေးပါ။'):'';
+  const txt=(info&&info.fitCaps)?fitCapNotice(info.fit):((info&&info.over)?('⚠️ အသံ ('+info.effDur.toFixed(1)+' စက္ကန့်) က video အပိုင်း ('+info.seg.toFixed(1)+' စက္ကန့်) ထက် ရှည်နေပါတယ် — အသံ အမြန် စုစုပေါင်း '+info.need.toFixed(2)+'× အထိ တင်ပါ၊ သို့မဟုတ် ✂️ Trim Feature မှာ Trim အပိုင်းကို ရှည်ပေးပါ။'):'');
   ['voiceWarn','cueWarn'].forEach(id=>{const w=E(id);if(w){w.style.display=txt?'block':'none';w.textContent=txt}});
   const ei=E('effInfo');
   if(ei){if(info){const d=info.seg-info.effDur;const diff=Math.abs(d)<1?' — အံကိုက် ✓':(d>0?(' — video ထက် '+Math.round(d)+'s တို'):(' — video ထက် '+Math.round(-d)+'s ရှည်'));ei.textContent='အသံ ကြာချိန် ~'+fmtDur(info.effDur)+' (စုစုပေါင်း အမြန် '+fmtSpeed(info.eff)+') · video အပိုင်း '+fmtDur(info.seg)+diff}else ei.textContent=''}
@@ -6241,6 +6463,7 @@ window.__recapProject={collect:projCollect,apply:applyProject,sigMatch:projSigMa
   if(SETTINGS.segParts){showNotice('⚠️ အပိုင်းခွဲ Export ဖွင့်ထားပါတယ် — အပိုင်းခွဲ video ကို 🎬 Export မှ ထုတ်ပါ (ဒီ "ထည့်မယ်" မှာ အပိုင်းခွဲ မရပါ)','err');return}
   if(!c.dur)c.dur=await probeAudioDur(c.bytes,c.ext);
   const info=voiceDurInfo();
+  if(info&&info.fitCaps)showNotice(fitCapNotice(info.fit),'err'); /* V264: cap-hit lines are named, but a fitted voice is never blocked for length — the Insert proceeds */
   if(info&&info.over){updateVoiceWarn();const w=E('voiceWarn');if(w)w.scrollIntoView({behavior:'smooth',block:'center'});showNotice('⚠️ အသံ ('+info.effDur.toFixed(1)+' စက္ကန့်) က video အပိုင်း ('+info.seg.toFixed(1)+' စက္ကန့်) ထက် ရှည်နေပါတယ် — အသံကို ဖြတ်မပစ်ပါ။ အမြန် စုစုပေါင်း '+info.need.toFixed(2)+'× အထိ တင်ပြီးမှ ပြန်ထည့်ပါ','err');return}
   ed.insertBusy=true;const btn=E('insertBtn');busyBtn(btn,true,'ထည့်နေပါတယ်…');
   const st=E('insertStatus');st.textContent='🎬 အသံပါသော video ထုတ်နေပါတယ်…';showNotice('▶️ Video ထဲ အသံ ထည့်ခြင်း စတင်ပါပြီ','info');

@@ -5155,6 +5155,26 @@ function resolveCues(ed,notify){
     through the effectiveVoiceBytes funnel, so one tap completes
     everything; (3) after a cue-edit Save (and after Auto Fix) the
     list scrolls to the touched row and pulses it briefly. */
+ /* V266: the V265 planner fixed 0 of 6 cap-hit lines on the
+    user's phone. Three restrictions caused it, all verified in
+    the V265 code: (1) a split was planned only when the line was
+    the SOLE canonical part of its script line — but in the
+    standard flow the cap-hit lines ARE width-split parts, so
+    every one was refused; (2) the split point had to be a SPACE
+    — Burmese script lines often contain none; (3) extension
+    had nowhere to go — the fit windows are contiguous. V266:
+    script-derived cue lists are planned on the PARENT script
+    line — its parts first REDISTRIBUTE the parent's total span
+    weighted by each part's measured chunk-duration need (a long
+    part borrows from shorter siblings of the SAME parent, never
+    across parents); a part that still caps is RE-SPLIT (the
+    parent is rewritten as one raw line per resulting part, so
+    the re-derived canonical lines match the plan exactly and
+    the text is preserved verbatim). Split points prefer a space
+    and otherwise use a grapheme-cluster boundary (splitPointFor)
+    — never inside a cluster. Hand-edited lists keep the V265
+    extension + single-cue split, with the same grapheme
+    fallback and the same parent-rewriting split apply. */
  /* The fit describes THIS cue list only when the rows are the fit's
     own lines: voice mode, same count, same texts, in order. Anything
     else (no voice, stale voice, a desynced cue list) => no red rows,
@@ -5190,30 +5210,66 @@ function resolveCues(ed,notify){
    setTimeout(()=>{try{row.classList.remove('cue-flash')}catch(e){}},1350);
   },90);
  }
- /* Plan the Auto Fix on a WORKING COPY of the fit (chunk durations +
-    windows in OUTPUT seconds — the fit's own timeline). Red lines
-    are processed in DESCENDING index order so a splice never shifts
-    a pending index; every entry carries its origin (the pre-fix line
-    index) so outcomes stay attributable after splices. Per red line:
-    (1) EXTEND the window end toward the next start — always keeping
-    the 0.12 s cue gap, the last line may run to the trim end —
-    aiming at factor CUEFIT_CAP*0.999 (a hair under the cap, so a
-    window built to land exactly on 3.0x cannot re-trip the strict
-    > cap test on floating point); (2) if still capped, SPLIT at the
-    space nearest the middle by grapheme count (splitLongCues'
-    25%–75% preference), dividing the (extended) window and the
-    estimated duration proportionally to the two texts — text is
-    preserved exactly (A + ' ' + B === the original). A split is
-    planned only when the line is the SOLE canonical part of its
-    script line: the script write then swaps exactly one raw line
-    for two, so neighbour lines' canonical texts cannot shift.
-    Outcomes are measured on the working model with computeCueFit
-    itself as the ground truth. */
+ /* The split point for one over-long line, shared by both
+    planners: a SPACE nearest the grapheme middle wins (the
+    consumed space is the separator — A + ' ' + B === the
+    original); where the line has no usable space — the normal
+    Burmese case — the grapheme-cluster boundary nearest the
+    balance point is used instead (A + B === the original).
+    Boundaries come from graphemeList, so a split can never land
+    inside a grapheme cluster or a Myanmar stacked consonant, and
+    neither side may start or end with a space (canonical parts
+    are trimmed — a side that changed under trimming would
+    break exact text preservation). */
+ function splitPointFor(text){
+  const gs=graphemeList(text);
+  if(gs.length<2)return null;
+  let best=-1,bestScore=1e18;
+  for(let k=1;k<gs.length-1;k++){
+   if(gs[k]!==' '||gs[k-1]===' '||gs[k+1]===' ')continue;
+   const score=Math.abs(k-(gs.length-1-k))+((k>=gs.length*0.25&&k<=gs.length*0.75)?0:1e6);
+   if(score<bestScore){bestScore=score;best=k}
+  }
+  if(best>0){const A=gs.slice(0,best).join(''),B=gs.slice(best+1).join('');if(A&&B)return{A,B,gA:best,gB:gs.length-best-1}}
+  let bk=-1,bd=1e18;
+  for(let k=1;k<gs.length;k++){
+   if(gs[k-1]===' '||gs[k]===' ')continue;
+   const d=Math.abs(k-gs.length/2);if(d<bd){bd=d;bk=k}
+  }
+  if(bk<1)return null;
+  const A=gs.slice(0,bk).join(''),B=gs.slice(bk).join('');
+  if(!A||!B||A.trim()!==A||B.trim()!==B)return null;
+  return{A,B,gA:bk,gB:gs.length-bk};
+ }
+ /* Plan the Auto Fix on a WORKING COPY of the fit (chunk
+    durations + windows in OUTPUT seconds — the fit's own
+    timeline). Two planners, one per cue-list provenance:
+    hand-edited lists (ed.cuesManual) keep the V265 per-cue
+    planner (extension, then a single-cue split); script-derived
+    lists go through the V266 parent planner below. Outcomes are
+    measured on the working model with computeCueFit itself as
+    the ground truth. */
  function planAutoFixCues(fit){
+  if(!ed.cuesManual)return planAutoFixParents(fit);
+  return planAutoFixManual(fit);
+ }
+ /* V265 planner for hand-edited cue lists. Red lines are
+    processed in DESCENDING index order so a splice never shifts
+    a pending index; every entry carries its origin (the pre-fix
+    line index) so outcomes stay attributable after splices. Per
+    red line: (1) EXTEND the window end toward the next start
+    — always keeping the 0.12 s cue gap, the last line may run
+    to the trim end — aiming at factor CUEFIT_CAP*0.999 (a hair
+    under the cap, so a window built to land exactly on 3.0x
+    cannot re-trip the strict > cap test on floating point);
+    (2) if still capped, SPLIT at the splitPointFor boundary,
+    dividing the (extended) window and the estimated duration
+    proportionally to the two texts — text is preserved
+    exactly. V266: the split is no longer gated to sole canonical
+    parts — the applier rewrites the whole parent line, so a
+    width-split part splits safely too. */
+ function planAutoFixManual(fit){
   const ss=segSpeedOf(ed),trim=trimRange(),P=fit.pause||0;
-  const parts=canonicalSplit(ed);
-  const partsAligned=parts.length===fit.lines.length&&parts.every((pt,j)=>pt.text===fit.lines[j]);
-  const sole=fit.lines.map((_,i)=>!!(partsAligned&&parts[i]&&parts.filter(q=>q.raw===parts[i].raw).length===1));
   const org=[],lines=[],durs=[],wins=[];
   fit.lines.forEach((t,i)=>{org.push(i);lines.push(t);durs.push(fit.durs[i]);wins.push({start:(ed.cues[i].start-trim.start)/ss,end:(ed.cues[i].end-trim.start)/ss})});
   const ops=[],extOrg=new Set(),splitOrg=new Set();
@@ -5232,28 +5288,17 @@ function resolveCues(ed,notify){
     if(newEnd>wins[i].end){wins[i].end=newEnd;extApplied=true}
    }
    if(extApplied&&!cappedAt(i)){ops.push({type:'ext',i0:o,endSrc:trim.start+wins[i].end*ss});extOrg.add(o);continue}
-   /* (2) split at a word boundary */
+   /* (2) split at a word or grapheme boundary */
    let didSplit=false;
-   if(sole[o]){
-    const gs=graphemeList(lines[i]);
-    let best=-1,bestScore=1e18;
-    for(let k=1;k<gs.length-1;k++){
-     if(gs[k]!==' '||gs[k-1]===' '||gs[k+1]===' ')continue;
-     const score=Math.abs(k-(gs.length-1-k))+((k>=gs.length*0.25&&k<=gs.length*0.75)?0:1e6);
-     if(score<bestScore){bestScore=score;best=k}
-    }
-    if(best>0){
-     const A=gs.slice(0,best).join(''),B=gs.slice(best+1).join('');
-     if(A&&B){
-      const s=wins[i].start,e=wins[i].end,gA=best,gB=gs.length-best-1;
-      const mid=s+(e-s)*(gA/(gA+gB));
-      org.splice(i,1,o,o);lines.splice(i,1,A,B);
-      durs.splice(i,1,durs[i]*(gA/(gA+gB)),durs[i]*(gB/(gA+gB)));
-      wins.splice(i,1,{start:s,end:mid},{start:mid,end:e});
-      ops.push({type:'split',i0:o,A,B,midSrc:trim.start+mid*ss,endSrc:trim.start+e*ss,origText:fit.lines[o]});
-      splitOrg.add(o);didSplit=true;
-     }
-    }
+   const sp=splitPointFor(lines[i]);
+   if(sp){
+    const s=wins[i].start,e=wins[i].end,gA=sp.gA,gB=sp.gB;
+    const mid=s+(e-s)*(gA/(gA+gB));
+    org.splice(i,1,o,o);lines.splice(i,1,sp.A,sp.B);
+    durs.splice(i,1,durs[i]*(gA/(gA+gB)),durs[i]*(gB/(gA+gB)));
+    wins.splice(i,1,{start:s,end:mid},{start:mid,end:e});
+    ops.push({type:'split',i0:o,A:sp.A,B:sp.B,midSrc:trim.start+mid*ss,endSrc:trim.start+e*ss,origText:fit.lines[o]});
+    splitOrg.add(o);didSplit=true;
    }
    if(!didSplit&&extApplied)ops.push({type:'ext',i0:o,endSrc:trim.start+wins[i].end*ss}); /* partial extension: applied (a later split starts from the longer window) but NOT counted as fixed */
   }
@@ -5262,38 +5307,152 @@ function resolveCues(ed,notify){
   let nExt=0,nSplit=0;
   extOrg.forEach(o=>{if(!remainingOrgs.has(o))nExt++});
   splitOrg.forEach(o=>{if(!remainingOrgs.has(o))nSplit++});
-  return{ops,nExt,nSplit,nRemainingPlanned:remainingOrgs.size};
+  return{ops,nExt,nRedist:0,nSplit,nRemainingPlanned:remainingOrgs.size};
+ }
+ /* V266 planner for script-derived cue lists: work on the
+    PARENT script line. A parent owns the span from its first
+    part's window start to its last part's window end. (1)
+    REDISTRIBUTE that span among the parts: each part first gets
+    the window its measured chunk duration needs at the cap
+    (dur / (CAP*0.999) + the inter-chunk pause), then any
+    leftover is shared in proportion to duration — so a long
+    part borrows time from shorter siblings of the SAME parent;
+    other parents' spans are never touched. When the needs sum
+    exceeds the span, the span is shared in proportion to
+    duration instead (the best the parent can do alone). (2) A
+    part that still caps is RE-SPLIT once (splitPointFor), the
+    span is redistributed over the new parts, and the outcome is
+    recounted — a split line's truth is the post-regeneration
+    fit (its chunk durations are estimates until re-spoken), so
+    a split counts as fixed-by-split even when the estimate
+    still caps; an unsplit line counts only when the model —
+    whose durations are the real measured chunks — says it
+    fits. A line can remain red only when its parent's span
+    cannot cover it and it has no legal split point. Groups are
+    processed in DESCENDING first-line order so the applier's
+    splices never shift a pending group. */
+ function planAutoFixParents(fit){
+  const ss=segSpeedOf(ed),trim=trimRange(),P=fit.pause||0;
+  const parts=canonicalSplit(ed);
+  const aligned=parts.length===fit.lines.length&&parts.every((pt,j)=>pt.text===fit.lines[j]);
+  const org=[],lines=[],durs=[],wins=[],grp=[];
+  const gidOf=new Map(),rawOf=[];let gcount=0;
+  fit.lines.forEach((t,i)=>{
+   org.push(i);lines.push(t);durs.push(fit.durs[i]);
+   wins.push({start:(ed.cues[i].start-trim.start)/ss,end:(ed.cues[i].end-trim.start)/ss});
+   const r=aligned?parts[i].raw:(-1-i);
+   if(!gidOf.has(r)){gidOf.set(r,gcount++);rawOf.push(r)}
+   grp.push(gidOf.get(r));
+  });
+  const ops=[];let nRedist=0,nSplit=0;const remainingOrgs=new Set();
+  const cappedAt=idx=>{const f=computeCueFit(durs,P,wins);return f?!!f.capped[idx]:false};
+  const gpos=g=>{const out=[];for(let j=0;j<lines.length;j++)if(grp[j]===g)out.push(j);return out};
+  const redist=g=>{
+   const G=gpos(g);if(!G.length)return;
+   const n=lines.length,spanS=wins[G[0]].start,spanE=wins[G[G.length-1]].end,spanLen=Math.max(0,spanE-spanS);
+   let sumNeed=0,sumDur=0;
+   const needs=G.map(j=>{const nd=durs[j]/(CUEFIT_CAP*0.999)+(j<n-1?P:0);sumNeed+=nd;sumDur+=durs[j];return nd});
+   let t=spanS;
+   G.forEach((j,k)=>{
+    let len;
+    if(sumNeed<=spanLen){const left=spanLen-sumNeed;len=needs[k]+(sumDur>0?left*durs[j]/sumDur:left/G.length)}
+    else len=spanLen*(sumDur>0?durs[j]/sumDur:1/G.length);
+    wins[j]={start:t,end:t+len};t+=len;
+   });
+  };
+  const splitAt=pos=>{
+   const sp=splitPointFor(lines[pos]);if(!sp)return false;
+   const s=wins[pos].start,e=wins[pos].end,tot=sp.gA+sp.gB,mid=s+(e-s)*(sp.gA/tot);
+   org.splice(pos,1,org[pos],org[pos]);grp.splice(pos,1,grp[pos],grp[pos]);
+   lines.splice(pos,1,sp.A,sp.B);
+   durs.splice(pos,1,durs[pos]*(sp.gA/tot),durs[pos]*(sp.gB/tot));
+   wins.splice(pos,1,{start:s,end:mid},{start:mid,end:e});
+   return true;
+  };
+  const gorder=[];
+  for(let g=0;g<gcount;g++){const G=gpos(g);if(G.length)gorder.push({g,first:org[G[0]]})}
+  gorder.sort((a,b)=>b.first-a.first);
+  for(const go of gorder){
+   const g=go.g,raw=rawOf[g];
+   let G=gpos(g);
+   const cappedOrgs=[...new Set(G.filter(j=>fit.capped[org[j]]).map(j=>org[j]))];
+   if(!cappedOrgs.length)continue;
+   const expect=G.map(j=>lines[j]);
+   const before=G.map(j=>({start:wins[j].start,end:wins[j].end}));
+   redist(g);
+   const splitOrgs=new Set();
+   if(gpos(g).some(j=>cappedAt(j))&&aligned&&raw>=0){
+    for(const o of cappedOrgs){
+     let pos=-1;const GG=gpos(g);
+     for(const j of GG)if(org[j]===o){pos=j;break}
+     if(pos<0||!cappedAt(pos))continue;
+     if(splitAt(pos))splitOrgs.add(o);
+    }
+    if(splitOrgs.size)redist(g);
+   }
+   G=gpos(g);
+   const stillCapped=new Set(G.filter(j=>cappedAt(j)).map(j=>org[j]));
+   let changed=splitOrgs.size>0;
+   if(!changed){for(let k=0;k<G.length;k++)if(Math.abs(wins[G[k]].start-before[k].start)>0.0005||Math.abs(wins[G[k]].end-before[k].end)>0.0005){changed=true;break}}
+   cappedOrgs.forEach(o=>{
+    if(splitOrgs.has(o))nSplit++;
+    else if(!stillCapped.has(o))nRedist++;
+    else remainingOrgs.add(o);
+   });
+   if(!changed)continue;
+   ops.push({type:'parent',i0:org[G[0]],raw,expect,
+    parts:G.map(j=>({text:lines[j],startSrc:trim.start+wins[j].start*ss,endSrc:trim.start+wins[j].end*ss})),
+    split:splitOrgs.size>0});
+  }
+  return{ops,nExt:0,nRedist,nSplit,nRemainingPlanned:remainingOrgs.size};
  }
  /* Apply a plan to the real cue state, in plan order (descending
-    original index — a splice at i0 never shifts the position of a
-    pending op at a lower index, in either ed.cues or the canonical
-    parts). Writes mirror the manual pop-up save exactly: cue fields
-    + ed.cuesManual for time fixes; for a split, the parent script
-    line is replaced by the two new lines (the syncCueTextToScript
-    precedent: cuesSig re-synced, staleness + gate refreshed) and the
-    cue is spliced into two cues over the divided window. One
-    pushCueUndo snapshots the whole fix, like one Save. Non-red
-    lines are never touched. */
+    original index — a splice at i0 never shifts the position of
+    a pending op at a lower index, in either ed.cues or the
+    canonical parts). Writes mirror the manual pop-up save
+    exactly: cue fields + ed.cuesManual for time fixes; for a
+    split, the parent script line is rewritten as one raw line
+    per resulting part (the syncCueTextToScript precedent:
+    cuesSig re-synced, staleness + gate refreshed) and the cue is
+    spliced over the divided window, so the canonical lines the
+    regeneration derives from the script are exactly the planned
+    ones. One pushCueUndo snapshots the whole fix, like one Save.
+    Non-red lines are never touched. */
  function applyAutoFixCues(plan){
   const fixedObjs=[];
   if(plan.ops.length)pushCueUndo();
   let scriptTouched=false;
+  const rewriteRawLine=(raw,newTexts)=>{
+   const rawLines=(E('subs').value||'').split('\n');let seen=-1,ti=-1;
+   for(let k=0;k<rawLines.length;k++){if(rawLines[k].trim()){seen++;if(seen===raw){ti=k;break}}}
+   if(ti<0)return false;
+   const lead=(rawLines[ti].match(/^\s*/)||[''])[0];
+   rawLines.splice(ti,1,...newTexts.map((t,k)=>(k===0?lead:'')+t));
+   E('subs').value=rawLines.join('\n');scriptTouched=true;return true;
+  };
   for(const op of plan.ops){
    if(op.type==='ext'){
     const c=ed.cues[op.i0];if(!c)continue;
     c.end=op.endSrc;ed.cuesManual=true;fixedObjs.push(c);
    }else if(op.type==='split'){
     const parts=canonicalSplit(ed);const pt=parts[op.i0];
-    if(!pt||pt.text!==op.origText||parts.filter(q=>q.raw===pt.raw).length!==1)continue;
+    if(!pt||pt.text!==op.origText)continue;
     const c=ed.cues[op.i0];if(!c)continue;
-    const rawLines=(E('subs').value||'').split('\n');let seen=-1,ti=-1;
-    for(let k=0;k<rawLines.length;k++){if(rawLines[k].trim()){seen++;if(seen===pt.raw){ti=k;break}}}
-    if(ti<0)continue;
-    const lead=(rawLines[ti].match(/^\s*/)||[''])[0];
-    rawLines[ti]=lead+op.A;rawLines.splice(ti+1,0,op.B);
-    E('subs').value=rawLines.join('\n');scriptTouched=true;
+    const sibs=parts.filter(q=>q.raw===pt.raw),repl=[];
+    sibs.forEach(q=>{if(q===pt)repl.push(op.A,op.B);else repl.push(q.text)});
+    if(!rewriteRawLine(pt.raw,repl))continue;
     const nc1={text:op.A,start:c.start,end:op.midSrc},nc2={text:op.B,start:op.midSrc,end:op.endSrc};
     ed.cues.splice(op.i0,1,nc1,nc2);ed.cuesManual=true;fixedObjs.push(nc1);
+   }else if(op.type==='parent'){
+    const partsNow=canonicalSplit(ed);
+    const cur=partsNow.filter(q=>q.raw===op.raw);
+    if(cur.length!==op.expect.length||cur.some((q,k)=>q.text!==op.expect[k]))continue;
+    let okc=true;
+    for(let k=0;k<op.expect.length;k++){const c=ed.cues[op.i0+k];if(!c||c.text!==op.expect[k]){okc=false;break}}
+    if(!okc)continue;
+    if(op.split&&!rewriteRawLine(op.raw,op.parts.map(pt=>pt.text)))continue;
+    const newCues=op.parts.map(pt=>({text:pt.text,start:pt.startSrc,end:pt.endSrc}));
+    ed.cues.splice(op.i0,op.expect.length,...newCues);ed.cuesManual=true;fixedObjs.push(newCues[0]);
    }
   }
   if(scriptTouched){ed.cuesSig=cueSigNow();updateCueCount();checkVoiceStale();refreshVoiceGate()}
@@ -5369,9 +5528,9 @@ function resolveCues(ed,notify){
    const fixedIdxs=applied.fixedObjs.map(o=>ed.cues.indexOf(o)).filter(x=>x>=0);
    const firstIdx=fixedIdxs.length?Math.min.apply(null,fixedIdxs):-1; /* the FIRST fixed row in list order (fixes are applied descending) */
    if(regenErr){
-    showNotice('⚠️ Cue များ ပြင်ပြီးပါပြီ (အချိန် ရှည်ပေးပြီး ပြင်: '+plan.nExt+' ကြောင်း · စာကြောင်း ခွဲပြီး ပြင်: '+plan.nSplit+' ကြောင်း) — ဒါပေမယ့် အသံ ပြန်ထုတ် မအောင်မြင်ပါ: '+(regenErr.message||String(regenErr))+' — 🎙️ Voice Create ကို ပြန်နှိပ်ပြီး အသံ ပြန်ထုတ်ပါ','err');
+    showNotice('⚠️ Cue များ ပြင်ပြီးပါပြီ (အချိန် ရှည်ပေးပြီး ပြင်: '+plan.nExt+' ကြောင်း · အချိန် ပြန်ခွဲပြီး ပြင်: '+(plan.nRedist||0)+' ကြောင်း · စာကြောင်း ခွဲပြီး ပြင်: '+plan.nSplit+' ကြောင်း) — ဒါပေမယ့် အသံ ပြန်ထုတ် မအောင်မြင်ပါ: '+(regenErr.message||String(regenErr))+' — 🎙️ Voice Create ကို ပြန်နှိပ်ပြီး အသံ ပြန်ထုတ်ပါ','err');
    }else{
-    let msg='✅ Auto Fix ပြီးပါပြီ — အချိန် ရှည်ပေးပြီး ပြင်: '+plan.nExt+' ကြောင်း · စာကြောင်း ခွဲပြီး ပြင်: '+plan.nSplit+' ကြောင်း · အသစ် ပြန်ထုတ်သော အသံ စာကြောင်း: '+synthCount+' ကြောင်း';
+    let msg='✅ Auto Fix ပြီးပါပြီ — အချိန် ရှည်ပေးပြီး ပြင်: '+plan.nExt+' ကြောင်း · အချိန် ပြန်ခွဲပြီး ပြင်: '+(plan.nRedist||0)+' ကြောင်း · စာကြောင်း ခွဲပြီး ပြင်: '+plan.nSplit+' ကြောင်း · အသစ် ပြန်ထုတ်သော အသံ စာကြောင်း: '+synthCount+' ကြောင်း';
     if(remaining>0)msg+=' · ⚠️ '+remaining+' ကြောင်း ကျန်နေသေးတယ် — အနီရောင် အတိုင်း ထားထားပါတယ်';
     showNotice(msg,remaining>0?'err':'ok');
    }

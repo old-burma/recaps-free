@@ -800,7 +800,7 @@ const urlBox='<div class="card" style="margin:12px 0"><h3 style="margin-bottom:8
 +'<button class="btn light" id="'+p+'-urlCancel" type="button" style="display:none;width:100%;margin-top:8px">ရပ်</button>'
 +'<div class="url-prog" id="'+p+'-urlProg" style="display:none"><div class="url-prog-pct" id="'+p+'-urlProgPct">0%</div><div class="url-prog-bar"><div class="url-prog-fill" id="'+p+'-urlProgFill"></div></div><div class="url-prog-meta"><span id="'+p+'-urlProgLabel"></span><span></span></div></div>'
 +'<div class="file-info" id="'+p+'-urlStatus"></div>'
-+'<p class="hint" style="margin-top:6px">YouTube / TikTok link ဒေါင်းတာက App (APK) version မှာပဲ ရပါတယ် — .mp4 link တိုက်ရိုက် ဆိုရင် ဒီကပဲ ယူနိုင်ပါတယ်</p></div>';
++'<p class="hint" style="margin-top:6px">YouTube link ဒေါင်းတာက App (APK) version မှာပဲ ရပါတယ် (TikTok link မရပါ) — .mp4 link တိုက်ရိုက် ဆိုရင် ဒီကပဲ ယူနိုင်ပါတယ်</p></div>';
 const trimInner='<div class="row2"><div class="field" id="'+p+'-f-start"><label>စချိန် (စက္ကန့်)</label><input type="number" id="'+p+'-start" value="0" min="0" step="0.1"><div class="err-text" id="'+p+'-e-start"></div></div><div class="field" id="'+p+'-f-end"><label>ဆုံးချိန် (စက္ကန့်)</label><input type="number" id="'+p+'-end" value="0" min="0" step="0.1"><div class="err-text" id="'+p+'-e-end"></div></div></div>'
 +'<div class="field"><label>စချိန် slider</label><input type="range" id="'+p+'-rstart" value="0" min="0" max="100" step="0.1"></div><div class="field"><label>ဆုံးချိန် slider</label><input type="range" id="'+p+'-rend" value="0" min="0" max="100" step="0.1"></div><p class="hint" style="font-size:12px;color:#9A9A9A">ကြာချိန်: <b id="'+p+'-durinfo">—</b></p><button class="btn light" id="'+p+'-trimReset" style="width:100%">↺ အပြည့် ပြန်ထား (Video တစ်ခုလုံး)</button>';
 /* V256 🎬 Auto Hook home (user request 2026-11-16 18:04): a section
@@ -1194,10 +1194,17 @@ function makeEditor(p){
           (which is ONLY ever used for direct media URLs);
       (b) any other http(s) URL + a native bridge (APK) -> the
           bridge downloads it on-device (contract below);
-      (c) YouTube/TikTok page URL with NO bridge -> NO network call
-          at all: the Render host is IP-blocked for those platforms,
+      (c) YouTube page URL with NO bridge -> NO network call
+          at all: the Render host is IP-blocked for that platform,
           so the box explains that link download works in the App
           (APK) version and to pick the file instead on web.
+      V269: TikTok URLs (tiktok.com / vt.tiktok.com /
+          vm.tiktok.com) are refused BEFORE any route — no bridge
+          call, no fetch: TikTok serves the phone a data-less
+          page, so even the APK bridge got no video data
+          (v1.6 direct + v1.7 WebView fallback both failed
+          on-device). The box says so and points to a YouTube
+          link or a direct file pick instead.
     On success the Blob becomes a File and enters the editor through
     acceptVideoFile(file, true) — the exact same entry point (and the
     same project-wipe semantics) as the 🎬 Video လဲ pick. */
@@ -1290,8 +1297,9 @@ function makeEditor(p){
    return{blob:r.blob,name:name};
   }catch(e){if(e&&e.cancelled)throw e;return null}
  }
- /* server route — DIRECT media URLs only (YouTube/TikTok page URLs
-    never reach here: the Render host is IP-blocked for those).
+ /* server route — DIRECT media URLs only (YouTube page URLs
+    never reach here: the Render host is IP-blocked for it;
+    TikTok URLs are refused even earlier, in urlFetchFromLink).
     V250 applies the audit's m7 fix: the status poll has an overall
     ~3-minute cap and surfaces the last known status on expiry. */
  async function urlFetchViaServer(url){
@@ -1409,15 +1417,26 @@ function makeEditor(p){
   if(ed.urlBusy)return;
   const inp=E('urlInput');
   const raw=inp?(inp.value||'').trim():'';
-  if(!raw){showNotice('⚠️ Link အရင် ထည့်ပါ — YouTube / TikTok link သို့မဟုတ် .mp4 link တိုက်ရိုက်','err');return}
+  if(!raw){showNotice('⚠️ Link အရင် ထည့်ပါ — YouTube link သို့မဟုတ် .mp4 link တိုက်ရိုက်','err');return}
   let u=null;try{u=new URL(raw)}catch(e){}
   if(!u||(u.protocol!=='http:'&&u.protocol!=='https:')){showNotice('⚠️ Link ပုံစံ မမှန်ပါ — http:// သို့မဟုတ် https:// နဲ့ စတဲ့ link အပြည့် ထည့်ပါ','err');return}
   const url=u.href;
+  /* V269: TikTok links are NOT supported (user's standing order
+     2026-11-17, executed 2026-11-18): TikTok serves the phone a
+     data-less page, so the APK bridge — v1.6 direct AND the v1.7
+     WebView fallback — extracts nothing. Refuse HERE, before the
+     bridge and before any fetch, with what-to-do-instead text. */
+  const host=u.hostname.toLowerCase();
+  if(host==='tiktok.com'||host.endsWith('.tiktok.com')){
+   setUrlStatus('❌ TikTok link မရပါ — YouTube link သုံးပါ');
+   showNotice('⚠️ TikTok link မရပါ — YouTube link ကို သုံးပါ။ TikTok video ဆိုရင် ဖိုင် အဖြစ် အရင် ဒေါင်းပြီး 📱 Video ဖိုင် ရွေးရန် မှ တင်ပါ','err');
+   return;
+  }
   const direct=isDirectMediaUrl(url);
   const bridge=(window.NLODownload&&typeof window.NLODownload.download==='function')?window.NLODownload:null;
   if(!direct&&!bridge){
-   setUrlStatus('ℹ️ YouTube / TikTok link ဒေါင်းတာက App (APK) version မှာပဲ ရပါတယ်');
-   showNotice('⚠️ YouTube / TikTok link ကို web ပေါ်မှာ တိုက်ရိုက် မယူနိုင်ပါ — App (APK) version မှာ ယူနိုင်ပါတယ်။ web မှာတော့ video ဖိုင် ကို တိုက်ရိုက် ရွေးပေးပါ (သို့မဟုတ် .mp4 link တိုက်ရိုက် သုံးပါ)','err');
+   setUrlStatus('ℹ️ YouTube link ဒေါင်းတာက App (APK) version မှာပဲ ရပါတယ်');
+   showNotice('⚠️ YouTube link ကို web ပေါ်မှာ တိုက်ရိုက် မယူနိုင်ပါ — App (APK) version မှာ ယူနိုင်ပါတယ်။ web မှာတော့ video ဖိုင် ကို တိုက်ရိုက် ရွေးပေးပါ (သို့မဟုတ် .mp4 link တိုက်ရိုက် သုံးပါ)','err');
    return;
   }
   ed.urlBusy=true;ed.urlCancel=false;
@@ -2014,6 +2033,35 @@ function cropPresetRect(ed,asp){
  const k=r/va; /* the rect's w/h ratio in FRACTION space */
  let w,h;if(k>=1){w=1;h=1/k}else{w=k;h=1}
  return{x:+((1-w)/2).toFixed(4),y:+((1-h)/2).toFixed(4),w:+w.toFixed(4),h:+h.toFixed(4)};
+}
+/* V269: the INITIAL crop rect (user order 2026-11-18: "at the
+   start, don't take the full screen — take it slightly inset
+   from each side"). A video with no crop yet starts from a rect
+   inset 5% of the frame on EVERY side, with the selected aspect
+   preset fitted inside that box, centred (Free = the box itself;
+   'orig' keeps its settled meaning — the full frame). This is
+   only a starting seed: the editing overlay draws it, the first
+   drag starts from it, and a preset chip tapped on an untouched
+   crop fits inside it. ed.crop itself stays null until the user
+   commits a change, an existing crop is returned untouched, and
+   the sheet Reset still clears to the FULL frame
+   (applyCropChange(null) — a separate path, unchanged). */
+const CROP_INSET=0.05;
+function cropInsetBox(){return{x:CROP_INSET,y:CROP_INSET,w:1-2*CROP_INSET,h:1-2*CROP_INSET}}
+/* the largest centred rect of a preset PIXEL aspect inside an
+   arbitrary fraction box — cropPresetRect generalised to a box */
+function fitAspectInBox(ed,asp,box){
+ const r={'9:16':9/16,'16:9':16/9,'1:1':1,'4:5':4/5}[asp];
+ if(!r)return{x:box.x,y:box.y,w:box.w,h:box.h};
+ const vd=effVideoDims(ed),va=vd.w/Math.max(1,vd.h),k=r/va;
+ let w,h;if(k>=box.w/box.h){w=box.w;h=box.w/k}else{h=box.h;w=box.h*k}
+ return{x:+(box.x+(box.w-w)/2).toFixed(4),y:+(box.y+(box.h-h)/2).toFixed(4),w:+w.toFixed(4),h:+h.toFixed(4)};
+}
+function initialCropRect(ed){
+ if(ed&&ed.crop)return normCrop(ed.crop);
+ const asp=(ed&&ed.cropAsp)||'free';
+ if(asp==='orig')return{x:0,y:0,w:1,h:1};
+ return fitAspectInBox(ed,asp,cropInsetBox());
 }
 /* clamp a candidate rect into the frame (minimum size 0.02) and,
    when lockK (a preset's fraction-space w/h) is given, hold the
@@ -7875,7 +7923,7 @@ window.__recapProject={collect:projCollect,apply:applyProject,sigMatch:projSigMa
   }
   if(layer){
    layer.style.display=(editing&&ed.file)?'block':'none';
-   if(editing&&rect){const pf=picRectFracFor(ed,null),nc=normCrop(ed.crop);
+   if(editing&&rect){const pf=picRectFracFor(ed,null),nc=initialCropRect(ed);
     rect.style.left=((pf.x+nc.x*pf.w)*100)+'%';rect.style.top=((pf.y+nc.y*pf.h)*100)+'%';rect.style.width=(nc.w*pf.w*100)+'%';rect.style.height=(nc.h*pf.h*100)+'%'}
   }
  }
@@ -7927,7 +7975,7 @@ window.__recapProject={collect:projCollect,apply:applyProject,sigMatch:projSigMa
    pf=picRectFracFor(ed,null);
    const pt=srcPt(e);if(!pt)return;
    mode=(e.target&&e.target.dataset&&e.target.dataset.h)?e.target.dataset.h:'move';
-   orig=Object.assign(normCrop(ed.crop),{_sx:pt.x,_sy:pt.y});pend=pt;
+   orig=Object.assign(initialCropRect(ed),{_sx:pt.x,_sy:pt.y});pend=pt;
    try{cropRectEl.setPointerCapture(e.pointerId)}catch(err){}
    e.preventDefault();e.stopPropagation();
   });
@@ -7939,7 +7987,10 @@ window.__recapProject={collect:projCollect,apply:applyProject,sigMatch:projSigMa
   const b=e.target.closest('.style-chip');if(!b)return;const a=b.dataset.v;
   if(a==='free'){ed.cropAsp='free';persistOvl();syncCropUI();return}
   if(a==='orig'){applyCropChange(null,'orig');return}
-  applyCropChange(cropPresetRect(ed,a),a);
+  /* V269: on an untouched crop the preset fits inside the inset
+     start box; on an existing crop the preset keeps its settled
+     full-frame fit */
+  applyCropChange(ed.crop?cropPresetRect(ed,a):fitAspectInBox(ed,a,cropInsetBox()),a);
  });
  const crRS=E('cropReset');if(crRS)crRS.onclick=()=>{applyCropChange(null,'free');showNotice('↺ Crop မူလ (အပြည့်) ပြန်ထားပါပြီ','info')};
  const tcBtn=E('toolCrop');if(tcBtn)tcBtn.onclick=()=>{openFeatureSheet('homeCrop','⛶ Crop');enterCropMode();const ret=sheetOnClose;sheetOnClose=()=>{if(ret)ret();exitCropMode()}};

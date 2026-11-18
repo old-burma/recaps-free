@@ -613,7 +613,17 @@ const DEF={aspect:'9:16',blur:28,voice:'Kore',subPosY:0.81,subColor:'white',subB
 function clampSubPos(f){f=(typeof f==='number'&&isFinite(f))?f:0.81;return Math.max(0.04,Math.min(0.98,f))}
 function loadSettings(){try{const s=Object.assign({},DEF,JSON.parse(localStorage.getItem('recaps_settings')||'{}'));if(ASPECT_MIGRATE[s.aspect])s.aspect=ASPECT_MIGRATE[s.aspect];if(!ASPECTS[s.aspect])s.aspect=DEF.aspect;return s}catch(e){return Object.assign({},DEF)}}
 let SETTINGS=loadSettings();
-function saveSettings(){localStorage.setItem('recaps_settings',JSON.stringify(SETTINGS))}
+/* V268: saveSettings was the ONE unguarded storage write in the
+   app — the logo / PiP / chunk-cache / device-id writes all catch
+   quota errors and degrade to memory-only. On a phone whose
+   WebView storage is full, the bare setItem threw
+   QuotaExceededError up through persistOvl / persistBlur, killing
+   editing commits mid-flight (the crop drag's pointerup commit:
+   "⚠️ Error: Uncaught QuotaExceededError…" on release, and the
+   preview syncs queued after the persist never ran). Settings
+   persistence is best-effort like every other store here — the
+   in-memory SETTINGS stay authoritative for the session. */
+function saveSettings(){try{localStorage.setItem('recaps_settings',JSON.stringify(SETTINGS))}catch(e){}}
 function getApiKey(){return (localStorage.getItem('recaps_gemini_key')||'').trim()}
 function fmtSize(b){if(!b&&b!==0)return'—';if(b<1048576)return(b/1024).toFixed(0)+' KB';if(b<1073741824)return(b/1048576).toFixed(1)+' MB';return(b/1073741824).toFixed(2)+' GB'}
 function fmtDur(s){s=Math.max(0,Math.round(s||0));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')}
@@ -4205,13 +4215,19 @@ async function exportOneHw(ff,ed,seg,idx,total,log,progs){
     H.264 stream, mixed audio, output) are deleted when the segment
     finishes OR fails — previously only in.mp4 was removed. voiceFile
     / mixFile are read at call time (both are set by then). */
+ /* V268: voiceFile / mixFile are declared HERE, in function
+    scope — they were let/const INSIDE the try below, so this
+    closure could not see them at all (the V249 note's "read at
+    call time" assumed they were in scope) and EVERY Hardware
+    export died at the final cleanup with "voiceFile is not
+    defined" — after a fully successful mux, at ~92%. */
+ let voiceFile='voice.wav',mixFile=null;
  const fsCleanHw=async()=>{for(const nm of['out'+idx+'.mp4',voiceFile,'hw_v'+idx+'.h264',mixFile,'hw_mix'+idx+'h.m4a','hw_mixfull'+idx+'.m4a','hw_sil'+idx+'.m4a','hw_hlist'+idx+'.txt']){if(nm)try{await ff.deleteFile(nm)}catch(e){}}};
  /* V259 (M4 completed): the whole body below sits inside this try —
     fsCleanHw now runs on EVERY exit (success, failure, cancel);
     previously a prep/encode throw leaked every temp */
  try{
  await ffEnsureSrc(ff,ed);prepStep('📥 ဖိုင် ပြင်နေပါတယ်…');
- let voiceFile='voice.wav';
  if(ed.audioMode==='voice'){let voiceArr;if(ed._cachedVoice){log('✅ အသံ အပိုင်းမှာ ထုတ်ထားသော အသံကို ပြန်သုံးပါတယ်');voiceArr=ed._cachedVoice;voiceFile='voice.'+(ed._cachedVoiceExt||'wav')}else{log('အသံ ထုတ်နေပါတယ်…');const gv=await generateVoiceLines(ed,seg.cues.map(c=>c.text),log,(i,n)=>{if(prep)prep(Math.min(1,(prepN+(n?i/n:1))/Math.max(1,prepItems)),'🎙️ အသံ ထုတ်နေပါတယ်… ('+i+'/'+n+')')});voiceArr=gv.bytes;voiceFile='voice.'+gv.ext}await ff.writeFile(voiceFile,ffCopy(voiceArr))}prepStep('🎙️ အသံ ပြင်နေပါတယ်…');
  /* overlay images: the SAME PNG bytes exportOne would overlay,
    decoded to drawables instead of written to MEMFS */
@@ -4233,7 +4249,7 @@ async function exportOneHw(ff,ed,seg,idx,total,log,progs){
  if(ed.pipOn&&ed.pipImgData){const pp=await buildPipPNG(ed,W,H);if(pp){const img=await hwImgFromBytes(pp.bytes);if(!img)throw new Error('PiP ပုံ ဖွင့် မရပါ');const xy=pipXY(ed,W,H,pp.w,pp.h);layers.pip={img:img,x:xy.x,y:xy.y};prepStep('🖼️ PiP ပုံ ပြင်နေပါတယ်…')}}
  for(const tk of['2','3']){const tOn=ed['txt'+tk+'On'],tStr=(ed['txt'+tk+'Str']||'').trim();if(tOn&&tStr){const bh2=Math.round(170*S);const ty2=txtStripY(ed['txt'+tk+'Pos'],H,bh2);const _t2O={size:Math.round((ed['txt'+tk+'Size']||40)*S),color:(ed['txt'+tk+'Color']||'#FFFFFF'),cx:0.5,font:fontFamFor('text')};const img=await hwImgCached('ovl|'+textPngKey(tStr,W,bh2,_t2O),await cachedTextPNG(tStr,W,bh2,_t2O));if(!img)throw new Error('စာသား ပုံ ဖွင့် မရပါ');const s2=(ed['txt'+tk+'Start']||0),e2=(ed['txt'+tk+'End']||0);layers.texts.push({img:img,x:0,y:ty2,from:s2,to:(e2>s2?e2:dur)});prepStep('🖼️ စာသား ပုံ ပြင်နေပါတယ်…')}}
  const _tMix=expNow();
- const mixFile=await hwMixedAudio(ff,ed,seg,voiceFile,idx,f=>{if(prep)prep(Math.min(1,(prepN+f)/Math.max(1,prepItems)),'🎙️ အသံ ရောနေပါတယ်…')});
+ mixFile=await hwMixedAudio(ff,ed,seg,voiceFile,idx,f=>{if(prep)prep(Math.min(1,(prepN+f)/Math.max(1,prepItems)),'🎙️ အသံ ရောနေပါတယ်…')});
  expPhaseLog(log,'အသံ ရောချိန်',_tMix);
  if(!mixFile)log('ℹ️ အသံ မပါသော video — အသံ မပါဘဲ ထုတ်ပါတယ်');
  /* V256: hook audio — the source window with ORIGINAL audio

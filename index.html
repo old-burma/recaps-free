@@ -857,7 +857,7 @@ const autoFitRow='<div class="switch-row"><div><b style="font-size:14px">🎯 Vi
    pill ids finds nothing to break; the pills themselves are gone. */
 const voiceFieldBlock='<div class="field" style="margin-bottom:16px"><label>🗣️ စကားပြောအသံ ရွေးချယ်မှု</label><button type="button" class="voice-field" id="'+p+'-voiceField"><span id="'+p+'-voiceFieldLabel">👨 သီဟ (အမျိုးသား)</span><span class="vf-caret">▾</span></button></div>';
 const audioInner='';
-const duckField='<div class="field"><label class="duck-chk"><input type="checkbox" id="'+p+'-autoDuck" checked> BGM အလိုအလျောက် လျှော့မည်</label><p class="hint">အသံ အသစ် ရွေးလိုက်ရင် BGM ကို 15% သို့ အလိုအလျောက် လျှော့ပေးမည်</p></div>';
+const duckField='<div class="field"><label class="duck-chk"><input type="checkbox" id="'+p+'-autoDuck"> BGM ကို 15% ထားမည်</label><p class="hint">ဒါကို ကိုယ်တိုင် ဖွင့်မှသာ BGM ကို 15% ထားပါမည် — အသံ ရွေးရုံနဲ့ BGM မပြောင်းပါ</p></div>';
 const scriptHome=subsFieldRecap
 +'<div id="'+p+'-aiTxWrap" style="display:none;margin-top:4px"><div class="switch-row"><div><b style="font-size:14px">မူရင်း စာသား (AI ကြားရသလောက်)</b><div style="font-size:12px;color:#9A9A9A">ဖတ်ရန်သာ — ပြင်၍ မရပါ</div></div><button class="btn light small" id="'+p+'-aiTxTgl">ဖျောက်</button></div><div class="field" id="'+p+'-f-transcript" style="margin-bottom:0"><textarea id="'+p+'-transcript" readonly placeholder="AI ထုတ်ထားသော မူရင်း စာသား ဒီမှာ ပေါ်ပါမယ်"></textarea></div></div>'
 +'<button class="btn light" id="'+p+'-recreate" style="width:100%;margin-top:12px">🎬 Recaps ပြန်လုပ်</button><p class="hint" style="margin-top:6px">ပုံစံ ပြန်ရွေးပြီး Script အသစ် ပြန်ထုတ်ရန် (လက်ရှိ Script နှင့် cue များကို အစားထိုးပါမယ်)</p>'
@@ -3363,7 +3363,9 @@ async function exportHookClip(ff,ed,hookAbs,log,seg){
  }else{
   fc+=';[vout]null[vfout]';
  }
- const enc=['-c:v','libx264','-preset','ultrafast','-crf','25','-pix_fmt','yuv420p','-movflags','+faststart'];
+ /* V271: same video_track_timescale as the main encode, so the
+    copy join's two parts share codec, geometry AND timescale */
+ const enc=['-c:v','libx264','-preset','ultrafast','-crf','25','-pix_fmt','yuv420p','-video_track_timescale','15360','-movflags','+faststart'];
  try{
   const ins=['-i','in.mp4'];subIns.forEach(fn=>ins.push('-loop','1','-t',String(HOOK_DUR),'-i',fn));
   const code=await ffExecP(ff,ins.concat(['-filter_complex',fc,'-map','[vfout]','-t',String(HOOK_DUR)]).concat(enc).concat(['hk_hookv.mp4']),3600000,HOOK_DUR,null);
@@ -3372,9 +3374,10 @@ async function exportHookClip(ff,ed,hookAbs,log,seg){
  }finally{/* V259: 'in.mp4' is the resident source copy — it stays for the join and any later stage */ for(const fn of subIns){try{await ff.deleteFile(fn)}catch(e){}}}
 }
 /* ffmpeg engines: render the hook, then join [hook]+[main] with
-   the concat DEMUXER (stream copy first; a re-encode join as the
-   fallback). Any failure THROWS — the export fails loudly rather
-   than delivering a hook-less file. */
+   the concat DEMUXER. V271: the join is a pure stream copy (the
+   main part stays bit-identical — the user's rule); any failure
+   THROWS — the export fails loudly rather than delivering a
+   hook-less or re-encoded file. */
 async function joinHookClip(ff,ed,seg,idx,mainBlob,log,segProgs){
  const hookAbs=seg.start+(ed.hookStart||0);
  log('🎬 Hook (အစပျိုး) ထည့်နေပါတယ် — '+fmtDur(hookAbs)+' – '+fmtDur(hookAbs+HOOK_DUR)+' (Voiceover + စာတန်း အပါ)…');
@@ -3383,23 +3386,33 @@ async function joinHookClip(ff,ed,seg,idx,mainBlob,log,segProgs){
     not as a final encode event */
  const muxJ=(segProgs&&(segProgs.muxJoin||segProgs.mux))||null;
  if(muxJ)muxJ(0,'🔀 အသံနဲ့ ပေါင်းနေပါတယ်…');
- const temps=['hk_main.mp4','hk_hook.mp4','hk_hookv.mp4','hk_haud.m4a','hk_list.txt','hk_join.mp4'];
+ const temps=['hk_main.mp4','hk_hook.mp4','hk_hookv.mp4','hk_haud.mp4','hk_list.txt','hk_join.mp4'];
  try{
   await ff.writeFile('hk_main.mp4',new Uint8Array(await mainBlob.arrayBuffer()));
   await exportHookClip(ff,ed,hookAbs,log,seg);
-  /* V270 (Change G): the hook's audio is a slice of the MAIN render's
-     own final track over the hook window — exactly what the main
-     export plays there (the generated voiceover with the project's
-     mix gains / ducked original underneath; in original mode the
-     final track IS the original audio, so no special case). The
-     window sits at hookStart/spd on the main OUTPUT timeline. The
-     slice is normalised to the join's fixed parameter set. */
+  /* V270 (Change G) design, V271 mechanics: the hook's audio is a
+     slice of the MAIN render's own final track over the hook
+     window — exactly what the main export plays there (the
+     generated voiceover with the project's mix gains; in original
+     mode the final track IS the original audio, so no special
+     case). The window sits at hookStart/spd on the main OUTPUT
+     timeline. V271: the slice is EXTRACTED BY STREAM COPY — same
+     codec, sample rate and channels as the main track by
+     construction — because the join below is a pure stream-copy
+     concat and the main part must stay bit-identical (the user's
+     rule: join the two pieces, never re-encode the recaps part).
+     The extraction uses OUTPUT seeking (-ss after -i): measured
+     on the wasm ffmpeg 5.1 core, INPUT seeking a stream copy out
+     of an MP4 emits ~44 ghost packets (~1.02 s of phantom
+     duration the concat demuxer then offsets the main part by —
+     voice landing ~1 s late against the subtitles), while
+     output seeking is packet-exact (216 packets, 5.000 s). */
   const sliceAt=Math.max(0,(ed.hookStart||0)/segSpeedOf(ed));
   let hookAud=false;
-  {const sc=await ffExecP(ff,['-i','hk_main.mp4','-vn','-af','atrim=start='+sliceAt.toFixed(3)+':end='+(sliceAt+HOOK_DUR).toFixed(3)+',asetpts=PTS-STARTPTS','-c:a','aac','-b:a','128k','-ar','44100','-ac','2','hk_haud.m4a'],3600000,HOOK_DUR,null);hookAud=(sc===0)}
+  {const sc=await ffExecP(ff,['-i','hk_main.mp4','-ss',sliceAt.toFixed(3),'-t',String(HOOK_DUR),'-vn','-c:a','copy','hk_haud.mp4'],3600000,HOOK_DUR,null);hookAud=(sc===0)}
   let hookFile='hk_hookv.mp4';
   if(hookAud){
-   const mc=await ffExecP(ff,['-i','hk_hookv.mp4','-i','hk_haud.m4a','-map','0:v','-map','1:a','-c','copy','-t',String(HOOK_DUR),'hk_hook.mp4'],3600000,HOOK_DUR,null);
+   const mc=await ffExecP(ff,['-i','hk_hookv.mp4','-i','hk_haud.mp4','-map','0:v','-map','1:a','-c','copy','-t',String(HOOK_DUR),'hk_hook.mp4'],3600000,HOOK_DUR,null);
    if(mc!==0)throw new Error('Hook အသံ ထည့်ရာ မအောင်မြင်ပါ (ffmpeg exit '+mc+')');
    hookFile='hk_hook.mp4';
   }else if(ed.audioMode==='voice'){
@@ -3416,19 +3429,22 @@ async function joinHookClip(ff,ed,seg,idx,mainBlob,log,segProgs){
   const lt="file '"+hookFile+"'\nfile 'hk_main.mp4'\n";const u8=new Uint8Array(lt.length);for(let i=0;i<lt.length;i++)u8[i]=lt.charCodeAt(i)&0xff;
   await ff.writeFile('hk_list.txt',u8);
   const totS=HOOK_DUR+(seg.end-seg.start)/segSpeedOf(ed);
-  /* V270 (Change F): the join NEVER stream-copies audio any more.
-     The V256 copy-first join produced corrupt files whenever the
-     two parts' audio parameters differed (hook = AAC-LC re-encode
-     vs main = stream-copied HE-AAC in original mode; sample-rate
-     mismatches in voice mode): the output kept the FIRST part's
-     codec parameters and every later frame was undecodable on the
-     phone (the user's 2026-11-18 export: hook audible, voiceover
-     silent/garbled). Audio is now ALWAYS re-encoded at the join to
-     one fixed set (AAC-LC, 44.1 kHz, stereo); the video keeps the
-     fast stream copy (both parts come from the same libx264
-     settings), with the full re-encode join as the fallback. */
-  let code=await ffExecP(ff,['-f','concat','-safe','0','-i','hk_list.txt','-c:v','copy','-c:a','aac','-b:a','128k','-ar','44100','-ac','2','-movflags','+faststart','hk_join.mp4'],3600000,totS,muxJ?(f)=>muxJ(f):null);
-  if(code!==0){log('ℹ️ Hook ဆက်ရာ မရပါ — အကုန် ပြန် encode ပြီး ဆက်နေပါတယ်…');code=await ffExecP(ff,['-f','concat','-safe','0','-i','hk_list.txt','-c:v','libx264','-preset','ultrafast','-crf','25','-pix_fmt','yuv420p','-c:a','aac','-b:a','128k','-ar','44100','-ac','2','-movflags','+faststart','hk_join.mp4'],3600000,totS,muxJ?(f)=>muxJ(f):null)}
+  /* V271: the join is a PURE STREAM-COPY concat — the user's rule
+     ("Recaps လုပ်ထားတဲ့ video နဲ့ အသံကို သွားမထိနဲ့ — auto hook +
+     recaps video ၂ ခုကို ဆက်"): the main part's packets pass
+     through untouched, bit-identical. It is safe now because the
+     two parts' parameters match BY CONSTRUCTION: the hook video
+     comes from the same encoder settings, geometry and timescale
+     as the main (exportHookClip mirrors exportOne), and the hook
+     audio is a stream-copy slice of the main's own track (same
+     codec / rate / channels). The V270 re-encode join — and the
+     V256 copy join before it, whose hook audio was a separate
+     fixed-parameter re-encode — both broke exactly here:
+     re-encoded or mismatched audio shifted the voice against the
+     subtitles and skewed the A/V durations. If the copy join
+     ever fails, the export FAILS LOUDLY — it never falls back to
+     re-encoding the main part. */
+  const code=await ffExecP(ff,['-f','concat','-safe','0','-i','hk_list.txt','-c','copy','-movflags','+faststart','hk_join.mp4'],3600000,totS,muxJ?(f)=>muxJ(f):null);
   if(code!==0)throw new Error('Hook ဆက်ရာ မအောင်မြင်ပါ (ffmpeg exit '+code+') — Hook မပါဘဲ မထုတ်ပါ; အခြား Export engine ပြောင်း ကြိုးစားပါ');
   const data=await ff.readFile('hk_join.mp4');
   if(muxJ)muxJ(1);
@@ -3439,36 +3455,45 @@ async function joinHookClip(ff,ed,seg,idx,mainBlob,log,segProgs){
 /* Hardware engine audio: the hook's mix is a slice of the MAIN mix
    over the hook window (V270 Change G — hwHookSlice; in original
    mode the main mix IS the original audio); the muxed audio is
-   [hook slice]+[main mix] joined with the concat demuxer —
-   re-encoded to one fixed parameter set, never stream-copied
-   (V270 Change F) — with a generated silence standing in for
-   whichever side has no audio so both parts stay aligned. */
+   [hook slice]+[main mix] joined with the concat demuxer. V271:
+   the slice is extracted by stream copy and the concat is a pure
+   stream copy too — the main mix is never re-encoded (the user's
+   join rule) — with a generated silence standing in for whichever
+   side has no audio so both parts stay aligned. */
 async function hwSilenceM4a(ff,name,dur){
  const code=await ffExecP(ff,['-f','lavfi','-i','anullsrc=channel_layout=stereo:sample_rate=44100','-t',Math.max(0.1,dur).toFixed(2),'-c:a','aac','-b:a','128k',name],3600000,dur,null);
  if(code!==0)throw new Error('Hook အသံ (တိတ်ဆိတ်) ထုတ်ရာ မအောင်မြင်ပါ (ffmpeg exit '+code+')');
  return name;
 }
-/* V270 (Change G): the hook's audio is the slice of the MAIN mix
-   over the hook window — [startOut, startOut+HOOK_DUR] on the main
-   OUTPUT timeline — normalised to the join's fixed parameter set
-   (AAC-LC, 44.1 kHz, stereo). In original mode the main mix IS the
+/* V270 (Change G) design, V271 mechanics: the hook's audio is the
+   slice of the MAIN mix over the hook window — [startOut,
+   startOut+HOOK_DUR] on the main OUTPUT timeline — EXTRACTED BY
+   STREAM COPY, so it carries the main mix's exact codec / rate /
+   channels and hwConcatAudio can stay a pure copy (the main mix
+   is never re-encoded). In original mode the main mix IS the
    original audio, so the hook keeps original audio there with no
    special case. Returns the file name, or null on failure. */
 async function hwHookSlice(ff,idx,mixFile,startOut){
  const name='hw_mix'+idx+'h.m4a';
- const code=await ffExecP(ff,['-i',mixFile,'-af','atrim=start='+startOut.toFixed(3)+':end='+(startOut+HOOK_DUR).toFixed(3)+',asetpts=PTS-STARTPTS','-c:a','aac','-b:a','128k','-ar','44100','-ac','2',name],3600000,HOOK_DUR,null);
+ /* V271: OUTPUT seeking, like joinHookClip's slice — input
+    seeking a stream copy out of an MP4 makes the wasm ffmpeg
+    5.1 core emit ghost packets (~1 s of phantom duration) */
+ const code=await ffExecP(ff,['-i',mixFile,'-ss',startOut.toFixed(3),'-t',String(HOOK_DUR),'-vn','-c:a','copy',name],3600000,HOOK_DUR,null);
  return code===0?name:null;
 }
 async function hwConcatAudio(ff,idx,files){
  const list='hw_hlist'+idx+'.txt',out='hw_mixfull'+idx+'.m4a';
  const txt=files.map(f=>"file '"+f+"'").join('\n')+'\n';const u8=new Uint8Array(txt.length);for(let i=0;i<txt.length;i++)u8[i]=txt.charCodeAt(i)&0xff;
  await ff.writeFile(list,u8);
- /* V270 (Change F): NEVER stream-copy this join — the two parts can
-    carry different AAC parameters (e.g. a stream-copied HE-AAC main
-    mix vs an encoded hook slice), and a copy join keeps the FIRST
-    part's codec parameters, leaving every later frame undecodable.
-    Always re-encode to one fixed set: AAC-LC, 44.1 kHz, stereo. */
- let code=await ffExecP(ff,['-f','concat','-safe','0','-i',list,'-c:a','aac','-b:a','128k','-ar','44100','-ac','2',out],3600000,0,null);
+ /* V271: PURE STREAM-COPY join — the user's rule (join the two
+    pieces, never touch the recaps part's audio). Safe because the
+    hook slice is itself a stream-copy extraction of the main mix
+    (hwHookSlice), so both parts carry identical codec parameters
+    by construction. The one degraded exception is the generated
+    silence stand-in (hwSilenceM4a, AAC-LC 44.1k stereo), used
+    only when a side has no audio at all. If the copy join fails,
+    the export fails loudly — the main mix is never re-encoded. */
+ let code=await ffExecP(ff,['-f','concat','-safe','0','-i',list,'-c','copy',out],3600000,0,null);
  if(code!==0)throw new Error('Hook အသံ ဆက်ရာ မအောင်မြင်ပါ (ffmpeg exit '+code+')');
  return out;
 }
@@ -3715,7 +3740,7 @@ function hwChunksToAnnexB(chunks,avcDesc,format){
 /* the mux command (route i): the Annex-B stream gets its timing from
    -framerate (frames ÷ segment seconds, so the total duration is the
    segment's), the mixed audio is stream-copied in beside it */
-function hwMuxArgs(fpsStr,audioFile,idx){const a=['-framerate',fpsStr,'-i','hw_v'+idx+'.h264'];if(audioFile)a.push('-i',audioFile);a.push('-map','0:v:0');if(audioFile)a.push('-map','1:a:0');a.push('-c','copy','-movflags','+faststart','out'+idx+'.mp4');return a}
+function hwMuxArgs(fpsStr,audioFile,idx,maxDur){const a=['-framerate',fpsStr,'-i','hw_v'+idx+'.h264'];if(audioFile)a.push('-i',audioFile);a.push('-map','0:v:0');if(audioFile)a.push('-map','1:a:0');a.push('-c','copy');if(maxDur>0)a.push('-t',Number(maxDur).toFixed(3));a.push('-movflags','+faststart','out'+idx+'.mp4');return a}
 /* PURE frame plan: every pixel value mirrors exportOne's graph math
    (same G/S, picY/subY from the shared subBlockGeom, region clamping,
    border width), so the canvas compositor draws exactly the layout
@@ -3768,19 +3793,26 @@ function hwDrawSrcRot(c,src,cx,cy,w,h,rot,flip){
 }
 /* V257 (FIX 6): the crop-aware twin of hwDrawSrcRot — draws only
    the crop window's RAW-source rect (plan.cropSrc: the rotated-
-   frame crop mapped back through the quarter turn + mirror) into
-   the same transformed destination, so the composed frame matches
-   the ffmpeg crop-after-rotate chain pixel for pixel. The local
-   destination is the same fraction of the full-frame rect, because
-   drawImage's source->dest map is affine. No crop = the exact old
-   draw. */
+   frame crop mapped back through the quarter turn + mirror).
+   V271: the destination is the WHOLE rect passed in, never the
+   crop's fraction of it — hwFramePlan computes every rect from
+   effSrcDims (the ALREADY-cropped dims), so the rect IS the
+   cropped picture's place on the canvas and the crop window's
+   pixels fill it entirely, exactly like the ffmpeg engines where
+   cropFilterOf crops the stream once and the layout works on the
+   cropped dims. The V257 fractional destination applied the crop
+   a SECOND time inside the rect: a 0.745-wide crop on an
+   Original-aspect canvas drew the picture at 0.745 of the canvas
+   width, left-aligned, with raw black filling the rest (the
+   user's 2026-11-18 Hardware export: picture right edge at x=426
+   of 572, black pillar beside it). No crop = the exact old draw. */
 function hwDrawSrcCrop(c,src,cx,cy,w,h,plan){
  if(!plan||!plan.crop){hwDrawSrcRot(c,src,cx,cy,w,h,plan?plan.rot:0,plan?plan.flipH:false);return}
  const sr=plan.cropSrc,sw=(src&&(src.videoWidth||src.width))||0,sh=(src&&(src.videoHeight||src.height))||0;
  if(!sw||!sh){hwDrawSrcRot(c,src,cx,cy,w,h,plan.rot,plan.flipH);return}
  c.save();c.translate(cx,cy);if(plan.rot)c.rotate(plan.rot*Math.PI/180);if(plan.flipH)c.scale(-1,1);
  const odd=(plan.rot%180)!==0,dw=odd?h:w,dh=odd?w:h;
- try{c.drawImage(src,sr.x*sw,sr.y*sh,Math.max(1,sr.w*sw),Math.max(1,sr.h*sh),-dw/2+sr.x*dw,-dh/2+sr.y*dh,sr.w*dw,sr.h*dh)}catch(e){}
+ try{c.drawImage(src,sr.x*sw,sr.y*sh,Math.max(1,sr.w*sw),Math.max(1,sr.h*sh),-dw/2,-dh/2,dw,dh)}catch(e){}
  c.restore();
 }
 /* draw ONE composited frame in the ffmpeg graph's z-order: blurred
@@ -4488,7 +4520,13 @@ async function exportOneHw(ff,ed,seg,idx,total,log,progs){
     feeds the encode progress or the encode ETA. Its media-µs
     stream resetting the ETA tracker (and the +faststart tail
     then freezing both) was the user's stuck-at-99% + ~35:02 ETA. */
- const code=await ffExecP(ff,hwMuxArgs(fpsStr,finalMix,idx),3600000,dur,(progs&&progs.mux)?(f)=>progs.mux(f,'🔀 အသံနဲ့ ပေါင်းနေပါတယ်…'):null);
+ /* V271: the mux is BOUND to the exact expected total
+    ((hook? HOOK_DUR:0) + the segment's output duration): the video
+    side is exact by construction (frames ÷ fpsStr), and any audio
+    overrun past the picture — the user's 2026-11-18 Hardware
+    export ran ~6.5 s of extra audio past the video end — is cut
+    at the bound instead of shipping A/V skew. */
+ const code=await ffExecP(ff,hwMuxArgs(fpsStr,finalMix,idx,(hookOn?HOOK_DUR:0)+durOutMain),3600000,dur,(progs&&progs.mux)?(f)=>progs.mux(f,'🔀 အသံနဲ့ ပေါင်းနေပါတယ်…'):null);
  expPhaseLog(log,'Mux ချိန်',_tMux);
  if(code!==0){await fsCleanHw();throw new Error('ffmpeg exit code '+code+' (mux) — အသေးစိတ်ကို log တွင် ကြည့်ပါ')}
  if(progs&&progs.mux)progs.mux(1);
@@ -6964,7 +7002,13 @@ window.__recapProject={collect:projCollect,apply:applyProject,sigMatch:projSigMa
   else if(kind==='nilar'){ed.audioMode='voice';ed.ttsEngine='edge';ed.edgeVoice='my-MM-NilarNeural'}
   else if(kind==='gemini'){ed.audioMode='voice';ed.ttsEngine='gemini';ed.voice=name}
   if(ed.refresh)ed.refresh();checkVoiceStale();refreshVoiceGate();refreshSummaries();
-  if(kind!=='original'){const dk=E('autoDuck');if(dk&&dk.checked)applyAutoDuck()}
+  /* V271: picking a voice NEVER changes BGM by itself. The old
+     auto-duck call here silently set bgmVol=15 on every pick, so a
+     voiceover export mixed the original track underneath at 15% —
+     heard as a continuous rushing bed behind the voice (the user's
+     2026-11-18 report). The original track now stays OUT of a
+     voiceover unless the user raised the BGM slider himself (or
+     explicitly ticked the mixer duck box, which sets it once). */
   showNotice('✅ အသံ ရွေးပါပြီ: '+voiceFieldLabelOf(ed),'ok');
  }
  /* The picker is a sheet OVER the Voice sheet: ANY close path (a row
@@ -7093,7 +7137,8 @@ window.__recapProject={collect:projCollect,apply:applyProject,sigMatch:projSigMa
   if(!u){showNotice('⚠️ Audio ဒေါင်းရန် အသံ အရင် လိုပါတယ် — 🎙️ Voice Create မှာ "📣 အသံ ထုတ်မယ်" အရင် နှိပ်ပါ','err');return}
   const a=document.createElement('a');a.href=u;a.download=(((ed.file&&ed.file.name)||'recap').replace(/\.[^.]+$/,'').replace(/[^\w\- ]+/g,'').trim()||'recap')+'_voice.'+(ed.renderUrl?'wav':(ed.voiceCache?ed.voiceCache.ext:'wav'));document.body.appendChild(a);a.click();a.remove();showNotice('✅ အသံ ဖိုင် ဒေါင်းနေပါပြီ','ok');
  };
- if(duckEl&&duckEl.checked)applyAutoDuck();
+ /* V271: importing a voice file does not touch BGM either (the
+    auto-duck call that stood here is gone — see selectVoicePick) */
  async function runVoiceGen(){
   if(ed.voiceBusy)return;
   wakeEdgeServer(); /* V245: last pre-warm chance before the lines start */
@@ -7895,7 +7940,7 @@ window.__recapProject={collect:projCollect,apply:applyProject,sigMatch:projSigMa
  const qtS=qtSrtEl();if(qtS)qtS.onclick=()=>{const t=E('subTgl');if(t)t.click();syncMainToggles();updateOverlay();showNotice(t&&t.classList.contains('on')?'စာတန်း ဖွင့်ထားပါတယ်':'စာတန်း ပိတ်ထားပါတယ်','info')};
  const qtV=qtVoiceEl();if(qtV)qtV.onclick=()=>{
   if(ed.audioMode==='voice'){ed.audioMode='original'}
-  else{ed.audioMode='voice';const dk=E('autoDuck');if(dk&&dk.checked)applyAutoDuck()}
+  else{ed.audioMode='voice'} /* V271: toggling voice on does not set BGM (see selectVoicePick) */
   if(ed.refresh)ed.refresh();checkVoiceStale();refreshVoiceGate();syncMainToggles();refreshSummaries();
  };
  const subTglSyncEl=E('subTgl');if(subTglSyncEl)subTglSyncEl.addEventListener('click',()=>syncMainToggles());
